@@ -1,5 +1,6 @@
 from cpymad.madx import Madx
 import json
+from pathlib import Path
 
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
@@ -27,7 +28,6 @@ class LHCOptics:
 
     @staticmethod
     def set_repository(version="2024"):
-        from pathlib import Path
         import subprocess
         import os
         accmodels = Path("acc-models-lhc")
@@ -150,14 +150,14 @@ class LHCOptics:
         return self
 
     def set_xsuite_model(self, model):
-        if os.path.exists(model):
+        if Path(model).exists():
             model = LHCXsuiteModel.from_json(model)
         self.model = model
         self.update_model()
         return self
 
     def set_madx_model(self, model):
-        if os.path.exists(model):
+        if Path(model).exists():
             model = LHCMadModel.from_madxfile(model)
         self.model = model
         self.update_model()

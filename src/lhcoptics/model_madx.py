@@ -73,7 +73,7 @@ use, sequence=lhcb2;
 
         madx = Madx()
         madx.options(echo=False, warn=False, info=False)
-        madx.call(madxfile)
+        madx.call(str(madxfile))
         madx.input(cls.extra_madx)
         return cls(madx)
 
