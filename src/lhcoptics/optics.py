@@ -1,6 +1,5 @@
 from cpymad.madx import Madx
 import json
-import os
 
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
@@ -25,6 +24,24 @@ class LHCOptics:
     Optics containts global knobs, global parameters and sections
     Section contains strengths, local knobs, local parameters
     """
+
+    @staticmethod
+    def set_repository(version="2024"):
+        from pathlib import Path
+        import subprocess
+        import os
+        accmodels = Path("acc-models-lhc")
+        if accmodels.exists():
+            if not (accmodels/"lhc.seq").exists():
+                raise FileNotFoundError("acc-models-lhc/lhc.seq not found")
+            else:
+                if  (accmodels/".git").exists():
+                    subprocess.run(["git", "switch", version], cwd=accmodels)
+        elif (lcl:=(Path.home()/"local"/"acc-models-lhc"/version)).exists():
+            accmodels.symlink_to(lcl)
+        else:
+            subprocess.run(["git", "clone", "https://gitlab.cern.ch/acc-models/lhc.git", "acc-models-lhc"])
+
 
     irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
     arcs = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]

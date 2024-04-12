@@ -156,7 +156,8 @@ use, sequence=lhcb2;
         return knobs
 
 
-    def mad_make_and_set0_knobs(madx, knob_names):
+    def make_and_set0_knobs(self, knob_names):
+        madx=self.madx
         defs = {}
         for knob in knob_names:
             for st in madx.globals:

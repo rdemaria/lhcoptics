@@ -26,15 +26,15 @@ class LHCIR(LHCSection):
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        strength_names += madmodel.filter(madx, f"kq[xt]?.*[lr]{irn}$")
-        quads = madmodel.filter(madx, f"ktq[x].*[lr]{irn}$")
-        quads += madmodel.filter(madx, f"kq[t]?[l]?[0-9][0-9]?\..*[lr]{irn}b[12]$")
+        strength_names += madmodel.filter(f"kq[xt]?.*[lr]{irn}$")
+        quads = madmodel.filter(f"ktq[x].*[lr]{irn}$")
+        quads += madmodel.filter(f"kq[t]?[l]?[0-9][0-9]?\..*[lr]{irn}b[12]$")
         # quads += madmodel.filter(madx, f"kq[t]?.*[lr]{irn}$")
         strength_names += sort_n(quads)
-        acb = madmodel.filter(madx, f"acbx.*[lr]{irn}$")
-        acb += madmodel.filter(madx, f"acb.*[lr]{irn}b[12]$")
+        acb = madmodel.filter(f"acbx.*[lr]{irn}$")
+        acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)
-        knobs = madmodel.make_and_set0_knobs(madx, cls.knobs)
+        knobs = madmodel.make_and_set0_knobs(cls.knobs)
         strengths = {st: madx.globals[st] for st in strength_names}
         for knob in knobs:
             madx.globals[knob] = knobs[knob].value

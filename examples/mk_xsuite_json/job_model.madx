@@ -1,0 +1,5 @@
+call,file="acc-models-lhc/scenarios/pp_lumi/RAMP-SQUEEZE-6.8TeV-ATS-2m-2024_V1/0/model.madx";
+call,file="acc-models-lhc/aperture/aperture.b1.madx";
+call,file="acc-models-lhc/aperture/aperture.b2.madx";
+call,file="acc-models-lhc/aperture/aper_tol.b1.madx";
+call,file="acc-models-lhc/aperture/aper_tol.b2.madx";
