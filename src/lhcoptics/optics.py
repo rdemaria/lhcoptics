@@ -12,7 +12,7 @@ from .ir7 import LHCIR7
 from .ir8 import LHCIR8
 from .arcs import LHCArc
 
-from .section import Knob, mad_make_and_set0_knobs
+from .section import Knob
 from .model_xsuite import LHCXsuiteModel, LHCMadModel
 
 irs = [LHCIR1, LHCIR2]
@@ -67,7 +67,8 @@ class LHCOptics:
 
     @classmethod
     def from_madx(cls, madx, name="lhcoptics", sliced=False, model=None):
-        knobs = mad_make_and_set0_knobs(madx, cls.knobs)
+        madmodel = LHCMadModel(madx)
+        knobs = madmodel.make_and_set0_knobs(cls.knobs)
         irs = [ir.from_madx(madx) for ir in cls.irs]
         arcs = [LHCArc.from_madx(madx, arc) for arc in cls.arcs]
         for k, knob in knobs.items():
@@ -77,7 +78,7 @@ class LHCOptics:
             model = LHCXsuiteModel.from_madx(madx,sliced=sliced)
             self.model=model
         elif model=='madx':
-            self.model = LHCMadModel(madx)
+            self.model = madmodel
         return self
 
 
@@ -159,5 +160,5 @@ class LHCOptics:
             "qpyb2": tw2.muy[-1],
         }
         for ss in self._irs + self._arcs:
-            params.update(ss.get_params())
+            params.update(ss.get_params_from_twiss(tw1, tw2))
         return params

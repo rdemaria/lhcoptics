@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail; IFS=$'\n\t'
 
-NAME=xlay
+NAME=lhcoptics
 VER=$( python -c "import $NAME; print($NAME.__version__)" )
 
 echo "========================================================================"

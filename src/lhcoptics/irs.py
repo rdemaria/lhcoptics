@@ -1,11 +1,10 @@
 from .section import (
     LHCSection,
-    mad_filter,
-    mad_make_and_set0_knobs,
     lhcprev,
     lhcsucc,
     sort_n,
 )
+from .model_madx import LHCMadModel
 
 
 class LHCIR(LHCSection):
@@ -18,22 +17,24 @@ class LHCIR(LHCSection):
     """
 
     knobs = []
+    _extra_param_names = []
 
     @classmethod
     def from_madx(cls, madx, name=None):
+        madmodel=LHCMadModel(madx)
         if name is None:
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        strength_names += mad_filter(madx, f"kq[xt]?.*[lr]{irn}$")
-        quads = mad_filter(madx, f"ktq[x].*[lr]{irn}$")
-        quads += mad_filter(madx, f"kq[t]?[l]?[0-9][0-9]?\..*[lr]{irn}b[12]$")
-        # quads += mad_filter(madx, f"kq[t]?.*[lr]{irn}$")
+        strength_names += madmodel.filter(madx, f"kq[xt]?.*[lr]{irn}$")
+        quads = madmodel.filter(madx, f"ktq[x].*[lr]{irn}$")
+        quads += madmodel.filter(madx, f"kq[t]?[l]?[0-9][0-9]?\..*[lr]{irn}b[12]$")
+        # quads += madmodel.filter(madx, f"kq[t]?.*[lr]{irn}$")
         strength_names += sort_n(quads)
-        acb = mad_filter(madx, f"acbx.*[lr]{irn}$")
-        acb += mad_filter(madx, f"acb.*[lr]{irn}b[12]$")
+        acb = madmodel.filter(madx, f"acbx.*[lr]{irn}$")
+        acb += madmodel.filter(madx, f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)
-        knobs = mad_make_and_set0_knobs(madx, cls.knobs)
+        knobs = madmodel.make_and_set0_knobs(madx, cls.knobs)
         strengths = {st: madx.globals[st] for st in strength_names}
         for knob in knobs:
             madx.globals[knob] = knobs[knob].value
@@ -62,6 +63,8 @@ class LHCIR(LHCSection):
         self.irn = irn
         self.startb12 = {1: f"s.ds.l{irn}.b1", 2: f"s.ds.l{irn}.b2"}
         self.endb12 = {1: f"e.ds.r{irn}.b1", 2: f"e.ds.r{irn}.b2"}
+        self.param_names=self._get_param_default_names()
+        self.param_names.extend(self._extra_param_names)
 
     @property
     def arc_left(self):
@@ -124,6 +127,20 @@ class LHCIR(LHCSection):
                 figlabel = f"{self.name}b{beam}"
             return mktwiss(beam).plot(figlabel=figlabel)
 
+    def _get_param_default_names(self):
+        ipname = f"ip{self.irn}"
+        params = []
+        for param in "betx bety alfx alfy dx dy".split():
+            for beam in '12':
+                params.append(f"{param}{ipname}{beam}")
+        for param in "mux muy".split():
+            for beam in '12':
+                params.append(f"{param}{ipname}b{beam}")
+                params.append(f"{param}{ipname}b{beam}_l")
+                params.append(f"{param}{ipname}b{beam}_r")
+        return params
+
+
     def get_params_from_twiss(self, tw1, tw2):
         ipname = f"ip{self.irn}"
         params = {}
@@ -132,15 +149,15 @@ class LHCIR(LHCSection):
                 params[f"{param}{ipname}{beam}"] = tw[param, ipname]
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
+                params[f"{param}{ipname}b{beam}"] = (
+                    tw[param, self.endb12[beam]]
+                    - tw[param, self.startb12[beam]]
+                )
                 params[f"{param}{ipname}b{beam}_l"] = (
                     tw[param, ipname] - tw[param, self.startb12[beam]]
                 )
                 params[f"{param}{ipname}b{beam}_r"] = (
                     tw[param, self.endb12[beam]] - tw[param, ipname]
-                )
-                params[f"{param}{ipname}b{beam}"] = (
-                    tw[param, self.endb12[beam]]
-                    - tw[param, self.startb12[beam]]
                 )
         return params
 

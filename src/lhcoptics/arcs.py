@@ -1,4 +1,4 @@
-from .section import LHCSection, mad_filter
+from .section import LHCSection
 from .model_xsuite import LHCMadModel
 import xtrack as xt
 
@@ -6,15 +6,16 @@ import xtrack as xt
 class LHCArc(LHCSection):
     @classmethod
     def from_madx(cls, madx, name="a12"):
+        madmodel = LHCMadModel(madx)
         i1, i2 = int(name[1]), int(name[2])
         strength_names = []
-        strength_names += mad_filter(madx, f"kq[fd]\.*{name}$")
-        strength_names += mad_filter(madx, f"kqt[fd]\.*{name}b[12]$")
-        strength_names += mad_filter(madx, f"kqs\.*{name}b[12]$")
-        strength_names += mad_filter(madx, f"ksq\.*r{i1}b[12]$")
-        strength_names += mad_filter(madx, f"ksq\.*l{i2}b[12]$")
-        strength_names += mad_filter(madx, f"ks[fd][12]\.*{name}b[12]$")
-        strength_names += mad_filter(madx, f"ko[fd]\.*{name}b[12]$")
+        strength_names += madmodel.filter(madx, f"kq[fd]\.*{name}$")
+        strength_names += madmodel.filter(madx, f"kqt[fd]\.*{name}b[12]$")
+        strength_names += madmodel.filter(madx, f"kqs\.*{name}b[12]$")
+        strength_names += madmodel.filter(madx, f"ksq\.*r{i1}b[12]$")
+        strength_names += madmodel.filter(madx, f"ksq\.*l{i2}b[12]$")
+        strength_names += madmodel.filter(madx, f"ks[fd][12]\.*{name}b[12]$")
+        strength_names += madmodel.filter(madx, f"ko[fd]\.*{name}b[12]$")
         knobs = {}
         params = {}
         strengths = {st: madx.globals[st] for st in strength_names}
@@ -105,9 +106,7 @@ class LHCArc(LHCSection):
                 figlabel = f"{self.name}b{beam}"
             return twiss.plot(figlabel=figlabel)
 
-    def get_params(self):
-        """Get params from model"""
-        tw1, tw2 = self.twiss()
+    def get_params_from_twiss(self, tw1, tw2):
         params = {
             f"mux{self.name}b1": tw1.mux[-1],
             f"muy{self.name}b1": tw1.muy[-1],
@@ -123,6 +122,12 @@ class LHCArc(LHCSection):
             - tw2["muy", self.start_cell[2]],
         }
         return params
+
+
+    def get_params(self):
+        """Get params from model"""
+        tw1, tw2 = self.twiss()
+        return self.get_params_from_twiss(tw1, tw2)
 
 
 class ActionArcPhaseAdvance(xt.Action):
