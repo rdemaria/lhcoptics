@@ -1,3 +1,6 @@
+
+import xtrack as xt
+
 from .section import (
     LHCSection,
     lhcprev,
@@ -18,10 +21,11 @@ class LHCIR(LHCSection):
 
     knobs = []
     _extra_param_names = []
+    default_twiss_method = "init"
 
     @classmethod
     def from_madx(cls, madx, name=None):
-        madmodel=LHCMadModel(madx)
+        madmodel = LHCMadModel(madx)
         if name is None:
             name = cls.name
         irn = int(name[-1])
@@ -63,8 +67,18 @@ class LHCIR(LHCSection):
         self.irn = irn
         self.startb12 = {1: f"s.ds.l{irn}.b1", 2: f"s.ds.l{irn}.b2"}
         self.endb12 = {1: f"e.ds.r{irn}.b1", 2: f"e.ds.r{irn}.b2"}
-        self.param_names=self._get_param_default_names()
+        self.param_names = self._get_param_default_names()
         self.param_names.extend(self._extra_param_names)
+
+    def __repr__(self):
+        if self.parent is not None:
+            return f"<LHCIR{self.ipname} in {self.parent}"
+        elif self.filename is not None:
+            return f"<LHCIR{self.ipname} from {self.filename}"
+        else:
+            return f"<LHCIR{self.ipname}"
+    
+
 
     @property
     def arc_left(self):
@@ -102,7 +116,24 @@ class LHCIR(LHCSection):
         )
 
     def twiss_from_params(self, beam):
-        pass
+        if beam is None:
+            return [
+                self.twiss_from_params(beam=1),
+                self.twiss_from_params(beam=2),
+            ]
+        sequence = self.model.sequence[beam]
+        init = xt.TwissInit(
+            element_name=self.ipname,
+            betx=self.params[f"betx{self.ipname}{beam}"],
+            alfx=self.params[f"alfx{self.ipname}{beam}"],
+            bety=self.params[f"bety{self.ipname}{beam}"],
+            alfy=self.params[f"alfy{self.ipname}{beam}"],
+            dx=self.params[f"dx{self.ipname}{beam}"],
+            dy=self.params[f"dy{self.ipname}{beam}"],
+        )
+        return sequence.twiss(
+            start=self.startb12[beam], end=self.endb12[beam], init=init
+        )
 
     def twiss_full(self, beam):
         if beam is None:
@@ -113,15 +144,23 @@ class LHCIR(LHCSection):
         init = sequence.twiss().get_twiss_init(start)
         return sequence.twiss(start=start, end=end, init=init)
 
-    def plot(self, beam=None, model="init", figlabel=None):
+    def twiss(self, beam=None, method="init"):
+        if method == "init":
+            return self.twiss_from_init(beam)
+        elif method == "full":
+            return self.twiss_full(beam)
+        elif method == "params":
+            return self.twiss_from_params(beam)
+
+    def plot(self, beam=None, method="init", figlabel=None):
         if beam is None:
             return [self.plot(beam=1), self.plot(beam=2)]
         else:
-            if model == "init":
+            if method == "init":
                 mktwiss = self.twiss_from_init
-            elif model == "full":
+            elif method == "full":
                 mktwiss = self.twiss_full
-            elif model == "params":
+            elif method == "params":
                 mktwiss = self.twiss_from_params
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
@@ -131,15 +170,14 @@ class LHCIR(LHCSection):
         ipname = f"ip{self.irn}"
         params = []
         for param in "betx bety alfx alfy dx dy".split():
-            for beam in '12':
+            for beam in "12":
                 params.append(f"{param}{ipname}{beam}")
         for param in "mux muy".split():
-            for beam in '12':
+            for beam in "12":
                 params.append(f"{param}{ipname}b{beam}")
                 params.append(f"{param}{ipname}b{beam}_l")
                 params.append(f"{param}{ipname}b{beam}_r")
         return params
-
 
     def get_params_from_twiss(self, tw1, tw2):
         ipname = f"ip{self.irn}"

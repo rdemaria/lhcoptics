@@ -4,6 +4,9 @@ import xtrack as xt
 
 
 class LHCArc(LHCSection):
+
+    default_twiss_method = "periodic"
+
     @classmethod
     def from_madx(cls, madx, name="a12"):
         madmodel = LHCMadModel(madx)
@@ -43,6 +46,7 @@ class LHCArc(LHCSection):
         self.endb = {1: f"e.ds.l{i2}.b1", 2: f"e.ds.l{i2}.b2"}
 
     def twiss_init(self, beam):
+        """Get twiss init at the beginning and end of the arc."""
         tw = self.twiss(beam)
         return [
             tw.get_twiss_init(self.startb[beam]),
@@ -50,6 +54,7 @@ class LHCArc(LHCSection):
         ]
 
     def twiss_cell(self, beam=None):
+        """Get twiss table of periodic cell."""
         if beam is None:
             return [self.twiss_cell(beam=1), self.twiss_cell(beam=2)]
         sequence = self.model.sequence[beam]
@@ -57,7 +62,8 @@ class LHCArc(LHCSection):
         end_cell = self.end_cell[beam]
         return sequence.twiss(start=start_cell, end=end_cell, init="periodic")
 
-    def twiss_cell_init(self, beam):
+    def twiss_init_cell(self, beam):
+        """Get twiss init at the beginning of the cell."""
         sequence = self.model.sequence[beam]
         start_cell = self.start_cell[beam]
         end_cell = self.end_cell[beam]
@@ -70,6 +76,7 @@ class LHCArc(LHCSection):
         return twinit_cell
 
     def twiss_full(self, beam=None):
+        """Get twiss table of full arc of the full LHC periodic solution"""
         if beam is None:
             return [self.twiss_full(beam=1), self.twiss_full(beam=2)]
         else:
@@ -79,11 +86,12 @@ class LHCArc(LHCSection):
             init = sequence.twiss().get_twiss_init(start)
             return sequence.twiss(start=start, end=end, init=init)
 
-    def twiss(self, beam=None):
+    def twiss_periodic(self, beam=None):
+        """Get twiss table of matched arc."""
         if beam is None:
             return [self.twiss(beam=1), self.twiss(beam=2)]
         else:
-            twinit_cell = self.twiss_cell_init(beam)
+            twinit_cell = self.twiss_init_cell(beam)
             start_arc = self.startb[beam]
             end_arc = self.endb[beam]
 
@@ -97,14 +105,6 @@ class LHCArc(LHCSection):
 
             return res
 
-    def plot(self, beam=None, method="periodic", figlabel=None):
-        if beam is None:
-            return [self.plot(beam=1), self.plot(beam=2)]
-        else:
-            twiss = self.twiss(beam)
-            if figlabel is None:
-                figlabel = f"{self.name}b{beam}"
-            return twiss.plot(figlabel=figlabel)
 
     def get_params_from_twiss(self, tw1, tw2):
         params = {

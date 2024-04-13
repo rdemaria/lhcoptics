@@ -1,5 +1,7 @@
 import re
 import json
+from pathlib import Path
+
 
 from .model_madx import LHCMadModel
 from .knob import Knob
@@ -37,6 +39,11 @@ class LHCSection:
 
     It can be updated from the model and update the model with the local values.
 
+    Needs:
+       twiss_<method>() to return a twiss table
+       get_params() method to return the parameters at the end of the section
+       get_params_from_twiss() method to return the parameters from a twiss table
+
     """
     def __init__(
         self,
@@ -61,6 +68,9 @@ class LHCSection:
         self.params = params
         self.knobs = knobs
         self.parent = parent
+
+    def __repr__(self):
+        return f"<LHCSection {self.name} {self.start}/{self.end}>"
 
     @property
     def model(self):
@@ -115,8 +125,31 @@ class LHCSection:
             "knobs": self.knobs,
         }
 
-    def __repr__(self):
-        return f"<LHCSection {self.name} {self.start}/{self.end}>"
+    
+    def to_madx(self,out=str):
+        out=[]
+        out.append(f"! {self.name}\n")
+        out.append(f"! Parameters\n")
+        for k, v in self.params.items():
+            out.append(f"{k:30} = {v:19.16f};")
+        out.append(f"! Strengths\n")
+        for k, v in self.strengths.items():
+            out.append(f"{k:30} = {v:19.16f};")
+        out.append(f"! Knobs\n")
+        for expr in LHCMadModel.knobs_to_expr(self.knobs,self.strengths):
+            out.append(expr)
+        if out is str:
+            return "\n".join(out)
+        elif hasattr(self,'input'):
+            for ll in out:
+                if ll[0]!='!':
+                    self.input(ll)
+        elif hasattr(self,'writelines'):
+            self.writelines(out)
+        elif isinstance(out,str) or isinstance(out,Path):
+            with open(out,'w') as f:
+                f.writelines(out)    
+
 
     def copy(self):
         return self.__class__.from_dict(self.to_dict())
@@ -172,3 +205,21 @@ class LHCSection:
         self.update_knobs(src)
         self.update_params(src)
         return self
+
+    def twiss(self, beam=None, method=None):
+        """Return twiss table from the model using specific methods."""
+        if method is None:
+            method = self.default_twiss_method
+        return getattr(self,"twiss_"+method)(beam)
+
+
+    def plot(self, beam=None, method="periodic", figlabel=None):
+        if beam is None:
+            return [self.plot(beam=1), self.plot(beam=2)]
+        else:
+            twiss = self.twiss(beam,method=method)
+            if figlabel is None:
+                figlabel = f"{self.name}b{beam}"
+            return twiss.plot(figlabel=figlabel)
+        
+    

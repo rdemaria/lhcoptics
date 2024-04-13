@@ -66,6 +66,18 @@ beam, particle=proton, energy=6.8e12, sequence=lhcb2, bv=-1;
 use, sequence=lhcb1;
 use, sequence=lhcb2;
     """
+    @staticmethod
+    def knobs_to_expr(knobs,strengths=None):
+        if strengths is None:
+            strengths = {}
+        weights = {}
+        for knob in knobs:
+            for st,val in knob.weights.items():
+                weights.setdefault(st,[]).append(f"{val:+.15g}*{knob.name}")
+        for st in weights:
+            if st in strengths:
+                weights[st].insert(f"{strengths[st]:+.15g}",0)
+        return [f"{st}:={''.join(weights[st])};" for st in weights]
 
     @classmethod
     def from_madxfile(cls, madxfile):
