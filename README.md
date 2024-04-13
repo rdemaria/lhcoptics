@@ -4,13 +4,16 @@ Build LHC optics
 
 Usage:
 ```
+git clone githttps://github.com/rdemaria/lhcoptics.git
+cd lhcoptics
+pip install -e .
 python examples/data/make.py
 ```
 
 ```
 from lhcoptics import LHCOptics
-inj=LHCOptics.from_json("data/opt_inj.json")
-inj.set_xsuite_model("data/lhc.json") # set an xsuite model
+inj=LHCOptics.from_json("examples/data/opt_inj.json")
+inj.set_xsuite_model("examples/data/lhc.json") # set an xsuite model
 inj.ir5.plot()
 ```
 
@@ -21,17 +24,19 @@ Currently needs `github.com/rdemaria/xtrack` branch `attr_in_twiss`
 An `LHCOptics` contains data for specifying a full LHC Optics. It contains global params and knobs and a list of LHC sections (`ir1`, `ir2`, ... , `ir8`, `a12`, `a23`, ..., `a78`) that contains strengths, local params and local knobs. The optics can contain a `model` that allows to compute twiss, plot and rematch the optics.
 
 Methods:
-- `cls.from_json(filename)`: Create optics from a json file
-- `cls.from_dict(dct)`: Create optics from a dict containing strengths, paramns and knobs, irs and arcs dict
-- `cls.from_madx(filename,model)`: Create optics from a madx istance by extracting strengths, params and knobs from variables. If model is 'madx' or 'xsuite' it will attach the model to the optics
-- `cls.from_madxfile(madxfile)`: As before, but creating a madx instance from a madx script
+- `LHCOptics.set_repository(branch)`: Create a link or a directory `acc-models-lhc` in the local directory from `gitlab.cern.ch/acc-models/acc-models-lhc` if it does not exists. Branch are `2024`, `hl16` etc. If `$HOME/local/acc-models-lhc/branch` exists, a symlink to this directory is created, else the a full git clone is done.
+
+- `LHCOptics.from_json(filename)`: Create optics from a json file
+- `LHCOptics.from_dict(dct)`: Create optics from a dict containing strengths, paramns and knobs, irs and arcs dict
+- `LHCOptics.from_madx(filename,model)`: Create optics from a madx istance by extracting strengths, params and knobs from variables. If model is 'madx' or 'xsuite' it will attach the model to the optics
+- `LHCOptics.from_madxfile(madxfile)`: As before, but creating a madx instance from a madx script
 
 
 ## LHC section methods
 An `LHCSection`  is indentified by name, start, end, strengths, params and knobs. A LHCSection is specialzed in LHC Arcs and LHCIRs.
 
 Methods:
-- `cls.from_json(filename)`: Create section  from a json file
+- `.from_json(filename)`: Create section  from a json file
 - `cls.from_dict(dct)`: Create section from a dict containing strengths, paramns and knobs
 - `cls.from_madxfile(filename)`: Create section from a madx file
 - `cls.from_madx(madx)`: Create section from a madx instance
