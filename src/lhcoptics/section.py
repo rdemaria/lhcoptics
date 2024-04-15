@@ -191,7 +191,7 @@ class LHCSection:
         Update existing params from self. model or src.params or src
         """
         if src is None:
-            src = self.model
+            src = self.get_params()
         elif hasattr(src,"params"):
             src = src.params
         for k in self.params:

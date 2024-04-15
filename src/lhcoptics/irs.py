@@ -1,5 +1,5 @@
-
 import xtrack as xt
+import numpy as np
 
 from .section import (
     LHCSection,
@@ -65,6 +65,7 @@ class LHCIR(LHCSection):
         self.init_left = None
         self.init_right = None
         self.irn = irn
+        self.ipname = f"ip{irn}"
         self.startb12 = {1: f"s.ds.l{irn}.b1", 2: f"s.ds.l{irn}.b2"}
         self.endb12 = {1: f"e.ds.r{irn}.b1", 2: f"e.ds.r{irn}.b2"}
         self.param_names = self._get_param_default_names()
@@ -77,8 +78,6 @@ class LHCIR(LHCSection):
             return f"<LHCIR{self.ipname} from {self.filename}"
         else:
             return f"<LHCIR{self.ipname}"
-    
-
 
     @property
     def arc_left(self):
@@ -167,7 +166,7 @@ class LHCIR(LHCSection):
             return mktwiss(beam).plot(figlabel=figlabel)
 
     def _get_param_default_names(self):
-        ipname = f"ip{self.irn}"
+        ipname = self.ipname
         params = []
         for param in "betx bety alfx alfy dx dy".split():
             for beam in "12":
@@ -180,20 +179,24 @@ class LHCIR(LHCSection):
         return params
 
     def get_params_from_twiss(self, tw1, tw2):
-        ipname = f"ip{self.irn}"
+        ipname = self.ipname
         params = {}
-        for param in "betx bety alfx alfy dx dy".split():
+        for param in "betx bety alfx alfy dx dpx".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
-                params[f"{param}{ipname}{beam}"] = tw[param, ipname]
+                params[f"{param}{ipname}b{beam}"] = tw[param, ipname]
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}"] = (
                     tw[param, self.endb12[beam]]
                     - tw[param, self.startb12[beam]]
                 )
+        for param in "mux muy".split():
+            for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_l"] = (
                     tw[param, ipname] - tw[param, self.startb12[beam]]
                 )
+        for param in "mux muy".split():
+            for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_r"] = (
                     tw[param, self.endb12[beam]] - tw[param, ipname]
                 )
@@ -206,4 +209,52 @@ class LHCIR(LHCSection):
         elif mode == "full":
             tw1 = self.twiss_full(1)
             tw2 = self.twiss_full(2)
-        return self.get_params_from_twiss(tw1, tw2)
+        params = self.get_params_from_twiss(tw1, tw2)
+        return {k: np.round(v, 8) for k, v in params.items()}
+
+    def get_match_targets(self):
+        inits_l = [self.init_left[1], self.init_left[2]]
+        inits_r = [self.init_right[1], self.init_right[2]]
+        ends = [self.endb12[1], self.endb12[2]]
+        lines = [f"b{beam}" for beam in [1, 2]]
+
+        targets = []
+
+        for ll, init, end in zip(lines, inits_r, ends):
+            for tt in ["alfx", "alfy", "betx", "bety", "dx", "dpx"]:
+                targets.append(
+                    xt.Target(
+                        tt,
+                        getattr(init, tt),
+                        line=ll,
+                        at=end,
+                        tag="matchtoarc",
+                    )
+                )
+
+        for tt in ["mux", "muy"]:
+            for ll, end in zip(lines, ends):
+                targets.append(
+                    xt.Target(
+                        tt,
+                        self.params[f"{tt}{self.ipname}{ll}"],
+                        line=ll,
+                        at=end,
+                        tag="phase",
+                    )
+                )
+
+        for tt in ["betx", "bety", "alfx", "alfy", "dx", "dpx"]:
+            for ll, end in zip(lines, ends):
+                targets.append(
+                    xt.Target(
+                        tt,
+                        self.params[f"{tt}{self.ipname}{ll}"],
+                        line=ll,
+                        at=self.ipname,
+                        tol=1e-1,
+                        tag="ipcond",
+                    )
+                )
+
+        return targets

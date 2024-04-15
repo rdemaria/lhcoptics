@@ -52,6 +52,8 @@ class LHCXsuiteModel:
                 lines[f"{ln}s"] = ls
 
         lhc = xt.Multiline(lines)
+        lines["b1"].build_tracker()
+        lines["b2"].build_tracker()
         out = cls(multiline=lhc)
         return out
 

@@ -201,11 +201,11 @@ class MADSequence:
 
     @property
     def start(self):
-        self.madx_sequence.elemnts[1].name
+        self.madx_sequence.elements[1].name
 
     @property
     def end(self):
-        self.madx_sequence.elemnts[-2].name
+        self.madx_sequence.elements[-2].name
 
     def twiss(
         self,
