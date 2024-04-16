@@ -42,15 +42,22 @@ class LHCArc(LHCSection):
         self.i2 = i2
         self.start_cell = {1: f"s.cell.{i1}{i2}.b1", 2: f"s.cell.{i1}{i2}.b2"}
         self.end_cell = {1: f"e.cell.{i1}{i2}.b1", 2: f"e.cell.{i1}{i2}.b2"}
-        self.startb = {1: f"s.ds.r{i1}.b1", 2: f"s.ds.r{i1}.b2"}
-        self.endb = {1: f"e.ds.l{i2}.b1", 2: f"e.ds.l{i2}.b2"}
+        self.startb = {1: f"e.ds.r{i1}.b1", 2: f"e.ds.r{i1}.b2"}
+        self.endb = {1: f"s.ds.l{i2}.b1", 2: f"s.ds.l{i2}.b2"}
 
     def twiss_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
         tw = self.twiss(beam)
+        start= tw.get_twiss_init(self.startb[beam])
+        end= tw.get_twiss_init(self.endb[beam])
+        start.mux=0
+        start.muy=0
+        end.mux=0
+        end.muy=0
         return [
-            tw.get_twiss_init(self.startb[beam]),
-            tw.get_twiss_init(self.endb[beam]),
+            start,
+            end
+
         ]
 
     def twiss_cell(self, beam=None):

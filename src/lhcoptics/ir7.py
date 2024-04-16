@@ -168,7 +168,7 @@ class LHCIR7(LHCIR):
         lhc = self.parent.model.multiline
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
-        if lhc.b2 is None:
+        if lhc.b2.tracker is None:
             lhc.b2.build_tracker()
         self.action_sp1 = SinglePassDispersion(
             lhc.b1, ele_start="tcp.d6l7.b1", ele_stop="tcspm.6r7.b1"
@@ -207,7 +207,7 @@ class LHCIR7(LHCIR):
             for tt in ["betx", "bety"]:
                 vv = self.params[f"{tt}_{cn}"]
                 tt = xt.Target(
-                    "betx",
+                    tt,
                     xt.GreaterThan(vv),
                     line=line,
                     at=cn,
@@ -215,6 +215,11 @@ class LHCIR7(LHCIR):
                     tag="coll",
                 )
                 colltargets.append(tt)
+
+        varylst = [
+            xt.Vary(kk, limits=[-0.1, 0.1], step=1e-9)
+            for kk in self.quads
+        ]
 
         opt = lhc.match(
             solve=False,
@@ -225,8 +230,9 @@ class LHCIR7(LHCIR):
             end=ends,
             init=inits,
             targets=(std_targets + sp_targets + colltargets),
-            vary=xt.VaryList(self.quads.keys()),
+            vary=varylst,
         )
         opt.disable_targets(tag="coll")
         opt.disable_targets(tag="spdx")
+        self.opt = opt
         return opt

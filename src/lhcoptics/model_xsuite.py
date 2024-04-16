@@ -1,15 +1,16 @@
 from .model_madx import LHCMadModel
 
+
 class LHCXsuiteModel:
     @classmethod
     def from_madxfile(cls, madxfile, sliced=False):
         """
         Create a LHCXsuiteModel from a MAD-X input file
         """
-        madmodel=LHCMadModel.from_madxfile(madxfile)
+        madmodel = LHCMadModel.from_madxfile(madxfile)
 
-        self=cls.from_madx(madmodel.madx, sliced=sliced, madxfile=madxfile)
-        self.madxfile=madxfile
+        self = cls.from_madx(madmodel.madx, sliced=sliced, madxfile=madxfile)
+        self.madxfile = madxfile
         return self
 
     @classmethod
@@ -136,5 +137,29 @@ class LHCXsuiteModel:
         if hasattr(src, "knobs"):
             self.update_knobs(src.knobs)
 
-
-
+    def twiss(
+        self,
+        start=None,
+        end=None,
+        init=None,
+        beam=None,
+        full=False,
+        chrom=False,
+    ):
+        if beam is None:
+            return self.twiss(
+                start=start, end=end, init=init, beam=1, full=full, chrom=chrom
+            ), self.twiss(
+                start=start, end=end, init=init, beam=2, full=full, chrom=chrom
+            )
+        line = self.sequence[beam]
+        startout = line.element_names[0] if start is None else start
+        endout = line.element_names[-1] if end is None else end
+        startmac = line.element_names[0] if full is None else start
+        endmac = line.element_names[-1] if full is None else end
+        if init is None:
+            tw = line.twiss(start=startmac, end=endmac, init="periodic")
+            if full:
+                tw = tw.rows[startout:endout]  # can fail because of cycle
+        else:
+            tw = line.twiss(start=startout, end=endout, init=init)

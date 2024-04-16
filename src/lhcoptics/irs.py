@@ -213,7 +213,6 @@ class LHCIR(LHCSection):
         return {k: np.round(v, 8) for k, v in params.items()}
 
     def get_match_targets(self):
-        inits_l = [self.init_left[1], self.init_left[2]]
         inits_r = [self.init_right[1], self.init_right[2]]
         ends = [self.endb12[1], self.endb12[2]]
         lines = [f"b{beam}" for beam in [1, 2]]
