@@ -158,7 +158,7 @@ class LHCIR7(LHCIR):
             "betxip7b1": 0.8,
         }
 
-    def match(self):
+    def match(self,kminmarg=0.0,kmaxmarg=0.00):
         if self.init_left is None or self.init_right is None:
             self.set_init()
         if len(self.params) == 0:
@@ -216,10 +216,15 @@ class LHCIR7(LHCIR):
                 )
                 colltargets.append(tt)
 
-        varylst = [
-            xt.Vary(kk, limits=[-0.1, 0.1], step=1e-9)
-            for kk in self.quads
-        ]
+        varylst = []
+
+        for kk in self.quads:
+            limits = self.parent.circuits[kk].get_klimits()
+            limits[0]*=(1+kminmarg)
+            limits[1]*=(1-kmaxmarg)
+            varylst.append(
+                xt.Vary(kk, limits=limits, step=1e-9)
+            )
 
         opt = lhc.match(
             solve=False,
@@ -231,6 +236,7 @@ class LHCIR7(LHCIR):
             init=inits,
             targets=(std_targets + sp_targets + colltargets),
             vary=varylst,
+            check_limits=False
         )
         opt.disable_targets(tag="coll")
         opt.disable_targets(tag="spdx")

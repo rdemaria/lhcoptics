@@ -186,7 +186,7 @@ class LHCSection:
         for k in self.knobs:
             self.knobs[k] = src[k]
 
-    def update_params(self,src=None):
+    def update_params(self,src=None,add=False):
         """
         Update existing params from self. model or src.params or src
         """
@@ -194,8 +194,11 @@ class LHCSection:
             src = self.get_params()
         elif hasattr(src,"params"):
             src = src.params
-        for k in self.params:
-            self.params[k] = src[k]
+        if add:
+            self.params.update(src)
+        else:
+            for k in self.params:
+               self.params[k] = src[k]
 
     def update(self, src=None):
         """

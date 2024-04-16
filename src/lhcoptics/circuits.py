@@ -2,6 +2,9 @@ import json
 import numpy as np
 
 
+_lsa = None
+
+
 def madname_from_pcname(pc):
     name = ".".join(pc.split(".")[2:]).lower()
     if name.startswith("rcb"):
@@ -10,42 +13,61 @@ def madname_from_pcname(pc):
         return "k" + name[1:]
 
 
+def get_lsa():
+    global _lsa
+    if _lsa is None:
+        import pjlsa
+
+        _lsa = pjlsa.LSAClient()
+    return _lsa
+
+
 class LHCCircuits:
     @staticmethod
-    def get_pc_names_from_lsa(lsa):
+    def get_pc_names_from_lsa():
+        lsa = get_lsa()
         pcs = lsa.findParameterNames(groupName="ALL MAGNETS", regexp=".*/IREF")
         pcs = [pc.split("/IREF")[0] for pc in pcs]
         return pcs
 
     @staticmethod
-    def get_calibs_from_lsa(calibnames,lsa):
-        req=lsa._cern.lsa.domain.devices.CalibrationsRequest.byCalibrationNames(calibnames)
+    def get_calibs_from_lsa(calibnames):
+        lsa = get_lsa()
+        req = lsa._cern.lsa.domain.devices.CalibrationsRequest.byCalibrationNames(
+            calibnames
+        )
         calibs = lsa._deviceService.findCalibrations(req)
-        calibrations={}
+        calibrations = {}
         for lsacalib in calibs:
-            calib=LHCCalibration.from_lsa_calib(lsacalib)
-            calibrations[calib.name]=calib
+            calib = LHCCalibration.from_lsa_calib(lsacalib)
+            calibrations[calib.name] = calib
         return calibrations
 
     @classmethod
-    def from_lsa(cls, lsa=None):
-        if lsa is None:
-            import pjlsa
-
-            lsa = pjlsa.LSAClient()
-        pcnames = cls.get_pc_names_from_lsa(lsa)
+    def from_lsa(cls):
+        lsa = get_lsa()
+        pcnames = cls.get_pc_names_from_lsa()
         circuits = {}
         for pcname in pcnames:
-            cir = LHCCircuit.from_lsa(pcname, lsa)
+            cir = LHCCircuit.from_lsa(pcname)
             circuits[cir.madname] = cir
-        calibnames={cir.calibname for cir in circuits.values() if cir.calibname is not None} 
-        calibrations = cls.get_calibs_from_lsa(calibnames,lsa)
+        calibnames = {
+            cir.calibname
+            for cir in circuits.values()
+            if cir.calibname is not None
+        }
+        calibrations = cls.get_calibs_from_lsa(calibnames)
         return cls(circuits, calibrations=calibrations)
 
     @classmethod
     def from_dict(cls, dct):
-        circuits = {k: LHCCircuit.from_dict(v) for k, v in dct["circuits"].items()}
-        calibrations = {k: LHCCalibration.from_dict(v) for k, v in dct["calibrations"].items()}
+        circuits = {
+            k: LHCCircuit.from_dict(v) for k, v in dct["circuits"].items()
+        }
+        calibrations = {
+            k: LHCCalibration.from_dict(v)
+            for k, v in dct["calibrations"].items()
+        }
         return cls(circuits, calibrations)
 
     @classmethod
@@ -60,8 +82,9 @@ class LHCCircuits:
             calibrations = {}
         self.calibrations = calibrations
         for cir in self.circuits.values():
-            cir._calib=self.calibrations.get(cir.calibname)
-
+            cir._calib = self.calibrations.get(cir.calibname)
+            if cir._calib is not None and cir._calib.imin < 0:
+                cir.imin = -cir.imax
 
     def to_dict(self):
         return {
@@ -74,7 +97,7 @@ class LHCCircuits:
     def to_json(self, filename):
         with open(filename, "w") as f:
             json.dump(self.to_dict(), f)
-
+        return self
 
     def __getitem__(self, key):
         return self.circuits[key]
@@ -85,31 +108,31 @@ class LHCCircuits:
 
 class LHCCircuit:
     @staticmethod
-    def get_logicalhardware_from_lsa(pcname, lsa):
+    def get_logicalhardware_from_lsa(pcname):
         """
         Contains also Rtot,Ltot, tau
         """
         return (
-            lsa._deviceService.findLogicalHardwaresByActualDeviceNames(
-                [pcname]
-            )
+            get_lsa()
+            ._deviceService.findLogicalHardwaresByActualDeviceNames([pcname])
             .get(pcname)
             .toArray()[0]
         )
 
     @staticmethod
-    def get_pcinfo_from_lsa(pcname, lsa):
-        return lsa._deviceService.findPowerConverterInfo(pcname)
+    def get_pcinfo_from_lsa(pcname):
+        return get_lsa()._deviceService.findPowerConverterInfo(pcname)
 
     @classmethod
-    def from_lsa(cls, pcname, lsa):
-        pcinfo = cls.get_pcinfo_from_lsa(pcname, lsa)
-        lh = cls.get_logicalhardware_from_lsa(pcname, lsa)
+    def from_lsa(cls, pcname):
+        pcinfo = cls.get_pcinfo_from_lsa(pcname)
+        lh = cls.get_logicalhardware_from_lsa(pcname)
         return cls(
             pcname=pcname,
             logicalname=lh.getName(),
             madname=lh.getMadStrengthName(),
             calibname=lh.getCalibrationName(),
+            calibsign=lh.getCalibrationSign(),
             imin=pcinfo.getIMinOp(),
             imax=pcinfo.getIPNo(),
             inominal=pcinfo.getINom(),
@@ -143,7 +166,7 @@ class LHCCircuit:
         vpmax=0,
         polarity=0,
         calibname=None,
-        calibsign=0,
+        calibsign=None,
         r1=0,
         l1=0,
         c1=0,
@@ -170,24 +193,28 @@ class LHCCircuit:
         self.vpmin = vpmin
         self.polarity = polarity
 
-    def get_calib_from_lsa(self, lsa):
-        pcname = self.pcname
-        req = lsa._cern.lsa.domain.devices.CalibrationsRequest.byLogicalHardwareName(
-            pcname
-        )
-        calib = lsa._deviceService.findCalibration(req)
-        if calib is None:
-            raise ValueError(f"Calibration not found for {pcname}")
-        calib = calib.getCalibrationFunctionMap().values().toArray()[0]
-        field = np.array(calib.toXArray())
-        current = np.array(calib.toYArray())
-        return current, field
-
     def to_dict(self):
-        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        return {
+            k: v for k, v in self.__dict__.items() if not k.startswith("_")
+        }
 
     def __repr__(self) -> str:
         return f"<LHCCircuit {self.pcname!r}>"
+
+    def get_field(self, current):
+        return self._calib.get_field(current) * self.calibsign
+
+    def get_klimits(self, pc=7e12):
+        brho = pc / 299792458
+        limits = self.get_field([self.imin, self.imax]) / brho
+        limits.sort()
+        return limits
+
+    def get_lsa_pcinfo(self):
+        return LHCCircuit.get_pcinfo_from_lsa(self.pcname)
+
+    def get_lsa_logicalhardware(self):
+        return LHCCircuit.get_logicalhardware_from_lsa(self.pcname)
 
 
 class LHCCircuit2in1:
@@ -201,9 +228,9 @@ class LHCCalibration:
     @classmethod
     def from_lsa_calib(cls, calib):
         name = calib.getName()
-        map=calib.getCalibrationFunctionMap()
+        map = calib.getCalibrationFunctionMap()
         for calibfuntype in map.keys():
-            if calibfuntype.getFunctionTypeName()=="B_FIELD":
+            if calibfuntype.getFunctionTypeName() == "B_FIELD":
                 break
         calibfun = map[calibfuntype]
         field = np.array(calibfun.toXArray())
@@ -217,11 +244,11 @@ class LHCCalibration:
 
     @classmethod
     def from_dict(cls, dct):
-        dct['current']=np.array(dct['current'])
-        dct['field']=np.array(dct['field'])
+        dct["current"] = np.array(dct["current"])
+        dct["field"] = np.array(dct["field"])
         return cls(**dct)
 
-    def __init__(self,name,current,field,fieldtype):
+    def __init__(self, name, current, field, fieldtype):
         self.name = name
         self.current = current
         self.field = field
@@ -243,21 +270,18 @@ class LHCCalibration:
     def fmax(self):
         return self.field.max()
 
-    def kmin(self,pc=7e12):
-        brho=pc/299792458
-        return self.fmin/brho
- 
-    def kmax(self,pc=7e12):
-        brho=pc/299792458
-        return self.fmax/brho
+    def get_field(self, current):
+        return np.interp(current, self.current, self.field)
 
     def to_dict(self):
-        dct=self.__dict__.copy()
-        dct['current']=dct['current'].tolist()
-        dct['field']=dct['field'].tolist()
+        dct = self.__dict__.copy()
+        dct["current"] = dct["current"].tolist()
+        dct["field"] = dct["field"].tolist()
         return dct
 
     def __repr__(self) -> str:
-        ilim=f"{self.imin:.0f}:{self.imax:.0f}"
-        flim=f"{self.fmin:.3g}:{self.fmax:.3g}"
-        return f"<LHCCalibration {self.name}, I {ilim}, {self.fieldtype} {flim}>"
+        ilim = f"{self.imin:.0f}:{self.imax:.0f}"
+        flim = f"{self.fmin:.3g}:{self.fmax:.3g}"
+        return (
+            f"<LHCCalibration {self.name}, I {ilim}, {self.fieldtype} {flim}>"
+        )

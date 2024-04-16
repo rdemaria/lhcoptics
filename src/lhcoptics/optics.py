@@ -43,8 +43,8 @@ class LHCOptics:
             subprocess.run(["git", "clone", "https://gitlab.cern.ch/acc-models/lhc.git", "acc-models-lhc"])
 
 
-    irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
-    arcs = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
+    _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
+    _arcs = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
 
     knobs = [f"dq{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
     knobs += [f"dqp{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
@@ -64,8 +64,8 @@ class LHCOptics:
         for arc in arcs:
             setattr(self, arc.name, arc)
             arc.parent = self
-        self._irs = irs
-        self._arcs = arcs
+        self.irs = irs
+        self.arcs = arcs
         if params is None:
             params = {}
         if knobs is None:
@@ -86,8 +86,8 @@ class LHCOptics:
     def from_madx(cls, madx, name="lhcoptics", sliced=False, model=None):
         madmodel = LHCMadModel(madx)
         knobs = madmodel.make_and_set0_knobs(cls.knobs)
-        irs = [ir.from_madx(madx) for ir in cls.irs]
-        arcs = [LHCArc.from_madx(madx, arc) for arc in cls.arcs]
+        irs = [ir.from_madx(madx) for ir in cls._irs]
+        arcs = [LHCArc.from_madx(madx, arc) for arc in cls._arcs]
         for k, knob in knobs.items():
             madx.globals[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs)
@@ -126,8 +126,8 @@ class LHCOptics:
     def to_dict(self):
         return {
             "name": self.name,
-            "irs": [ir.to_dict() for ir in self._irs],
-            "arcs": [arc.to_dict() for arc in self._arcs],
+            "irs": [ir.to_dict() for ir in self.irs],
+            "arcs": [arc.to_dict() for arc in self.arcs],
             "params": self.params,
             "knobs": {n: k.to_dict() for n, k in self.knobs.items()},
         }
@@ -140,12 +140,12 @@ class LHCOptics:
             json.dump(self.to_dict(), f, indent=2)
 
     def update_model(self):
-        for ss in self._irs + self._arcs:
+        for ss in self.irs + self.arcs:
             ss.update_model()
         return self
 
     def update_from_model(self):
-        for ss in self._irs + self._arcs:
+        for ss in self.irs + self.arcs:
             ss.update_from_model()
         return self
 
@@ -163,6 +163,11 @@ class LHCOptics:
         self.update_model()
         return self
 
+    def set_circuits_from_json(self, filename):
+        from .circuits import LHCCircuits
+        self.circuits = LHCCircuits.from_json(filename)
+        return self
+
     def get_params(self):
         tw1 = self.model.b1.twiss(compute_chromatic_properties=True)
         tw2 = self.model.b2.twiss(compute_chromatic_properties=True)
@@ -170,6 +175,7 @@ class LHCOptics:
 
     def get_params_from_twiss(self, tw1, tw2):
         params = {
+            "pc0": tw1.p0c,
             "qxb1": tw1.mux[-1],
             "qyb1": tw1.muy[-1],
             "qxb2": tw2.mux[-1],
@@ -179,13 +185,21 @@ class LHCOptics:
             "qpxb2": tw2.mux[-1],
             "qpyb2": tw2.muy[-1],
         }
-        for ss in self._irs + self._arcs:
-            params.update(ss.get_params_from_twiss(tw1, tw2))
+        #for ss in self.irs + self.arcs:
+        #    params.update(ss.get_params_from_twiss(tw1, tw2))
         return params
-    
+
     def twiss(self,beam=None, chrom=False):
         if beam is None:
             return [self.twiss(beam=1), self.twiss(beam=2)]
         tw1 = self.model.b1.twiss(compute_chromatic_propertie=chrom)
         tw2 = self.model.b2.twiss(compute_chromatic_properties=chrom)
-        return [ss.twiss_from_params(beam) for ss in self._irs + self._arcs]
+        return tw1, tw2
+
+    def plot(self,beam=None):
+        if beam is None:
+            for beam in [1,2]:
+                self.plot(beam)
+        else:
+            self.twiss(beam=beam).plot()
+        return self

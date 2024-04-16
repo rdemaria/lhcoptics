@@ -30,10 +30,12 @@ class LHCIR(LHCSection):
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        strength_names += madmodel.filter(f"kq[xt]?.*[lr]{irn}$")
-        quads = madmodel.filter(f"ktq[x].*[lr]{irn}$")
+        quads = madmodel.filter(f"kq[xt]?.*[lr]{irn}$")
+        quads += madmodel.filter(f"ktq[x].*[lr]{irn}$")
         quads += madmodel.filter(f"kq[t]?[l]?[0-9][0-9]?\..*[lr]{irn}b[12]$")
-        # quads += madmodel.filter(madx, f"kq[t]?.*[lr]{irn}$")
+        if irn == 7:
+            quads.remove("kqt5.l7")
+            quads.remove("kqt5.r7")
         strength_names += sort_n(quads)
         acb = madmodel.filter(f"acbx.*[lr]{irn}$")
         acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
@@ -43,6 +45,8 @@ class LHCIR(LHCSection):
         for knob in knobs:
             madx.globals[knob] = knobs[knob].value
         params = {}
+        if irn == 7:
+           print(strengths)
         return cls(name, strengths, params, knobs)
 
     def __init__(
