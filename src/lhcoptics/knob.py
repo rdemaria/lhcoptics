@@ -15,6 +15,9 @@ class Knob:
     def __repr__(self):
         return f"Knob({self.name!r}, {self.value})"
 
+    def copy(self):
+        return Knob(self.name, self.value, self.weights.copy())
+
     def to_dict(self):
         return {
             "name": self.name,

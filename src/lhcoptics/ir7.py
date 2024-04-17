@@ -111,45 +111,6 @@ class LHCIR7(LHCIR):
         "kq5.lr7": -0.001202569087048791,
     }
 
-    knobsRematched13b_mu = {
-        "kqt4.l3": 0.0006887129999999986,
-        "kqt4.r3": 0.000688713,
-        "kqt5.l3": 0.000972084,
-        "kqt5.r3": 0.000972084,
-        "kqt13.l3b1": -0.002328955907392481,
-        "kqt12.l3b1": 0.002822813556121194,
-        "kqtl11.l3b1": 0.0012986138594000976,
-        "kqtl10.l3b1": 0.0010616412957247959,
-        "kqtl9.l3b1": -0.005223865183101024,
-        "kqtl8.l3b1": 0.00033781692792629684,
-        "kqtl7.l3b1": -0.000876435629840312,
-        "kq6.l3b1": 0.0025894410128743917,
-        "kq6.r3b1": -0.002412918519504643,
-        "kqtl7.r3b1": 0.0022028677895794004,
-        "kqtl8.r3b1": 0.0035691450329306527,
-        "kqtl9.r3b1": -7.37775306738355e-05,
-        "kqtl10.r3b1": 0.004022882019207013,
-        "kqtl11.r3b1": -0.0030302762162364503,
-        "kqt12.r3b1": -0.005138992845888184,
-        "kqt13.r3b1": -0.001896775114412516,
-        "kqt13.l3b2": -0.0025197838172713494,
-        "kqt12.l3b2": -0.003785001043390164,
-        "kqtl11.l3b2": -0.0032679415485541703,
-        "kqtl10.l3b2": 0.004726996198081681,
-        "kqtl9.l3b2": -0.0006237278666374633,
-        "kqtl8.l3b2": 0.0038112997328762573,
-        "kqtl7.l3b2": 0.0005221529209823068,
-        "kq6.l3b2": -0.002467855997059401,
-        "kq6.r3b2": 0.0025687299038460276,
-        "kqtl7.r3b2": 0.0007580546568790491,
-        "kqtl8.r3b2": -0.0007870443115947539,
-        "kqtl9.r3b2": -0.004254750086155878,
-        "kqtl10.r3b2": 0.00041179336225102066,
-        "kqtl11.r3b2": 0.0006593584215004978,
-        "kqt12.r3b2": -9.48176531256308e-05,
-        "kqt13.r3b2": -0.005098976136482916,
-    }
-
     def update_from_model(self):
         for beam, tw in enumerate(self.twiss):
             self.params[f"betxip7b{beam+1}"] = tw["betxip"]
@@ -158,7 +119,7 @@ class LHCIR7(LHCIR):
             "betxip7b1": 0.8,
         }
 
-    def match(self,kminmarg=0.0,kmaxmarg=0.00):
+    def match(self,kminmarg=0.0,kmaxmarg=0.00, collimation=False):
         if self.init_left is None or self.init_right is None:
             self.set_init()
         if len(self.params) == 0:
@@ -170,51 +131,55 @@ class LHCIR7(LHCIR):
             lhc.b1.build_tracker()
         if lhc.b2.tracker is None:
             lhc.b2.build_tracker()
-        self.action_sp1 = SinglePassDispersion(
-            lhc.b1, ele_start="tcp.d6l7.b1", ele_stop="tcspm.6r7.b1"
-        )
-        self.action_sp2 = SinglePassDispersion(
-            lhc.b2, ele_start="tcp.d6r7.b2", ele_stop="tcspm.6l7.b2"
-        )
-        dxb1 = self.action_sp1.run()["dx"]
-        dxb2 = self.action_sp2.run()["dx"]
+
+        if collimation:
+            self.action_sp1 = SinglePassDispersion(
+                lhc.b1, ele_start="tcp.d6l7.b1", ele_stop="tcspm.6r7.b1"
+            )
+            self.action_sp2 = SinglePassDispersion(
+                lhc.b2, ele_start="tcp.d6r7.b2", ele_stop="tcspm.6l7.b2"
+            )
+            dxb1 = self.action_sp1.run()["dx"]
+            dxb2 = self.action_sp2.run()["dx"]
 
         inits = [self.init_left[1], self.init_left[2]]
         starts = [self.startb12[1], self.startb12[2]]
         ends = [self.endb12[1], self.endb12[2]]
         lines = ["b1", "b2"]
 
-        std_targets = LHCIR.get_match_targets(self)
-        sp_targets = [
-            xt.Target(
-                action=self.action_sp1,
-                tar="dx",
-                value=dxb1,
-                tol=1e-2,
-                tag="spdx",
-            ),
-            xt.Target(
-                action=self.action_sp2,
-                tar="dx",
-                value=dxb2,
-                tol=1e-2,
-                tag="spdx",
-            ),
-        ]
-        colltargets = []
-        for cn in self.collimators:
-            line = "b1" if "b1" in cn else "b2"
-            for tt in ["betx", "bety"]:
-                vv = self.params[f"{tt}_{cn}"]
-                tt = xt.Target(
-                    tt,
-                    xt.GreaterThan(vv),
-                    line=line,
-                    at=cn,
-                    tol=1e-1,
-                    tag="coll",
-                )
-                colltargets.append(tt)
+        targets = LHCIR.get_match_targets(self)
+        if collimation:
+            sp_targets = [
+                xt.Target(
+                    action=self.action_sp1,
+                    tar="dx",
+                    value=dxb1,
+                    tol=1e-2,
+                    tag="spdx",
+                ),
+                xt.Target(
+                    action=self.action_sp2,
+                    tar="dx",
+                    value=dxb2,
+                    tol=1e-2,
+                    tag="spdx",
+                ),
+            ]
+            colltargets = []
+            for cn in self.collimators:
+                line = "b1" if "b1" in cn else "b2"
+                for tt in ["betx", "bety"]:
+                    vv = self.params[f"{tt}_{cn}"]
+                    tt = xt.Target(
+                        tt,
+                        xt.GreaterThan(vv),
+                        line=line,
+                        at=cn,
+                        tol=1e-1,
+                        tag="coll",
+                    )
+                    colltargets.append(tt)
+            targets+=sp_targets+colltargets
 
         varylst = []
 
@@ -234,9 +199,10 @@ class LHCIR7(LHCIR):
             start=starts,
             end=ends,
             init=inits,
-            targets=(std_targets + sp_targets + colltargets),
+            targets=targets,
             vary=varylst,
-            check_limits=False
+            check_limits=False,
+            strengths=False
         )
         opt.disable_targets(tag="coll")
         opt.disable_targets(tag="spdx")

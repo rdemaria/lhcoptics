@@ -105,6 +105,12 @@ class LHCCircuits:
     def __repr__(self) -> str:
         return f"<LHCCircuits {len(self.circuits)} circuits>"
 
+    def get_current(self, kname, kval, pc=7e12):
+        return self.circuits[kname].get_current(kval, pc)
+
+    def get_field(self, kname, current):
+        return self.circuits[kname].get_field(current)
+
 
 class LHCCircuit:
     @staticmethod
@@ -204,6 +210,9 @@ class LHCCircuit:
     def get_field(self, current):
         return self._calib.get_field(current) * self.calibsign
 
+    def get_current(self, k, p0c=7e12):
+        return self._calib.get_current(k, p0c) * self.calibsign
+
     def get_klimits(self, pc=7e12):
         brho = pc / 299792458
         limits = self.get_field([self.imin, self.imax]) / brho
@@ -272,6 +281,10 @@ class LHCCalibration:
 
     def get_field(self, current):
         return np.interp(current, self.current, self.field)
+
+    def get_current(self, k, p0c=7e12):
+        brho = p0c / 299792458
+        return np.interp(k*brho, self.field, self.current)
 
     def to_dict(self):
         dct = self.__dict__.copy()

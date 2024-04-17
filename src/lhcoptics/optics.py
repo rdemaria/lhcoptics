@@ -30,18 +30,27 @@ class LHCOptics:
     def set_repository(version="2024"):
         import subprocess
         import os
+
         accmodels = Path("acc-models-lhc")
         if accmodels.exists():
-            if not (accmodels/"lhc.seq").exists():
+            if not (accmodels / "lhc.seq").exists():
                 raise FileNotFoundError("acc-models-lhc/lhc.seq not found")
             else:
-                if  (accmodels/".git").exists():
+                if (accmodels / ".git").exists():
                     subprocess.run(["git", "switch", version], cwd=accmodels)
-        elif (lcl:=(Path.home()/"local"/"acc-models-lhc"/version)).exists():
+        elif (
+            lcl := (Path.home() / "local" / "acc-models-lhc" / version)
+        ).exists():
             accmodels.symlink_to(lcl)
         else:
-            subprocess.run(["git", "clone", "https://gitlab.cern.ch/acc-models/lhc.git", "acc-models-lhc"])
-
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "https://gitlab.cern.ch/acc-models/lhc.git",
+                    "acc-models-lhc",
+                ]
+            )
 
     _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
     _arcs = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
@@ -91,13 +100,12 @@ class LHCOptics:
         for k, knob in knobs.items():
             madx.globals[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs)
-        if model=='xsuite':
-            model = LHCXsuiteModel.from_madx(madx,sliced=sliced)
-            self.model=model
-        elif model=='madx':
+        if model == "xsuite":
+            model = LHCXsuiteModel.from_madx(madx, sliced=sliced)
+            self.model = model
+        elif model == "madx":
             self.model = madmodel
         return self
-
 
     @classmethod
     def from_dict(cls, data):
@@ -139,9 +147,39 @@ class LHCOptics:
         with open(filename, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
-    def update_model(self):
-        for ss in self.irs + self.arcs:
-            ss.update_model()
+    def update_model(self, src=None, full=True):
+        """
+        Update model knobs, if full incluiding all sections strengths and knobs
+        """
+        if self.model is None:
+            raise ValueError("Model not set")
+        if src is None:
+            src = self
+        src.model.update_knobs(self.knobs)
+        if full:
+            for ss in src.irs + src.arcs:
+                if hasattr(src, ss.name):
+                    src_ss = getattr(src, ss.name)
+                    ss.update_model(src=src_ss)
+                elif ss.name in src:
+                    src_ss = src[ss.name]
+                    ss.update_model(src=src_ss)
+        return self
+
+    def update_knobs(self, src=None, full=True):
+        """
+        Update optics knobs from src, if full incluiding all sections nobs
+        """
+        if src is None:
+            src = self.model
+        if full:
+            for ss in self.irs + self.arcs:
+                if hasattr(src, ss.name):
+                    src_ss = getattr(src, ss.name)
+                    ss.update_knobs(src=src_ss)
+                elif ss.name in src:
+                    src_ss = src[ss.name]
+                    ss.update_knobs(src=src_ss)
         return self
 
     def update_from_model(self):
@@ -165,6 +203,7 @@ class LHCOptics:
 
     def set_circuits_from_json(self, filename):
         from .circuits import LHCCircuits
+
         self.circuits = LHCCircuits.from_json(filename)
         return self
 
@@ -185,20 +224,29 @@ class LHCOptics:
             "qpxb2": tw2.mux[-1],
             "qpyb2": tw2.muy[-1],
         }
-        #for ss in self.irs + self.arcs:
+        # for ss in self.irs + self.arcs:
         #    params.update(ss.get_params_from_twiss(tw1, tw2))
         return params
 
-    def twiss(self,beam=None, chrom=False):
+    def set_params(self,full=True):
+        """
+        Copy all parameters from get_params() into params
+        """
+        self.params.update(self.get_params())
+        if full:
+            for ss in self.irs + self.arcs:
+                ss.set_params()
+
+    def twiss(self, beam=None, chrom=False):
         if beam is None:
             return [self.twiss(beam=1), self.twiss(beam=2)]
         tw1 = self.model.b1.twiss(compute_chromatic_propertie=chrom)
         tw2 = self.model.b2.twiss(compute_chromatic_properties=chrom)
         return tw1, tw2
 
-    def plot(self,beam=None):
+    def plot(self, beam=None):
         if beam is None:
-            for beam in [1,2]:
+            for beam in [1, 2]:
                 self.plot(beam)
         else:
             self.twiss(beam=beam).plot()

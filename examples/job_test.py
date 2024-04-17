@@ -6,4 +6,3 @@ inj.set_circuits_from_json("data/lhccircuits.json")
 inj.get_params()
 
 
-

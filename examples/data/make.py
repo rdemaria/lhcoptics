@@ -4,6 +4,7 @@ LHCOptics.set_repository("2024")
 
 inj=LHCOptics.from_madxfile("model.madx",model='xsuite')
 inj.model.to_json("lhc.json")
+inj.set_params()
 inj.to_json("opt_inj.json")
 inj=LHCOptics.from_madxfile("model.madx",model='xsuite',sliced=True)
 inj.model.to_json("lhc_sliced.json")

@@ -1,8 +1,8 @@
 """
 LHCModel -> Compute twiss, aperture, match
 LHCOptics -> Contains complete optics
-LHCIROptics -> Contains strengths, constraints, knobs
-LHCArcOptics -> Contains strengths, constraints, knobs
+LHCIR(s) -> Contains strengths, constraints, knobs
+LHCArc -> Contains strengths, constraints, knobs
 """
 
 __version__ = "0.0.0"
