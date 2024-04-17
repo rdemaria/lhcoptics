@@ -72,16 +72,14 @@ class LHCSection:
         self.knobs = knobs
         self.parent = parent
         self.filename = filename
+        self._model = None
 
     def __repr__(self):
         return f"<LHCSection {self.name} {self.start}/{self.end}>"
 
     @property
     def model(self):
-        if hasattr(self, "model"):
-            return self.model
-        else:
-            return self.parent.model
+        return self.parent.model
 
     @property
     def circuits(self):
