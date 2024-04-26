@@ -85,14 +85,32 @@ class LHCOptics:
 
     @classmethod
     def from_madxfile(
-        cls, filename, name="lhcoptics", sliced=False, model=None
+        cls,
+        filename,
+        name="lhcoptics",
+        sliced=False,
+        gen_model=None,
+        xsuite_model=None,
     ):
         madx = Madx()
         madx.call(filename)
-        return cls.from_madx(madx, name=name, sliced=sliced, model=model)
+        return cls.from_madx(
+            madx,
+            name=name,
+            sliced=sliced,
+            gen_model=gen_model,
+            xsuite_model=xsuite_model,
+        )
 
     @classmethod
-    def from_madx(cls, madx, name="lhcoptics", sliced=False, model=None):
+    def from_madx(
+        cls,
+        madx,
+        name="lhcoptics",
+        sliced=False,
+        gen_model=None,
+        xsuite_model=None,
+    ):
         madmodel = LHCMadModel(madx)
         knobs = madmodel.make_and_set0_knobs(cls.knobs)
         irs = [ir.from_madx(madx) for ir in cls._irs]
@@ -100,33 +118,37 @@ class LHCOptics:
         for k, knob in knobs.items():
             madx.globals[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs)
-        if model == "xsuite":
-            model = LHCXsuiteModel.from_madx(madx, sliced=sliced)
-            self.model = model
-        elif model == "madx":
+        if gen_model == "xsuite":
+            gen_model = LHCXsuiteModel.from_madx(madx, sliced=sliced)
+            self.model = gen_model
+        elif gen_model == "madx":
             self.model = madmodel
+        elif xsuite_model is not None:
+            self.set_xsuite_model(xsuite_model)
         return self
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data, xsuite_model=None):
         irs = [
             globals()[f"LHCIR{n+1}"].from_dict(d)
             for n, d in enumerate(data["irs"])
         ]
         arcs = [LHCArc.from_dict(d) for d in data["arcs"]]
+        if xsuite_model is None:
+            xsuite_model = LHCXsuiteModel.from_dict(xsuite_model)
         return cls(
             name=data["name"],
             irs=irs,
             arcs=arcs,
             params=data["params"],
             knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
-        )
+        ).set_xsuite_model(xsuite_model)
 
     @classmethod
-    def from_json(cls, filename):
+    def from_json(cls, filename, xsuite_model=None):
         with open(filename) as f:
             data = json.load(f)
-            return cls.from_dict(data)
+            return cls.from_dict(data, xsuite_model=xsuite_model)
 
     def __repr__(self) -> str:
         return f"<LHCOptics {self.name!r}>"
@@ -188,7 +210,7 @@ class LHCOptics:
         return self
 
     def set_xsuite_model(self, model):
-        if Path(model).exists():
+        if isinstance(model, str):
             model = LHCXsuiteModel.from_json(model)
         self.model = model
         self.update_model()
@@ -228,7 +250,7 @@ class LHCOptics:
         #    params.update(ss.get_params_from_twiss(tw1, tw2))
         return params
 
-    def set_params(self,full=True):
+    def set_params(self, full=True):
         """
         Copy all parameters from get_params() into params
         """

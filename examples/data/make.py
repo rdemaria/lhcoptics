@@ -2,10 +2,10 @@ from lhcoptics import LHCOptics, LHCCircuits
 
 LHCOptics.set_repository("2024")
 
-inj=LHCOptics.from_madxfile("model.madx",model='xsuite')
+inj=LHCOptics.from_madxfile("model.madx",gen_model='xsuite')
 inj.model.to_json("lhc.json")
 inj.set_params()
 inj.to_json("opt_inj.json")
-inj=LHCOptics.from_madxfile("model.madx",model='xsuite',sliced=True)
+inj=LHCOptics.from_madxfile("model.madx",gen_model='xsuite',sliced=True)
 inj.model.to_json("lhc_sliced.json")
 circuits=LHCCircuits.from_lsa().to_json("lhccircuits.json")

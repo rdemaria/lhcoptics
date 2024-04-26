@@ -34,12 +34,14 @@ class LHCIR(LHCSection):
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        quads = madmodel.filter(f"kq[xt]?.*[lr]{irn}$")
-        quads += madmodel.filter(f"ktq[x].*[lr]{irn}$")
-        quads += madmodel.filter(f"kq[t]?[l]?[0-9][0-9]?\..*[lr]{irn}b[12]$")
+        quads = madmodel.filter(f"kt?q[xt]?[0-9].*[lr]{irn}$")
+        quads += madmodel.filter(f"ktq[x][0-9].*[lr]{irn}$")
+        quads += madmodel.filter(f"kqt?l?[0-9][0-9]?\..*[lr]{irn}b[12]$")
         if irn == 7:
-            quads.remove("kqt5.l7")
-            quads.remove("kqt5.r7")
+            if "kqt5.l7" in quads:
+                quads.remove("kqt5.l7")
+            if "kqt5.r7" in quads:
+                quads.remove("kqt5.r7")
         strength_names += sort_n(quads)
         acb = madmodel.filter(f"acbx.*[lr]{irn}$")
         acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
@@ -101,7 +103,7 @@ class LHCIR(LHCSection):
 
     @property
     def quads(self):
-        return {k: v for k, v in self.strengths.items() if "kq" in k}
+        return {k: v for k, v in self.strengths.items() if "kq" in k and not "kqs" in k}
 
     def set_init(self):
         arcleft = self.arc_left
@@ -224,51 +226,99 @@ class LHCIR(LHCSection):
         params = self.get_params_from_twiss(tw1, tw2)
         return {k: np.round(v, 8) for k, v in params.items()}
 
-    def get_match_targets(self):
-        inits_r = [self.init_right[1], self.init_right[2]]
-        ends = [self.endb12[1], self.endb12[2]]
+    def get_match_targets(self, lrphase=False, left=True, right=True, b1=True, b2=True):
+        lines =[]
+        inits_r=[]
+        ends =[]
+        if b1:
+            lines.append("b1")
+            inits_r.append(self.init_right[1])
+            ends.append(self.endb12[1])
+        if b2:
+            lines.append("b2")
+            inits_r.append(self.init_right[2])
+            ends.append(self.endb12[2])
+
         lines = [f"b{beam}" for beam in [1, 2]]
 
         targets = []
 
-        for ll, init, end in zip(lines, inits_r, ends):
-            for tt in ["alfx", "alfy", "betx", "bety", "dx", "dpx"]:
-                targets.append(
-                    xt.Target(
-                        tt,
-                        getattr(init, tt),
-                        line=ll,
-                        at=end,
-                        tag="matchtoarc",
+        if right:
+            for tt in ["mux", "muy"]:
+                for ll, end in zip(lines, ends):
+                    targets.append(
+                        xt.Target(
+                            tt,
+                            self.params[f"{tt}{self.ipname}{ll}"],
+                            line=ll,
+                            at=end,
+                            tag=f"{tt}{self.ipname}{ll}",
+                        )
                     )
-                )
 
-        for tt in ["mux", "muy"]:
-            for ll, end in zip(lines, ends):
-                targets.append(
-                    xt.Target(
-                        tt,
-                        self.params[f"{tt}{self.ipname}{ll}"],
-                        line=ll,
-                        at=end,
-                        tag="phase",
+        if lrphase:
+            for tt in ["mux", "muy"]:
+                for ll in lines:
+                    targets.append(
+                        xt.Target(
+                            tt,
+                            self.params[f"{tt}{self.ipname}{ll}_l"],
+                            line=ll,
+                            at=self.ipname,
+                            tag=f"{tt}{self.ipname}{ll}_l",
+                        )
                     )
-                )
 
-        for tt in ["betx", "bety", "alfx", "alfy", "dx", "dpx"]:
-            for ll, end in zip(lines, ends):
-                targets.append(
-                    xt.Target(
-                        tt,
-                        self.params[f"{tt}{self.ipname}{ll}"],
-                        line=ll,
-                        at=self.ipname,
-                        tol=1e-1,
-                        tag="ipcond",
+        if right:
+            for ll, init, end in zip(lines, inits_r, ends):
+                for tt in ["alfx", "alfy", "betx", "bety", "dx", "dpx"]:
+                    targets.append(
+                        xt.Target(
+                            tt,
+                            getattr(init, tt),
+                            line=ll,
+                            at=end,
+                            tag=f"e_{tt}{ll}",
+                        )
                     )
-                )
+
+        if left:
+            for tt in ["betx", "bety", "alfx", "alfy", "dx", "dpx"]:
+                for ll in lines:
+                    targets.append(
+                        xt.Target(
+                            tt,
+                            self.params[f"{tt}{self.ipname}{ll}"],
+                            line=ll,
+                            at=self.ipname,
+                            tol=1e-1,
+                            tag=f"ip_{tt}{ll}",
+                        )
+                    )
 
         return targets
+
+
+    def get_match_vary(self, b1=True, b2=True, common=True, kmin_marg=0.0, kmax_marg=0.0):
+        varylst = []
+        for kk in self.quads:
+            limits = self.parent.circuits[kk].get_klimits()
+            limits[0] *= (1 + kmin_marg)
+            limits[1] *= (1 - kmax_marg)
+            if 'b1' in kk and b1:
+                tag="b1"
+                add=True
+            elif 'b2' in kk and b2:
+                tag="b2"
+                add=True
+            elif common:
+                tag="common"
+                add=True
+            if add:
+               varylst.append(
+                xt.Vary(kk, limits=limits, step=1e-9, tag=tag)
+            )
+        return varylst
 
 
 class Col:
@@ -305,7 +355,9 @@ class LHCIRTable:
                 dct.update(self.tab_quads(n))
         else:
             ir = self.rows[0]
-            quad_names = [k for k in ir.quads if re.match(f"kq[xtl]*{n}\\.", k)]
+            quad_names = [
+                k for k in ir.quads if re.match(f"kq[xtl]*{n}\\.", k)
+            ]
             return {k: [ir.quads[k] for ir in self.rows] for k in quad_names}
 
     @property
@@ -329,8 +381,10 @@ class LHCIRTable:
         else:
             return np.array([ir[k] for ir in self.rows])
 
-    def plot_quad(self, n, xaxis="id", ax=None, title=None, figname=None,p0c=6.8e12):
-        brho=p0c/299792458
+    def plot_quad(
+        self, n, xaxis="id", ax=None, title=None, figname=None, p0c=6.8e12
+    ):
+        brho = p0c / 299792458
         if title is None:
             title = f"{self.rows[0].name.upper()} Q{n}"
         if figname is None:
@@ -340,53 +394,57 @@ class LHCIRTable:
             ax = plt.gca()
         xx = self[xaxis]
         for q in self.get_quads(n):
-            ax.plot(xx, self[q]*brho, label=q)
+            ax.plot(xx, self[q] * brho, label=q)
         ax.set_title(title)
         ax.set_xlabel(xaxis)
         ax.set_ylabel(r"k [$T/m$]")
         ax.legend()
 
-    def plot_quads(self, xaxis="id", fig=None, title=None, figname=None,p0c=6.8e12):
-        nq=[]
+    def plot_quads(
+        self, xaxis="id", fig=None, title=None, figname=None, p0c=6.8e12
+    ):
+        nq = []
         for n in range(1, 13):
             if len(self.get_quads(n)) > 0:
                 nq.append(n)
-        rows=len(nq)//3
-        cols=len(nq)//rows
-        if hasattr(self,"fig") and self.fig is not None:
-            fig=self.fig
+        rows = len(nq) // 3
+        cols = len(nq) // rows
+        if hasattr(self, "fig") and self.fig is not None:
+            fig = self.fig
         if fig is None:
             if title is None:
                 title = f"{self.rows[0].name.upper()} Quads"
             if figname is None:
                 figname = f"{self.rows[0].name.upper()} Quads"
-            fig, axs = plt.subplots(cols, rows, num=figname,figsize=(2.5*cols,2.5*cols))
-            self.fig=fig
-            axs=axs.flatten()
+            fig, axs = plt.subplots(
+                cols, rows, num=figname, figsize=(2.5 * cols, 2.5 * cols)
+            )
+            self.fig = fig
+            axs = axs.flatten()
         else:
-            axs=fig.axes
-        for i,(n, ax) in enumerate(zip(nq, axs)):
+            axs = fig.axes
+        for i, (n, ax) in enumerate(zip(nq, axs)):
             ax.clear()
             self.plot_quad(n, xaxis, ax, p0c=p0c)
             ax.title.set_text(None)
-            if i%rows>0:
+            if i % rows > 0:
                 ax.set_ylabel(None)
-            if i<len(nq)-cols:
+            if i < len(nq) - cols:
                 ax.set_xlabel(None)
-        for ax in axs[len(nq):]:
+        for ax in axs[len(nq) :]:
             ax.set_visible(False)
         plt.suptitle(title)
-        #plt.tight_layout()
+        # plt.tight_layout()
 
-    def interp_val(self,p, kname,order=1,pname="id"):
-        pp=self[pname]
-        yy=self[kname]
-        return np.interp(p,pp,yy)
+    def interp_val(self, p, kname, order=1, pname="id"):
+        pp = self[pname]
+        yy = self[kname]
+        return np.interp(p, pp, yy)
 
-    def interp(self,n,order=1,xaxis="id"):
-        ir0=self.rows[0]
-        strengths={k: self.interp_val(n,k,order,xaxis) for k in ir0.strengths}
-        params={k: self.interp_val(n,k,order,xaxis) for k in ir0.params}
-        return ir0.__class__(strengths=strengths,params=params)
-
-
+    def interp(self, n, order=1, xaxis="id"):
+        ir0 = self.rows[0]
+        strengths = {
+            k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths
+        }
+        params = {k: self.interp_val(n, k, order, xaxis) for k in ir0.params}
+        return ir0.__class__(strengths=strengths, params=params)

@@ -119,13 +119,23 @@ class LHCIR7(LHCIR):
             "betxip7b1": 0.8,
         }
 
-    def match(self,kminmarg=0.0,kmaxmarg=0.00, collimation=False):
+    def match(
+        self,
+        kmin_marg=0.0,
+        kmax_marg=0.0,
+        collimation=False,
+        b1=True,
+        b2=True,
+        common=True,
+    ):
+        if self.parent.model is None:
+            raise ValueError("Model not set for {self)")
+        if self.parent.circuits is None:
+            raise ValueError("Circuits not set for {self)")
         if self.init_left is None or self.init_right is None:
             self.set_init()
         if len(self.params) == 0:
             self.params = self.get_params()
-        if self.parent.model is None:
-            raise ValueError("Model not set for {self)")
         lhc = self.parent.model.multiline
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
@@ -179,17 +189,17 @@ class LHCIR7(LHCIR):
                         tag="coll",
                     )
                     colltargets.append(tt)
-            targets+=sp_targets+colltargets
+            targets += sp_targets + colltargets
 
-        varylst = []
 
-        for kk in self.quads:
-            limits = self.parent.circuits[kk].get_klimits()
-            limits[0]*=(1+kminmarg)
-            limits[1]*=(1-kmaxmarg)
-            varylst.append(
-                xt.Vary(kk, limits=limits, step=1e-9)
-            )
+        varylst = LHCIR.get_match_vary(
+            self,
+            b1=b1,
+            b2=b2,
+            common=common,
+            kmin_marg=kmin_marg,
+            kmax_marg=kmax_marg,
+        )
 
         opt = lhc.match(
             solve=False,
@@ -202,9 +212,10 @@ class LHCIR7(LHCIR):
             targets=targets,
             vary=varylst,
             check_limits=False,
-            strengths=False
+            strengths=False,
         )
-        opt.disable_targets(tag="coll")
-        opt.disable_targets(tag="spdx")
+        opt.disable(target="coll")
+        opt.disable(target="spdx")
+        opt.disable(target="mu.*_l")
         self.opt = opt
         return opt

@@ -5,9 +5,10 @@ inj.set_xsuite_model("data/lhc.json") # set an xsuite model
 inj.set_circuits_from_json("data/lhccircuits.json")
 inj.ir7.get_params()
 
-inj.ir7.match().vary_status()
-inj.ir7.match().target_status()
-inj.ir7.match().step(10)
+mtc=inj.ir7.match()
+mtc.vary_status()
+mtc.target_status()
+mtc.step(10)
 inj.ir7.to_json("ir7_inj.json")
 
 inj.ir7.update_model(src=inj.ir7.knobsRematched12c6b)
