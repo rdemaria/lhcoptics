@@ -9,3 +9,4 @@ __version__ = "0.0.0"
 from .optics import LHCOptics
 from .model_xsuite import LHCXsuiteModel, LHCMadModel
 from .circuits import LHCCircuits, get_lsa
+from .repo import LHC

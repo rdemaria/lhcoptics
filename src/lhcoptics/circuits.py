@@ -1,9 +1,7 @@
 import json
 import numpy as np
 
-
-_lsa = None
-
+from .lsa_util import get_lsa
 
 def madname_from_pcname(pc):
     name = ".".join(pc.split(".")[2:]).lower()
@@ -11,15 +9,6 @@ def madname_from_pcname(pc):
         return "a" + name[1:]
     else:
         return "k" + name[1:]
-
-
-def get_lsa():
-    global _lsa
-    if _lsa is None:
-        import pjlsa
-
-        _lsa = pjlsa.LSAClient()
-    return _lsa
 
 
 class LHCCircuits:

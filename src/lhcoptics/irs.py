@@ -103,7 +103,11 @@ class LHCIR(LHCSection):
 
     @property
     def quads(self):
-        return {k: v for k, v in self.strengths.items() if "kq" in k and not "kqs" in k}
+        return {
+            k: v
+            for k, v in self.strengths.items()
+            if "kq" in k and not "kqs" in k
+        }
 
     def set_init(self):
         arcleft = self.arc_left
@@ -167,7 +171,13 @@ class LHCIR(LHCSection):
 
     def plot(self, beam=None, method="init", figlabel=None):
         if beam is None:
-            return [self.plot(beam=1), self.plot(beam=2)]
+            if figlabel is None:
+                figlabel1 = f"{self.name}b1"
+                figlabel2 = f"{self.name}b2"
+            return [
+                self.plot(beam=1, method=method, figlabel=figlabel1),
+                self.plot(beam=2, method=method, figlabel=figlabel2),
+            ]
         else:
             if method == "init":
                 mktwiss = self.twiss_from_init
@@ -226,10 +236,12 @@ class LHCIR(LHCSection):
         params = self.get_params_from_twiss(tw1, tw2)
         return {k: np.round(v, 8) for k, v in params.items()}
 
-    def get_match_targets(self, lrphase=False, left=True, right=True, b1=True, b2=True):
-        lines =[]
-        inits_r=[]
-        ends =[]
+    def get_match_targets(
+        self, lrphase=False, left=True, right=True, b1=True, b2=True
+    ):
+        lines = []
+        inits_r = []
+        ends = []
         if b1:
             lines.append("b1")
             inits_r.append(self.init_right[1])
@@ -298,26 +310,25 @@ class LHCIR(LHCSection):
 
         return targets
 
-
-    def get_match_vary(self, b1=True, b2=True, common=True, kmin_marg=0.0, kmax_marg=0.0):
+    def get_match_vary(
+        self, b1=True, b2=True, common=True, kmin_marg=0.0, kmax_marg=0.0
+    ):
         varylst = []
         for kk in self.quads:
             limits = self.parent.circuits[kk].get_klimits()
-            limits[0] *= (1 + kmin_marg)
-            limits[1] *= (1 - kmax_marg)
-            if 'b1' in kk and b1:
-                tag="b1"
-                add=True
-            elif 'b2' in kk and b2:
-                tag="b2"
-                add=True
+            limits[0] *= 1 + kmin_marg
+            limits[1] *= 1 - kmax_marg
+            if "b1" in kk and b1:
+                tag = "b1"
+                add = True
+            elif "b2" in kk and b2:
+                tag = "b2"
+                add = True
             elif common:
-                tag="common"
-                add=True
+                tag = "common"
+                add = True
             if add:
-               varylst.append(
-                xt.Vary(kk, limits=limits, step=1e-9, tag=tag)
-            )
+                varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
 
 
