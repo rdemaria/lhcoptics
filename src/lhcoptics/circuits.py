@@ -3,6 +3,7 @@ import numpy as np
 
 from .lsa_util import get_lsa
 
+
 def madname_from_pcname(pc):
     name = ".".join(pc.split(".")[2:]).lower()
     if name.startswith("rcb"):
@@ -34,12 +35,12 @@ class LHCCircuits:
 
     @classmethod
     def from_lsa(cls):
-        lsa = get_lsa()
         pcnames = cls.get_pc_names_from_lsa()
         circuits = {}
         for pcname in pcnames:
             cir = LHCCircuit.from_lsa(pcname)
-            circuits[cir.madname] = cir
+            circuits[cir.pcname] = cir
+
         calibnames = {
             cir.calibname
             for cir in circuits.values()
@@ -66,18 +67,21 @@ class LHCCircuits:
             return cls.from_dict(data)
 
     def __init__(self, circuits, calibrations=None):
-        self.circuits = circuits
+        self.pcname = circuits
         if calibrations is None:
             calibrations = {}
         self.calibrations = calibrations
-        for cir in self.circuits.values():
+        for cir in self.pcname.values():
             cir._calib = self.calibrations.get(cir.calibname)
             if cir._calib is not None and cir._calib.imin < 0:
                 cir.imin = -cir.imax
 
+        self.madname = {cir.madname: cir for cir in self.pcname.values()}
+        self.shortname= {'.'.join(cir.pcname.split(".")[2:]): cir for cir in self.pcname.values()}
+
     def to_dict(self):
         return {
-            "circuits": {k: v.to_dict() for k, v in self.circuits.items()},
+            "circuits": {k: v.to_dict() for k, v in self.pcname.items()},
             "calibrations": {
                 k: v.to_dict() for k, v in self.calibrations.items()
             },
@@ -89,16 +93,21 @@ class LHCCircuits:
         return self
 
     def __getitem__(self, key):
-        return self.circuits[key]
+        if key in self.pcname:
+            return self.pcname[key]
+        elif key in self.madname:
+            return self.madname[key]
+        else:
+            raise KeyError(f"Key {key} not found in {self}")
 
     def __repr__(self) -> str:
-        return f"<LHCCircuits {len(self.circuits)} circuits>"
+        return f"<LHCCircuits {len(self.pcname)} circuits>"
 
     def get_current(self, kname, kval, pc=7e12):
-        return self.circuits[kname].get_current(kval, pc)
+        return self.pcname[kname].get_current(kval, pc)
 
     def get_field(self, kname, current):
-        return self.circuits[kname].get_field(current)
+        return self.pcname[kname].get_field(current)
 
 
 class LHCCircuit:
@@ -122,7 +131,7 @@ class LHCCircuit:
     def from_lsa(cls, pcname):
         pcinfo = cls.get_pcinfo_from_lsa(pcname)
         lh = cls.get_logicalhardware_from_lsa(pcname)
-        return cls(
+        pc =cls(
             pcname=pcname,
             logicalname=lh.getName(),
             madname=lh.getMadStrengthName(),
@@ -137,6 +146,10 @@ class LHCCircuit:
             ippmax=pcinfo.getAccelerationLimit(),
             ippmin=pcinfo.getDecelerationLimit(),
         )
+        # patch RTQX
+        if "RTQX" in pcname:
+            pc.madname = f"ktqx{pcname[-4:].lower()}"
+        return pc
 
     @classmethod
     def from_dict(cls, dct):
@@ -273,7 +286,7 @@ class LHCCalibration:
 
     def get_current(self, k, p0c=7e12):
         brho = p0c / 299792458
-        return np.interp(k*brho, self.field, self.current)
+        return np.interp(k * brho, self.field, self.current)
 
     def to_dict(self):
         dct = self.__dict__.copy()

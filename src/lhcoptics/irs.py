@@ -34,7 +34,7 @@ class LHCIR(LHCSection):
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        quads = madmodel.filter(f"kt?q[xt]?[0-9]?.*[lr]{irn}$")
+        quads = madmodel.filter(f"kt?q[xt]?[0-9]?\.[lr]{irn}$")
         #quads += madmodel.filter(f"ktq[x][0-9].*[lr]{irn}$")
         quads += madmodel.filter(f"kqt?l?[0-9][0-9]?\..*[lr]{irn}b[12]$")
         if irn == 7:
@@ -106,7 +106,7 @@ class LHCIR(LHCSection):
         return {
             k: v
             for k, v in self.strengths.items()
-            if "kq" in k and not "kqs" in k
+            if "kq" in k or "ktq" in k
         }
 
     def set_init(self):
