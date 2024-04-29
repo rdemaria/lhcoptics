@@ -134,7 +134,7 @@ class LHCOptics:
             for n, d in enumerate(data["irs"])
         ]
         arcs = [LHCArc.from_dict(d) for d in data["arcs"]]
-        if xsuite_model is None:
+        if xsuite_model is not None:
             xsuite_model = LHCXsuiteModel.from_dict(xsuite_model)
         return cls(
             name=data["name"],
@@ -142,7 +142,7 @@ class LHCOptics:
             arcs=arcs,
             params=data["params"],
             knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
-        ).set_xsuite_model(xsuite_model)
+            model=xsuite_model)
 
     @classmethod
     def from_json(cls, filename, xsuite_model=None):
