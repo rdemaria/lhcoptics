@@ -14,6 +14,7 @@ from .arcs import LHCArc
 
 from .section import Knob
 from .model_xsuite import LHCXsuiteModel, LHCMadModel
+from .circuits import LHCCircuits
 
 irs = [LHCIR1, LHCIR2]
 
@@ -110,6 +111,7 @@ class LHCOptics:
         sliced=False,
         gen_model=None,
         xsuite_model=None,
+        circuits=None,
     ):
         madmodel = LHCMadModel(madx)
         knobs = madmodel.make_and_set0_knobs(cls.knobs)
@@ -125,17 +127,21 @@ class LHCOptics:
             self.model = madmodel
         elif xsuite_model is not None:
             self.set_xsuite_model(xsuite_model)
+        if circuits is not None:
+            self.set_circuits_from_json(circuits)
         return self
 
     @classmethod
-    def from_dict(cls, data, xsuite_model=None):
+    def from_dict(cls, data, xsuite_model=None, circuits=None):
         irs = [
             globals()[f"LHCIR{n+1}"].from_dict(d)
             for n, d in enumerate(data["irs"])
         ]
         arcs = [LHCArc.from_dict(d) for d in data["arcs"]]
-        if xsuite_model is not None:
-            xsuite_model = LHCXsuiteModel.from_dict(xsuite_model)
+        if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
+            xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
+        if isinstance(circuits, str) or isinstance(circuits, Path):
+            circuits = LHCCircuits.from_json(circuits)
         return cls(
             name=data["name"],
             irs=irs,
@@ -145,7 +151,7 @@ class LHCOptics:
             model=xsuite_model)
 
     @classmethod
-    def from_json(cls, filename, xsuite_model=None):
+    def from_json(cls, filename, xsuite_model=None, circuits=None):
         with open(filename) as f:
             data = json.load(f)
             return cls.from_dict(data, xsuite_model=xsuite_model)
@@ -262,7 +268,7 @@ class LHCOptics:
     def twiss(self, beam=None, chrom=False):
         if beam is None:
             return [self.twiss(beam=1), self.twiss(beam=2)]
-        tw1 = self.model.b1.twiss(compute_chromatic_propertie=chrom)
+        tw1 = self.model.b1.twiss(compute_chromatic_properties=chrom)
         tw2 = self.model.b2.twiss(compute_chromatic_properties=chrom)
         return tw1, tw2
 

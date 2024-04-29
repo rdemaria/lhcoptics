@@ -34,8 +34,8 @@ class LHCIR(LHCSection):
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        quads = madmodel.filter(f"kt?q[xt]?[0-9].*[lr]{irn}$")
-        quads += madmodel.filter(f"ktq[x][0-9].*[lr]{irn}$")
+        quads = madmodel.filter(f"kt?q[xt]?[0-9]?.*[lr]{irn}$")
+        #quads += madmodel.filter(f"ktq[x][0-9].*[lr]{irn}$")
         quads += madmodel.filter(f"kqt?l?[0-9][0-9]?\..*[lr]{irn}b[12]$")
         if irn == 7:
             if "kqt5.l7" in quads:
