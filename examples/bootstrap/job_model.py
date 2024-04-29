@@ -11,11 +11,4 @@ eor=LHCOptics.from_madxfile(repo_model,xsuite_model="acc-models-lhc/xsuite/lhc.j
 eor.ir5.plot()
 
 eor2=LHCOptics.from_madxfile(repo_model,gen_model="xsuite")
-
-
-
-from lhcoptics import LHC
-inj=LHC(2024).pp_lumi.inj.optics.ir5.plot()
-
-from lhcoptics import LHC
-inj=LHC(2024).pp_lumi.endoframp.optics.ir5.plot()
+eor.2ir5.plot()
