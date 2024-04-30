@@ -140,60 +140,60 @@ class LHCArc(LHCSection):
     def get_match_targets(self, b1=True, b2=True):
         """Get match targets for the arc"""
         targets = []
+        beams = []
         if b1:
-            targets.append(
-                xt.Target(
-                    action=ActionArcPhaseAdvance(self, 1),
-                    tar="mux",
-                    value=0,
-                    tol=1e-2,
-                    tag="mux",
-                )
-            )
+            beams.append(1)
         if b2:
-            targets.append(
-                xt.Target(
-                    action=ActionArcPhaseAdvance(self, 2),
-                    tar="mux",
-                    value=0,
-                    tol=1e-2,
-                    tag="mux",
+            beams.append(2)
+        for beam in beams:
+            for mu in "mux", "muy":
+                targets.append(
+                    xt.Target(
+                        action=ActionArcPhaseAdvance(self, beam),
+                        tar=mu,
+                        value=self.params[f"{mu}{self.name}b{beam}"],
+                        tol=1e-2,
+                        tag=mu,
+                    )
                 )
-            )
         return targets
 
-    def get_match_kq_vary(self, fd, beam='', kmax_marg=0.0):
+    def get_match_kq_vary(self, fd, beam="", kmax_marg=0.0):
         """Get match vary for the arc"""
         if beam:
-           kname= f"kqt{fd}.{self.name}{beam}"
+            kname = f"kqt{fd}.{self.name}{beam}"
         else:
-           kname= f"kq{fd}.{self.name}"
-        limits= self.parent.circuits.get_klimits(kname,self.parent.params["pc0"])
+            kname = f"kq{fd}.{self.name}"
+        limits = self.parent.circuits.get_klimits(
+            kname, self.parent.params["pc0"]
+        )
         limits[0] *= 1 + kmax_marg
         limits[1] *= 1 - kmax_marg
-        return xt.Vary(
-                        name=kname,
-                        lower=limits[0],
-                        upper=limits[1],
-                        step=1e-8,
-                        tag=beam
-                    )
+        tag=beam if beam else "common"
+        return xt.Vary(name=kname, limits=limits, step=1e-8, tag=tag)
 
     def match(self, b1=True, b2=True):
+        lhc = self.parent.model.multiline
+        if lhc.b1.tracker is None:
+            lhc.b1.build_tracker()
+        if lhc.b2.tracker is None:
+            lhc.b2.build_tracker()
         """Match the arc"""
         targets = self.get_match_targets(b1=b1, b2=b2)
-        varylst=[]
-        for fd in ['f','d']:
-                if b1 and b2:
-                    varylst.append(self.get_match_kq_vary(fd))
-                    varylst.append(self.get_match_kq_vary(fd),"b1")
-                    self.model.vref[f"ktq{fd}.{self.name}b2"] = -self.model.vref[f"kq{fd}.{self.name}b1"]
-                elif b1:
-                    varylst.append(self.get_match_kq_vary(fd),"b1")
-                elif b2:
-                    varylst.append(self.get_match_kq_vary(fd),"b2")
+        varylst = []
+        for fd in ["f", "d"]:
+            if b1 and b2:
+                varylst.append(self.get_match_kq_vary(fd))
+                varylst.append(self.get_match_kq_vary(fd, "b1"))
+                self.model.vref[f"ktq{fd}.{self.name}b2"] = -self.model.vref[
+                    f"kqt{fd}.{self.name}b1"
+                ]
+            elif b1:
+                varylst.append(self.get_match_kq_vary(fd), "b1")
+            elif b2:
+                varylst.append(self.get_match_kq_vary(fd), "b2")
 
-        opt = xt.match(
+        opt = lhc.match(
             solve=False,
             default_tol={None: 5e-8},
             solver_options=dict(max_rel_penalty_increase=2.0),
@@ -203,6 +203,19 @@ class LHCArc(LHCSection):
             strengths=False,
         )
         return opt
+    
+
+    def shift_phase(self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0):
+        arc=self.name
+        a=int(arc[1])
+        b=int(arc[2])
+        self.params[f"mux{arc}b1"]+=dmuxb1
+        self.params[f"muy{arc}b1"]+=dmuyb1
+        self.params[f"mux{arc}b2"]+=dmuxb2
+        self.params[f"muy{arc}b2"]+=dmuyb2
+        self.match().solve()
+        getattr(self.parent, f"ir{a}").match().solve()
+        getattr(self.parent, f"ir{b}").match().solve()
 
 
 class ActionArcPhaseAdvance(xt.Action):

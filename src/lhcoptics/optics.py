@@ -269,14 +269,14 @@ class LHCOptics:
     def get_params_from_twiss(self, tw1, tw2):
         params = {
             "pc0": tw1.p0c,
-            "qxb1": tw1.mux[-1],
-            "qyb1": tw1.muy[-1],
-            "qxb2": tw2.mux[-1],
-            "qyb2": tw2.muy[-1],
-            "qpxb1": tw1.mux[-1],
-            "qpyb1": tw1.muy[-1],
-            "qpxb2": tw2.mux[-1],
-            "qpyb2": tw2.muy[-1],
+            "qxb1": tw1.qx,
+            "qyb1": tw1.qy,
+            "qxb2": tw2.qx,
+            "qyb2": tw2.qy,
+            "qpxb1": tw1.dqx,
+            "qpyb1": tw1.dqy,
+            "qpxb2": tw2.dqx,
+            "qpyb2": tw2.dqy,
         }
         # for ss in self.irs + self.arcs:
         #    params.update(ss.get_params_from_twiss(tw1, tw2))
@@ -307,3 +307,6 @@ class LHCOptics:
     def disable_bumps(self):
         for ir in self.irs:
             ir.disable_bumps()
+
+
+
