@@ -262,8 +262,8 @@ class LHCOptics:
         return self
 
     def get_params(self):
-        tw1 = self.model.b1.twiss(compute_chromatic_properties=True)
-        tw2 = self.model.b2.twiss(compute_chromatic_properties=True)
+        tw1 = self.model.b1.twiss(compute_chromatic_properties=True,strengths=False)
+        tw2 = self.model.b2.twiss(compute_chromatic_properties=True,strengths=False)
         return self.get_params_from_twiss(tw1, tw2)
 
     def get_params_from_twiss(self, tw1, tw2):
@@ -291,10 +291,10 @@ class LHCOptics:
             for ss in self.irs + self.arcs:
                 ss.set_params()
 
-    def twiss(self, beam=None, chrom=False):
+    def twiss(self, beam=None, chrom=False,strengths=True):
         if beam is None:
-            return [self.twiss(beam=1), self.twiss(beam=2)]
-        return getattr(self.model,f"b{beam}").twiss(compute_chromatic_properties=chrom)
+            return [self.twiss(beam=1,strenghts=strengths), self.twiss(beam=2,strengths=strengths)]
+        return getattr(self.model,f"b{beam}").twiss(compute_chromatic_properties=chrom,strenghts=strengths)
 
     def plot(self, beam=None):
         if beam is None:

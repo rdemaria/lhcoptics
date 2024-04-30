@@ -58,16 +58,16 @@ class LHCArc(LHCSection):
         end.muy = 0
         return [start, end]
 
-    def twiss_cell(self, beam=None):
+    def twiss_cell(self, beam=None, strengths=True):
         """Get twiss table of periodic cell."""
         if beam is None:
-            return [self.twiss_cell(beam=1), self.twiss_cell(beam=2)]
+            return [self.twiss_cell(beam=1, strengths=strengths), self.twiss_cell(beam=2, strengths=strengths)]
         sequence = self.model.sequence[beam]
         start_cell = self.start_cell[beam]
         end_cell = self.end_cell[beam]
-        return sequence.twiss(start=start_cell, end=end_cell, init="periodic")
+        return sequence.twiss(start=start_cell, end=end_cell, init="periodic", strengths=strengths)
 
-    def twiss_init_cell(self, beam):
+    def twiss_init_cell(self, beam, strengths=True):
         """Get twiss init at the beginning of the cell."""
         sequence = self.model.sequence[beam]
         start_cell = self.start_cell[beam]
@@ -77,32 +77,33 @@ class LHCArc(LHCSection):
             end=end_cell,
             init="periodic",
             only_twiss_init=True,
+            strengths=strengths
         )
         return twinit_cell
 
-    def twiss_full(self, beam=None):
+    def twiss_full(self, beam=None, strengths=True):
         """Get twiss table of full arc of the full LHC periodic solution"""
         if beam is None:
-            return [self.twiss_full(beam=1), self.twiss_full(beam=2)]
+            return [self.twiss_full(beam=1, strengths=strengths), self.twiss_full(beam=2, strengths=strengths)]
         else:
             sequence = self.model.sequence[beam]
             start = self.startb12[beam]
             end = self.endb12[beam]
-            init = sequence.twiss().get_twiss_init(start)
-            return sequence.twiss(start=start, end=end, init=init)
+            init = sequence.twiss(strengths=False).get_twiss_init(start)
+            return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
 
-    def twiss_periodic(self, beam=None):
+    def twiss_periodic(self, beam=None, strengths=True):
         """Get twiss table of matched arc."""
         if beam is None:
-            return [self.twiss(beam=1), self.twiss(beam=2)]
+            return [self.twiss(beam=1, strengths=strengths), self.twiss(beam=2, strengths=strengths)]
         else:
-            twinit_cell = self.twiss_init_cell(beam)
+            twinit_cell = self.twiss_init_cell(beam, strengths=strengths)
             start_arc = self.startb[beam]
             end_arc = self.endb[beam]
 
             sequence = self.model.sequence[beam]
             res = sequence.twiss(
-                start=start_arc, end=end_arc, init=twinit_cell
+                start=start_arc, end=end_arc, init=twinit_cell, strengths=strengths
             )
 
             res["mux"] = res["mux"] - res["mux", start_arc]
@@ -129,7 +130,7 @@ class LHCArc(LHCSection):
 
     def get_params(self):
         """Get params from model"""
-        tw1, tw2 = self.twiss()
+        tw1, tw2 = self.twiss(strengths=False)
         return self.get_params_from_twiss(tw1, tw2)
 
     @property
@@ -213,9 +214,14 @@ class LHCArc(LHCSection):
         self.params[f"muy{arc}b1"]+=dmuyb1
         self.params[f"mux{arc}b2"]+=dmuxb2
         self.params[f"muy{arc}b2"]+=dmuyb2
+        print(f"Match {self}")
         self.match().solve()
-        getattr(self.parent, f"ir{a}").match().solve()
-        getattr(self.parent, f"ir{b}").match().solve()
+        ira=getattr(self.parent, f"ir{a}")
+        irb=getattr(self.parent, f"ir{b}")
+        print(f"Match {ira}")
+        ira.match().solve()
+        print(f"Match {irb}")
+        irb.match().solve()
 
 
 class ActionArcPhaseAdvance(xt.Action):

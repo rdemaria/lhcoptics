@@ -241,23 +241,22 @@ class LHCSection:
         """
         if isinstance(src, str):
             src = self.__class__.from_json(src)
-        print(self)
         self.update_strengths(src)
         self.update_knobs(src)
         self.update_params(src)
         return self
 
-    def twiss(self, beam=None, method=None):
+    def twiss(self, beam=None, method=None, strengths=True):
         """Return twiss table from the model using specific methods."""
         if method is None:
             method = self.default_twiss_method
-        return getattr(self, "twiss_" + method)(beam)
+        return getattr(self, "twiss_" + method)(beam,strengths=strengths)
 
     def plot(self, beam=None, method="periodic", figlabel=None):
         if beam is None:
             return [self.plot(beam=1), self.plot(beam=2)]
         else:
-            twiss = self.twiss(beam, method=method)
+            twiss = self.twiss(beam, method=method,strengths=True)
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
             return twiss.plot(figlabel=figlabel)

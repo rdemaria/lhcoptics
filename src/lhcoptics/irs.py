@@ -15,6 +15,7 @@ from .model_madx import LHCMadModel
 
 from .irtable import LHCIRTable
 
+
 class LHCIR(LHCSection):
     """
     Model of an LHC Interaction Region
@@ -36,7 +37,7 @@ class LHCIR(LHCSection):
         irn = int(name[-1])
         strength_names = []
         quads = madmodel.filter(f"kt?q[xt]?[0-9]?\.[lr]{irn}$")
-        #quads += madmodel.filter(f"ktq[x][0-9].*[lr]{irn}$")
+        # quads += madmodel.filter(f"ktq[x][0-9].*[lr]{irn}$")
         quads += madmodel.filter(f"kqt?l?[0-9][0-9]?\..*[lr]{irn}b[12]$")
         if irn == 7:
             if "kqt5.l7" in quads:
@@ -105,9 +106,7 @@ class LHCIR(LHCSection):
     @property
     def quads(self):
         return {
-            k: v
-            for k, v in self.strengths.items()
-            if "kq" in k or "ktq" in k
+            k: v for k, v in self.strengths.items() if "kq" in k or "ktq" in k
         }
 
     def set_init(self):
@@ -122,15 +121,21 @@ class LHCIR(LHCSection):
             2: arcright.twiss_init(2)[0],
         }
 
-    def twiss_from_init(self, beam=None):
+    def twiss_from_init(self, beam=None, strengths=True):
         if beam is None:
-            return [self.twiss_from_init(beam=1), self.twiss_from_init(beam=2)]
+            return [
+                self.twiss_from_init(beam=1, strengths=strengths),
+                self.twiss_from_init(beam=2, strengths=strengths),
+            ]
         if self.init_left is None:
             self.set_init()
         start = self.startb12[beam]
         end = self.endb12[beam]
         return self.model.sequence[beam].twiss(
-            start=start, end=end, init=self.init_left[beam]
+            start=start,
+            end=end,
+            init=self.init_left[beam],
+            strengths=strengths,
         )
 
     def twiss_from_params(self, beam):
@@ -153,14 +158,19 @@ class LHCIR(LHCSection):
             start=self.startb12[beam], end=self.endb12[beam], init=init
         )
 
-    def twiss_full(self, beam):
+    def twiss_full(self, beam, strengths=True):
         if beam is None:
-            return [self.twiss_full(beam=1), self.twiss_full(beam=2)]
+            return [
+                self.twiss_full(beam=1, strengths=strengths),
+                self.twiss_full(beam=2, strengths=strengths),
+            ]
         sequence = self.model.sequence[beam]
         start = self.startb12[beam]
         end = self.endb12[beam]
         init = sequence.twiss().get_twiss_init(start)
-        return sequence.twiss(start=start, end=end, init=init)
+        return sequence.twiss(
+            start=start, end=end, init=init, strengths=strengths
+        )
 
     def twiss(self, beam=None, method="init"):
         if method == "init":
@@ -229,11 +239,11 @@ class LHCIR(LHCSection):
 
     def get_params(self, mode="init"):
         if mode == "init":
-            tw1 = self.twiss_from_init(1)
-            tw2 = self.twiss_from_init(2)
+            tw1 = self.twiss_from_init(1, strengths=False)
+            tw2 = self.twiss_from_init(2, strengths=False)
         elif mode == "full":
-            tw1 = self.twiss_full(1)
-            tw2 = self.twiss_full(2)
+            tw1 = self.twiss_full(1, strengths=False)
+            tw2 = self.twiss_full(2, strengths=False)
         params = self.get_params_from_twiss(tw1, tw2)
         return {k: np.round(v, 8) for k, v in params.items()}
 
@@ -316,7 +326,9 @@ class LHCIR(LHCSection):
     ):
         varylst = []
         for kk in self.quads:
-            limits = self.parent.circuits.get_klimits(kk,self.parent.params['pc0'])
+            limits = self.parent.circuits.get_klimits(
+                kk, self.parent.params["pc0"]
+            )
             limits[0] *= 1 + kmin_marg
             limits[1] *= 1 - kmax_marg
             if "b1" in kk and b1:
@@ -333,11 +345,10 @@ class LHCIR(LHCSection):
         return varylst
 
     def disable_bumps(self):
-        for k,knob in self.knobs.items():
-            if re.match(r"on_[xsao]",k):
+        for k, knob in self.knobs.items():
+            if re.match(r"on_[xsao]", k):
                 knob.value = 0
-                self.parent.model[k]=0
-
+                self.parent.model[k] = 0
 
     def match(
         self, kmin_marg=0.0, kmax_marg=0.0, b1=True, b2=True, common=True
@@ -385,11 +396,6 @@ class LHCIR(LHCSection):
             check_limits=False,
             strengths=False,
         )
-        opt.disable(target="coll")
-        opt.disable(target="spdx")
         opt.disable(target="mu.*_l")
         self.opt = opt
         return opt
-
-
-
