@@ -24,7 +24,6 @@ class LHCArc(LHCSection):
         strengths = {st: madx.globals[st] for st in strength_names}
         return cls(name, strengths, params, knobs)
 
-
     def __init__(
         self,
         name=None,
@@ -38,7 +37,9 @@ class LHCArc(LHCSection):
         i1, i2 = int(name[1]), int(name[2])
         start = f"s.ds.r{i1}"
         end = f"e.ds.l{i2}"
-        super().__init__(name, start, end, strengths, params, knobs,filename=filename)
+        super().__init__(
+            name, start, end, strengths, params, knobs, filename=filename
+        )
         self.i1 = i1
         self.i2 = i2
         self.start_cell = {1: f"s.cell.{i1}{i2}.b1", 2: f"s.cell.{i1}{i2}.b2"}
@@ -49,17 +50,13 @@ class LHCArc(LHCSection):
     def twiss_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
         tw = self.twiss(beam)
-        start= tw.get_twiss_init(self.startb[beam])
-        end= tw.get_twiss_init(self.endb[beam])
-        start.mux=0
-        start.muy=0
-        end.mux=0
-        end.muy=0
-        return [
-            start,
-            end
-
-        ]
+        start = tw.get_twiss_init(self.startb[beam])
+        end = tw.get_twiss_init(self.endb[beam])
+        start.mux = 0
+        start.muy = 0
+        end.mux = 0
+        end.muy = 0
+        return [start, end]
 
     def twiss_cell(self, beam=None):
         """Get twiss table of periodic cell."""
@@ -113,7 +110,6 @@ class LHCArc(LHCSection):
 
             return res
 
-
     def get_params_from_twiss(self, tw1, tw2):
         params = {
             f"mux{self.name}b1": tw1.mux[-1],
@@ -131,11 +127,82 @@ class LHCArc(LHCSection):
         }
         return params
 
-
     def get_params(self):
         """Get params from model"""
         tw1, tw2 = self.twiss()
         return self.get_params_from_twiss(tw1, tw2)
+
+    @property
+    def quads(self):
+        """Get quads in the arc"""
+        return [k for k in self.strengths if "kq" in k]
+
+    def get_match_targets(self, b1=True, b2=True):
+        """Get match targets for the arc"""
+        targets = []
+        if b1:
+            targets.append(
+                xt.Target(
+                    action=ActionArcPhaseAdvance(self, 1),
+                    tar="mux",
+                    value=0,
+                    tol=1e-2,
+                    tag="mux",
+                )
+            )
+        if b2:
+            targets.append(
+                xt.Target(
+                    action=ActionArcPhaseAdvance(self, 2),
+                    tar="mux",
+                    value=0,
+                    tol=1e-2,
+                    tag="mux",
+                )
+            )
+        return targets
+
+    def get_match_kq_vary(self, fd, beam='', kmax_marg=0.0):
+        """Get match vary for the arc"""
+        if beam:
+           kname= f"kqt{fd}.{self.name}{beam}"
+        else:
+           kname= f"kq{fd}.{self.name}"
+        limits= self.parent.circuits.get_klimits(kname,self.parent.params["pc0"])
+        limits[0] *= 1 + kmax_marg
+        limits[1] *= 1 - kmax_marg
+        return xt.Vary(
+                        name=kname,
+                        lower=limits[0],
+                        upper=limits[1],
+                        step=1e-8,
+                        tag=beam
+                    )
+
+    def match(self, b1=True, b2=True):
+        """Match the arc"""
+        targets = self.get_match_targets(b1=b1, b2=b2)
+        varylst=[]
+        for fd in ['f','d']:
+                if b1 and b2:
+                    varylst.append(self.get_match_kq_vary(fd))
+                    varylst.append(self.get_match_kq_vary(fd),"b1")
+                    self.model.vref[f"ktq{fd}.{self.name}b2"] = -self.model.vref[f"kq{fd}.{self.name}b1"]
+                elif b1:
+                    varylst.append(self.get_match_kq_vary(fd),"b1")
+                elif b2:
+                    varylst.append(self.get_match_kq_vary(fd),"b2")
+
+        opt = xt.match(
+            solve=False,
+            default_tol={None: 5e-8},
+            solver_options=dict(max_rel_penalty_increase=2.0),
+            targets=targets,
+            vary=varylst,
+            check_limits=False,
+            strengths=False,
+        )
+        return opt
 
 
 class ActionArcPhaseAdvance(xt.Action):

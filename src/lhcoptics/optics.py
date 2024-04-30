@@ -154,7 +154,9 @@ class LHCOptics:
     def from_json(cls, filename, xsuite_model=None, circuits=None):
         with open(filename) as f:
             data = json.load(f)
-            return cls.from_dict(data, xsuite_model=xsuite_model)
+            out=cls.from_dict(data, xsuite_model=xsuite_model, circuits=circuits)
+            out.update_model()
+            return out
 
     def __repr__(self) -> str:
         return f"<LHCOptics {self.name!r}>"
@@ -200,6 +202,12 @@ class LHCOptics:
         """
         if src is None:
             src = self.model
+        if hasattr(src, "knobs"):
+            src=src.knobs
+        elif hasattr(src, "get_knob"):
+            src={k: src.get_knob(knob) for k,knob in self.knobs.items()}
+        for k in self.knobs:
+            self.knobs[k] = Knob.from_src(src[k])
         if full:
             for ss in self.irs + self.arcs:
                 if hasattr(src, ss.name):
@@ -210,9 +218,27 @@ class LHCOptics:
                     ss.update_knobs(src=src_ss)
         return self
 
-    def update_from_model(self):
+    def update(self,src=None):
+        self.update_knobs(src)
+        self.update_params(src)
         for ss in self.irs + self.arcs:
-            ss.update_from_model()
+            ss.update(src)
+        return self
+    
+    def update_params(self, src=None, add=False):
+        """
+        Update existing params from self.model or src.params or src
+        """
+        if src is None:
+            src = self.get_params()
+        elif hasattr(src, "params"):
+            src = src.params
+        if add:
+            self.params.update(src)
+        else:
+            for k in self.params:
+                if k in src:
+                    self.params[k] = src[k]
         return self
 
     def set_xsuite_model(self, model):
@@ -268,9 +294,7 @@ class LHCOptics:
     def twiss(self, beam=None, chrom=False):
         if beam is None:
             return [self.twiss(beam=1), self.twiss(beam=2)]
-        tw1 = self.model.b1.twiss(compute_chromatic_properties=chrom)
-        tw2 = self.model.b2.twiss(compute_chromatic_properties=chrom)
-        return tw1, tw2
+        return getattr(self.model,f"b{beam}").twiss(compute_chromatic_properties=chrom)
 
     def plot(self, beam=None):
         if beam is None:
@@ -279,3 +303,7 @@ class LHCOptics:
         else:
             self.twiss(beam=beam).plot()
         return self
+
+    def disable_bumps(self):
+        for ir in self.irs:
+            ir.disable_bumps()

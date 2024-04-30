@@ -211,16 +211,17 @@ class LHCSection:
         """
         if src is None:
             src = self.model
-            raise NotImplementedError
+        if hasattr(src, "get_knob"):
+            src = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
         elif hasattr(src, "knobs"):
             src = src.knobs
         for k in self.knobs:
-            self.knobs[k] = src[k]
+            self.knobs[k] = Knob.from_src(src[k])
         return self
 
     def update_params(self, src=None, add=False):
         """
-        Update existing params from self. model or src.params or src
+        Update existing params from self.model or src.params or src
         """
         if src is None:
             src = self.get_params()
@@ -240,6 +241,7 @@ class LHCSection:
         """
         if isinstance(src, str):
             src = self.__class__.from_json(src)
+        print(self)
         self.update_strengths(src)
         self.update_knobs(src)
         self.update_params(src)
@@ -274,3 +276,6 @@ class LHCSection:
         if self.parent.circuit is None:
             raise ValueError("Circuit not set")
         return self.parent.circuit.get_current(kname, self[kname], pc0)
+
+    def disable_bumps(self):
+        pass

@@ -111,14 +111,6 @@ class LHCIR7(LHCIR):
         "kq5.lr7": -0.001202569087048791,
     }
 
-    def update_from_model(self):
-        for beam, tw in enumerate(self.twiss):
-            self.params[f"betxip7b{beam+1}"] = tw["betxip"]
-            self.params[f"betyip7b{beam+1}"] = tw["betyip"]
-        self.params = {
-            "betxip7b1": 0.8,
-        }
-
     def match(
         self,
         kmin_marg=0.0,

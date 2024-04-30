@@ -3,6 +3,13 @@ class Knob:
     def from_dict(cls, data):
         return cls(data["name"], data["value"], data["weights"])
 
+    @classmethod
+    def from_src(cls, src):
+        if  hasattr(src, "name") and hasattr(src, "value") and hasattr(src, "weights"):
+            return cls(src.name, src.value, src.weights)
+        else:
+            return cls.from_dict(src)
+
     def __init__(self, name, value=0, weights=None):
         self.name = name
         self.value = value

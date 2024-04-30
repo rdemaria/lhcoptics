@@ -1,4 +1,5 @@
 from .model_madx import LHCMadModel
+from .knob import Knob
 
 
 class LHCXsuiteModel:
@@ -128,6 +129,23 @@ class LHCXsuiteModel:
                     task is not None and k not in task.dependencies
                 ):
                     self.vref[wn] += self.vref[name] * self.vref[k]
+
+    def get_knob(self,knob):
+        value= self._var_values[knob.name]
+        weights = {}
+        for wname in knob.weights:
+            weights[wname]= self._var_values[f"{wname}_from_{knob.name}"]
+        return Knob(knob.name,value,weights)
+
+
+    def get_knob_by_naming(self, name):
+        weights = {}
+        wname= f"_from_{name}"
+        for k in self._var_values:
+            if k.endswith(wname):
+                weights[k]= self._var_values[k]
+        value = self._var_values[name]
+        return Knob(name,value,weights)
 
     def update(self, src):
         if hasattr(src, "strengths"):

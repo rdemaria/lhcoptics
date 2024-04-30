@@ -13,6 +13,7 @@ from .section import (
 )
 from .model_madx import LHCMadModel
 
+from .irtable import LHCIRTable
 
 class LHCIR(LHCSection):
     """
@@ -315,7 +316,7 @@ class LHCIR(LHCSection):
     ):
         varylst = []
         for kk in self.quads:
-            limits = self.parent.circuits[kk].get_klimits()
+            limits = self.parent.circuits.get_klimits(kk,self.parent.params['pc0'])
             limits[0] *= 1 + kmin_marg
             limits[1] *= 1 - kmax_marg
             if "b1" in kk and b1:
@@ -331,131 +332,64 @@ class LHCIR(LHCSection):
                 varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
 
-
-class Col:
-    def __init__(self, attr, rows):
-        self.attr = attr
-        self.rows = rows
-
-    def __getitem__(self, k):
-        attrs = [getattr(row, self.attr) for row in self.rows]
-        return [attr[k] for attr in attrs]
-
-    def __repr__(self) -> str:
-        return f"<Col {self.attr!r} {len(self.rows)} rows>"
+    def disable_bumps(self):
+        for k,knob in self.knobs.items():
+            if re.match(r"on_[xsao]",k):
+                knob.value = 0
+                self.parent.model[k]=0
 
 
-class LHCIRTable:
-
-    def __init__(self, rows):
-        self.rows = rows
-        self.strengths = Col("strengths", rows)
-        self.params = Col("params", rows)
-        self.knobs = Col("knobs", rows)
-
-    def __len__(self):
-        return len(self.rows)
-
-    def __repr__(self):
-        return f"<LHCIRTable {len(self)} rows>"
-
-    def get_quads(self, n=None):
-        if n is None:
-            dct = {}
-            for n in range(1, 13):
-                dct.update(self.tab_quads(n))
-        else:
-            ir = self.rows[0]
-            quad_names = [
-                k for k in ir.quads if re.match(f"kq[xtl]*{n}\\.", k)
-            ]
-            return {k: [ir.quads[k] for ir in self.rows] for k in quad_names}
-
-    @property
-    def tab(self):
-        tab = {}
-        tab["id"] = np.arange(len(self))
-        ir0 = self.rows[0]
-        for k in ir0.strengths:
-            tab[k] = [ir.strengths[k] for ir in self.rows]
-        for k in ir0.params:
-            tab[k] = [ir.params[k] for ir in self.rows]
-        for k in ir0.knobs:
-            tab[f"{k.name}_value"] = [ir.knobs[k].value for ir in self.rows]
-            for w in ir0.knobs[k].weights:
-                tab[f"{k}_{w}"] = [ir.knobs[k].weights[w] for ir in self.rows]
-        return xd.Table(tab, index="id")
-
-    def __getitem__(self, k):
-        if k == "id":
-            return np.arange(len(self))
-        else:
-            return np.array([ir[k] for ir in self.rows])
-
-    def plot_quad(
-        self, n, xaxis="id", ax=None, title=None, figname=None, p0c=6.8e12
+    def match(
+        self, kmin_marg=0.0, kmax_marg=0.0, b1=True, b2=True, common=True
     ):
-        brho = p0c / 299792458
-        if title is None:
-            title = f"{self.rows[0].name.upper()} Q{n}"
-        if figname is None:
-            figname = f"{self.rows[0].name.upper()} Q{n}"
-        if ax is None:
-            fig, ax = plt.subplots(num=figname)
-            ax = plt.gca()
-        xx = self[xaxis]
-        for q in self.get_quads(n):
-            ax.plot(xx, self[q] * brho, label=q)
-        ax.set_title(title)
-        ax.set_xlabel(xaxis)
-        ax.set_ylabel(r"k [$T/m$]")
-        ax.legend()
+        if self.parent.model is None:
+            raise ValueError("Model not set for {self)")
+        if self.parent.circuits is None:
+            raise ValueError("Circuits not set for {self)")
+        if self.init_left is None or self.init_right is None:
+            self.set_init()
+        if len(self.params) == 0:
+            self.params = self.get_params()
+        lhc = self.parent.model.multiline
+        if lhc.b1.tracker is None:
+            lhc.b1.build_tracker()
+        if lhc.b2.tracker is None:
+            lhc.b2.build_tracker()
 
-    def plot_quads(
-        self, xaxis="id", fig=None, title=None, figname=None, p0c=6.8e12
-    ):
-        nq = []
-        for n in range(1, 13):
-            if len(self.get_quads(n)) > 0:
-                nq.append(n)
-        rows = len(nq) // 3
-        cols = len(nq) // rows
-        if hasattr(self, "fig") and self.fig is not None:
-            fig = self.fig
-        if fig is None:
-            if title is None:
-                title = f"{self.rows[0].name.upper()} Quads"
-            if figname is None:
-                figname = f"{self.rows[0].name.upper()} Quads"
-            fig, axs = plt.subplots(
-                cols, rows, num=figname, figsize=(2.5 * cols, 2.5 * cols)
-            )
-            self.fig = fig
-            axs = axs.flatten()
-        else:
-            axs = fig.axes
-        for i, (n, ax) in enumerate(zip(nq, axs)):
-            ax.clear()
-            self.plot_quad(n, xaxis, ax, p0c=p0c)
-            ax.title.set_text(None)
-            if i % rows > 0:
-                ax.set_ylabel(None)
-            if i < len(nq) - cols:
-                ax.set_xlabel(None)
-        for ax in axs[len(nq) :]:
-            ax.set_visible(False)
-        plt.suptitle(title)
-        # plt.tight_layout()
+        inits = [self.init_left[1], self.init_left[2]]
+        starts = [self.startb12[1], self.startb12[2]]
+        ends = [self.endb12[1], self.endb12[2]]
+        lines = ["b1", "b2"]
 
-    def interp_val(self, p, kname, order=1, pname="id"):
-        pp = self[pname]
-        yy = self[kname]
-        return np.interp(p, pp, yy)
+        targets = LHCIR.get_match_targets(self, b1=b1, b2=b2)
+        varylst = LHCIR.get_match_vary(
+            self,
+            b1=b1,
+            b2=b2,
+            common=common,
+            kmin_marg=kmin_marg,
+            kmax_marg=kmax_marg,
+        )
+        varylst = [v for v in varylst if not v.name.startswith("kq4")]
 
-    def interp(self, n, order=1, xaxis="id"):
-        ir0 = self.rows[0]
-        strengths = {
-            k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths
-        }
-        params = {k: self.interp_val(n, k, order, xaxis) for k in ir0.params}
-        return ir0.__class__(strengths=strengths, params=params)
+        opt = lhc.match(
+            solve=False,
+            default_tol={None: 5e-8},
+            solver_options=dict(max_rel_penalty_increase=2.0),
+            lines=lines,
+            start=starts,
+            end=ends,
+            init=inits,
+            targets=targets,
+            vary=varylst,
+            check_limits=False,
+            strengths=False,
+        )
+        opt.disable(target="coll")
+        opt.disable(target="spdx")
+        opt.disable(target="mu.*_l")
+        self.opt = opt
+        return opt
+
+
+

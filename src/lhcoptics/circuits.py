@@ -1,5 +1,8 @@
 import json
+import re
+
 import numpy as np
+import matplotlib.pyplot as plt
 
 from .lsa_util import get_lsa
 
@@ -23,14 +26,17 @@ class LHCCircuits:
     @staticmethod
     def get_calibs_from_lsa(calibnames):
         lsa = get_lsa()
-        req = lsa._cern.lsa.domain.devices.CalibrationsRequest.byCalibrationNames(
-            calibnames
-        )
+        #req = lsa._cern.lsa.domain.devices.CalibrationsRequest.byCalibrationNames(
+        #    calibnames
+        #)
+        #temp fix for the triplets
+        req=lsa._cern.lsa.domain.devices.CalibrationsRequest.ALL
         calibs = lsa._deviceService.findCalibrations(req)
         calibrations = {}
         for lsacalib in calibs:
             calib = LHCCalibration.from_lsa_calib(lsacalib)
-            calibrations[calib.name] = calib
+            if calib is not None:
+                calibrations[calib.name] = calib
         return calibrations
 
     @classmethod
@@ -77,7 +83,10 @@ class LHCCircuits:
                 cir.imin = -cir.imax
 
         self.madname = {cir.madname: cir for cir in self.pcname.values()}
-        self.shortname= {'.'.join(cir.pcname.split(".")[2:]): cir for cir in self.pcname.values()}
+        self.shortname = {
+            ".".join(cir.pcname.split(".")[2:]): cir
+            for cir in self.pcname.values()
+        }
 
     def to_dict(self):
         return {
@@ -109,19 +118,73 @@ class LHCCircuits:
     def get_field(self, kname, current):
         return self.pcname[kname].get_field(current)
 
+    def get_klimits(self, kname, pc=7e12):
+        if kname.startswith('kqx') or kname.startswith('ktqx'):
+            brho = pc / 299792458
+            return [-205/brho, 205/brho]
+        else:
+            return self.madname[kname].get_klimits(pc)
+
+    def get_current_triplet(self, side, kqx, ktqx1, ktqx2, pc=7e12):
+        k3=kqx
+        k1=ktqx1+kqx
+        k2=-ktqx2-kqx
+        return self.get_current_triplet(side,k1,k2,k3,pc)
+
+    def get_current_triplet(self, side, k1, k2, k3, pc=7e12):
+        side=side.upper()
+        n1=f"MQXA1.{side}"
+        n2=f"MQXB2.{side}"
+        n3=f"MQXA3.{side}"
+        i1=self.calibrations[n1].get_current(k1,pc)
+        i2=self.calibrations[n2].get_current(k2,pc)
+        i3=self.calibrations[n3].get_current(k3,pc)
+        return i1,i2,i3
+
+    def get_field_triplet(self, side, i1, i2, i3):
+        side=side.upper()
+        n1=f"MQXA1.{side}"
+        n2=f"MQXB2.{side}"
+        n3=f"MQXA3.{side}"
+        f1=self.calibrations[n1].get_field(i1)
+        f2=self.calibrations[n2].get_field(i2)
+        f3=self.calibrations[n3].get_field(i3)
+        return f1,f2,f3
+
+    def get_current_triplet_trims(self, side, k1, k2, k3, pc=7e12):
+        i1,i2,i3=self.get_current_triplet(side,k1,k2,k3,pc)
+        return {f"RQX.{side}":i3,f"RTQX1.{side}":i3-i1,f"RQTX2.{side}":i2-i3}
+
+    def find_calib(self, name):
+        return [calib for cname,calib in self.calibrations.items() if re.match(name,cname)]
+
+    def find_pc(self, madname=None, pcname=None, shortname=None):
+        out=[]
+        if madname:
+            out+=[pc for pc in self.pcname.values() if pc.madname and re.match(madname,pc.madname)]
+        if pcname:
+            out+=[pc for pc in self.pcname.values() if re.match(pcname,pc.pcname)]
+        if shortname:
+            out+=[pc for pc in self.pcname.values() if re.match(shortname,pc.shortname)]
+        return out
+
 
 class LHCCircuit:
     @staticmethod
-    def get_logicalhardware_from_lsa(pcname):
+    def get_logicalhardware_from_lsa(pcname, first=True):
         """
         Contains also Rtot,Ltot, tau
         """
-        return (
+        lst = (
             get_lsa()
             ._deviceService.findLogicalHardwaresByActualDeviceNames([pcname])
             .get(pcname)
-            .toArray()[0]
+            .toArray()
         )
+        if first:
+            return lst[0]
+        else:
+            return lst
 
     @staticmethod
     def get_pcinfo_from_lsa(pcname):
@@ -131,7 +194,7 @@ class LHCCircuit:
     def from_lsa(cls, pcname):
         pcinfo = cls.get_pcinfo_from_lsa(pcname)
         lh = cls.get_logicalhardware_from_lsa(pcname)
-        pc =cls(
+        pc = cls(
             pcname=pcname,
             logicalname=lh.getName(),
             madname=lh.getMadStrengthName(),
@@ -149,6 +212,12 @@ class LHCCircuit:
         # patch RTQX
         if "RTQX" in pcname:
             pc.madname = f"ktqx{pcname[-4:].lower()}"
+        elif ".RQF." in pcname:
+            pc.calibname = lh.getName()+"B1"
+            pc.calibsign = 1
+        elif ".RQD." in pcname:
+            pc.calibname = lh.getName()+"B1"
+            pc.calibsign = -1
         return pc
 
     @classmethod
@@ -240,6 +309,8 @@ class LHCCalibration:
     def from_lsa_calib(cls, calib):
         name = calib.getName()
         map = calib.getCalibrationFunctionMap()
+        if len(map) == 0:
+            return None
         for calibfuntype in map.keys():
             if calibfuntype.getFunctionTypeName() == "B_FIELD":
                 break
@@ -300,3 +371,14 @@ class LHCCalibration:
         return (
             f"<LHCCalibration {self.name}, I {ilim}, {self.fieldtype} {flim}>"
         )
+
+    def plot(self):
+        plt.figure(num=self.name)
+        plt.plot(self.current, self.field,'k',label="Field")
+        plt.xlabel("Current [A]")
+        plt.ylabel("Field [T/m^n]")
+        dfdi=(self.field[-1]-self.field[0])/(self.current[-1]-self.current[0])
+        plt.plot(self.current,dfdi*self.current,'r',label="Field Deviation")
+        plt.title(self.name)
+        plt.grid(True)
+        plt.legend()
