@@ -119,15 +119,16 @@ class LHCIR7(LHCIR):
         b1=True,
         b2=True,
         common=True,
+        hold_init=False,
     ):
         if self.parent.model is None:
             raise ValueError("Model not set for {self)")
         if self.parent.circuits is None:
             raise ValueError("Circuits not set for {self)")
-        if self.init_left is None or self.init_right is None:
+        if not hold_init:
             self.set_init()
         if len(self.params) == 0:
-            self.params = self.get_params()
+            self.set_params()
         lhc = self.parent.model.multiline
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
@@ -209,5 +210,5 @@ class LHCIR7(LHCIR):
         opt.disable(target="coll")
         opt.disable(target="spdx")
         opt.disable(target="mu.*_l")
-        self.opt = opt
+        self.optmizer = opt
         return opt

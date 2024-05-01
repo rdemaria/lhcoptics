@@ -84,6 +84,7 @@ class LHCXsuiteModel:
         self._var_values = multiline._xdeps_vref._owner
         self.vref = multiline._xdeps_vref
         self.mgr = multiline._xdeps_manager
+        self.madxfile= madxfile
         self.sequence = {1: multiline.b1, 2: multiline.b2}
 
     @property
@@ -104,6 +105,9 @@ class LHCXsuiteModel:
 
     def __getitem__(self, key):
         return self._var_values[key]
+
+    def __contains__(self, key):
+        return key in self._var_values
 
     def __setitem__(self, key, value):
         self.vref[key] = value
@@ -181,3 +185,12 @@ class LHCXsuiteModel:
                 tw = tw.rows[startout:endout]  # can fail because of cycle
         else:
             tw = line.twiss(start=startout, end=endout, init=init)
+
+
+    def copy(self):
+        return self.__class__(
+            multiline=self.multiline.copy(),
+            settings=self.settings,
+            jsonfile=self.jsonfile,
+            madxfile=self.madxfile,
+        )

@@ -71,12 +71,12 @@ use, sequence=lhcb2;
         if strengths is None:
             strengths = {}
         weights = {}
-        for knob in knobs:
+        for knob in knobs.values():
             for st,val in knob.weights.items():
                 weights.setdefault(st,[]).append(f"{val:+.15g}*{knob.name}")
         for st in weights:
             if st in strengths:
-                weights[st].insert(f"{strengths[st]:+.15g}",0)
+                weights[st].insert(0,f"{strengths[st]:+.15g}")
         return [f"{st}:={''.join(weights[st])};" for st in weights]
 
     @classmethod

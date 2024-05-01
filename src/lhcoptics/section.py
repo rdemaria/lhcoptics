@@ -130,29 +130,39 @@ class LHCSection:
             json.dump(self.to_dict(), f)
         return self
 
-    def to_madx(self, out=str):
+    def to_madx(self, output=None):
         out = []
-        out.append(f"! {self.name}\n")
-        out.append(f"! Parameters\n")
-        for k, v in self.params.items():
-            out.append(f"{k:30} = {v:19.16f};")
-        out.append(f"! Strengths\n")
-        for k, v in self.strengths.items():
-            out.append(f"{k:30} = {v:19.16f};")
-        out.append(f"! Knobs\n")
-        for expr in LHCMadModel.knobs_to_expr(self.knobs, self.strengths):
-            out.append(expr)
-        if out is str:
+        out.append(f"! {self.name.upper()}\n")
+        if len(self.strengths) > 0:
+            out.append(f"! Strengths")
+            for k, v in self.strengths.items():
+                out.append(f"{k:30} = {v:19.16f};")
+            out.append("")
+        if len(self.params) > 0:
+            out.append(f"! Parameters")
+            for k, v in self.params.items():
+                out.append(f"{k:30} = {v:19.16f};")
+            out.append("")
+        if len(self.knobs) > 0:
+            out.append(f"! Knobs")
+            for expr in LHCMadModel.knobs_to_expr(self.knobs, self.strengths):
+                out.append(expr)
+            out.append("")
+        if output is str:
             return "\n".join(out)
-        elif hasattr(self, "input"):
+        elif hasattr(output, "input"):
             for ll in out:
                 if ll[0] != "!":
-                    self.input(ll)
-        elif hasattr(self, "writelines"):
-            self.writelines(out)
-        elif isinstance(out, str) or isinstance(out, Path):
-            with open(out, "w") as f:
+                    output.input(ll)
+        elif hasattr(output, "writelines"):
+            output.writelines(out)
+        elif isinstance(output, str) or isinstance(output, Path):
+            with open(output, "w") as f:
                 f.writelines(out)
+        elif output is None:
+            print("\n".join(out))
+        else:
+            raise ValueError(f"Unknown output type {output}")
 
     def copy(self, src=None):
         other = self.__class__(
@@ -193,7 +203,7 @@ class LHCSection:
         self.model.update_knobs(knobs)
         return self
 
-    def update_strengths(self, src=None):
+    def update_strengths(self, src=None, verbose=False):
         """
         Update existing stregnths from self. model or src.strengths or src
         """
@@ -202,10 +212,13 @@ class LHCSection:
         elif hasattr(src, "strengths"):
             src = src.strengths
         for k in self.strengths:
-            self.strengths[k] = src[k]
+            if k in src:
+                if verbose and self.strengths[k] != src[k]:
+                    print(f"Updating {k} from {self.strengths[k]} to {src[k]}")
+                self.strengths[k] = src[k]
         return self
 
-    def update_knobs(self, src=None):
+    def update_knobs(self, src=None, verbose=False):
         """
         Update existing knobs from self. model or src.knobs or src
         """
@@ -216,10 +229,13 @@ class LHCSection:
         elif hasattr(src, "knobs"):
             src = src.knobs
         for k in self.knobs:
-            self.knobs[k] = Knob.from_src(src[k])
+            if k in src:
+                self.knobs[k] = Knob.from_src(src[k])
+            if verbose:
+                print(f"Updating {k} = {self.knobs[k]}")
         return self
 
-    def update_params(self, src=None, add=False):
+    def update_params(self, src=None, add=False, verbose=False):
         """
         Update existing params from self.model or src.params or src
         """
@@ -228,22 +244,31 @@ class LHCSection:
         elif hasattr(src, "params"):
             src = src.params
         if add:
-            self.params.update(src)
+            for k in src:
+                if k not in self.params:
+                    if verbose:
+                        print(f"Adding {k} = {src[k]}")
+                    self.params[k] = src[k]
         else:
             for k in self.params:
                 if k in src:
+                    if verbose and self.params[k] != src[k]:
+                        print(f"Updating {k} from {self.params[k]} to {src[k]}")
                     self.params[k] = src[k]
         return self
 
-    def update(self, src=None):
+    def update(self, src=None,verbose=False,knobs=True,strengths=True,params=True):
         """
         Update existing strengths, knobs, params from self. model or src.params or src
         """
         if isinstance(src, str):
             src = self.__class__.from_json(src)
-        self.update_strengths(src)
-        self.update_knobs(src)
-        self.update_params(src)
+        if strengths:
+            self.update_strengths(src,verbose=verbose)
+        if knobs:
+            self.update_knobs(src,verbose=verbose)
+        if params:
+            self.update_params(src,verbose=verbose)
         return self
 
     def twiss(self, beam=None, method=None, strengths=True):
@@ -278,3 +303,7 @@ class LHCSection:
 
     def disable_bumps(self):
         pass
+
+    def knobs_off(self):
+        for k in self.knobs:
+            self.parent.model[k] = 0

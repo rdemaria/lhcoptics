@@ -53,7 +53,25 @@ class LHCIR(LHCSection):
         for knob in knobs:
             madx.globals[knob] = knobs[knob].value
         params = {}
+        for param in "betx bety alfx alfy dx dpx".split():
+            for beam in "12":
+                ppname=f"{param}ip{irn}b{beam}"
+                if ppname in madx.globals:
+                   params[ppname] = madx.globals[ppname]
+        for param in "mux muy".split():
+            for beam in "12":
+                for suffix in ["", "_l", "_r"]:
+                    ppname=f"{param}ip{irn}b{beam}{suffix}"
+                    if ppname in madx.globals:
+                       params[ppname] = madx.globals[ppname]
         return cls(name, strengths, params, knobs)
+
+    @classmethod
+    def from_madxfile(cls, filename, name=None,stdout=False):
+        from cpymad.madx import Madx
+        madx = Madx(stdout=stdout)
+        madx.call(filename)
+        return cls.from_madx(madx, name)
 
     def __init__(
         self,
@@ -108,6 +126,14 @@ class LHCIR(LHCSection):
         return {
             k: v for k, v in self.strengths.items() if "kq" in k or "ktq" in k
         }
+    
+    @property
+    def kqxl(self):
+        return [k for k in self.quads if "l" in k and 'x' in k]
+    
+    @property
+    def kqxr(self):
+        return [k for k in self.quads if "r" in k and 'x' in k]
 
     def set_init(self):
         arcleft = self.arc_left
@@ -167,18 +193,18 @@ class LHCIR(LHCSection):
         sequence = self.model.sequence[beam]
         start = self.startb12[beam]
         end = self.endb12[beam]
-        init = sequence.twiss().get_twiss_init(start)
+        init = sequence.twiss(strengths=strengths).get_twiss_init(start)
         return sequence.twiss(
             start=start, end=end, init=init, strengths=strengths
         )
 
-    def twiss(self, beam=None, method="init"):
+    def twiss(self, beam=None, method="init",strengths=True):
         if method == "init":
-            return self.twiss_from_init(beam)
+            return self.twiss_from_init(beam, strengths=strengths)
         elif method == "full":
-            return self.twiss_full(beam)
+            return self.twiss_full(beam, strengths=strengths)
         elif method == "params":
-            return self.twiss_from_params(beam)
+            return self.twiss_from_params(beam, strengths=strengths)
 
     def plot(self, beam=None, method="init", figlabel=None):
         if beam is None:
@@ -314,7 +340,6 @@ class LHCIR(LHCSection):
                             self.params[f"{tt}{self.ipname}{ll}"],
                             line=ll,
                             at=self.ipname,
-                            tol=1e-1,
                             tag=f"ip_{tt}{ll}",
                         )
                     )
@@ -351,16 +376,17 @@ class LHCIR(LHCSection):
                 self.parent.model[k] = 0
 
     def match(
-        self, kmin_marg=0.0, kmax_marg=0.0, b1=True, b2=True, common=True
+        self, kmin_marg=0.0, kmax_marg=0.0, b1=True, b2=True, common=True,
+        hold_init=False, sym_triplets=True, lrphase=False
     ):
         if self.parent.model is None:
             raise ValueError("Model not set for {self)")
         if self.parent.circuits is None:
             raise ValueError("Circuits not set for {self)")
-        if self.init_left is None or self.init_right is None:
+        if not hold_init:
             self.set_init()
         if len(self.params) == 0:
-            self.params = self.get_params()
+            self.set_params()
         lhc = self.parent.model.multiline
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
@@ -381,9 +407,12 @@ class LHCIR(LHCSection):
             kmin_marg=kmin_marg,
             kmax_marg=kmax_marg,
         )
-        varylst = [v for v in varylst if not v.name.startswith("kq4")]
+        if self.name=="ir1":
+             varylst = [v for v in varylst if not v.name.startswith("kq4")]
 
-        opt = lhc.match(
+
+
+        match = lhc.match(
             solve=False,
             default_tol={None: 5e-8},
             solver_options=dict(max_rel_penalty_increase=2.0),
@@ -396,6 +425,21 @@ class LHCIR(LHCSection):
             check_limits=False,
             strengths=False,
         )
-        opt.disable(target="mu.*_l")
-        self.opt = opt
-        return opt
+        if lrphase is False:
+           match.disable(target="mu.*_l")
+        if sym_triplets:
+            for kl, kr in zip(self.kqxl,self.kqxr):
+               self.parent.model.vref[kl]=-self.parent.model.vref[kr]
+               match.disable(vary_name=kl)
+        self.optimizer = match
+        return match
+
+
+    def set_betastar(self, beta=None, ratio=1.0):
+        if self.irn in [1,2,5,8]:
+            self.params[f"betx{self.ipname}b1"] = beta
+            self.params[f"betx{self.ipname}b2"] = beta
+            self.params[f"bety{self.ipname}b1"] = beta/ratio
+            self.params[f"bety{self.ipname}b2"] = beta/ratio
+        else:
+            raise ValueError(f"IR{self.irn} not allowed for beta* setting")

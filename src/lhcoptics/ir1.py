@@ -15,4 +15,3 @@ class LHCIR1(LHCIR):
         "on_yip1b1",
         "on_ov1",
     ]
-

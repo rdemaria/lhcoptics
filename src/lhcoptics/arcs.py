@@ -49,7 +49,7 @@ class LHCArc(LHCSection):
 
     def twiss_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
-        tw = self.twiss(beam)
+        tw = self.twiss(beam, strengths=False)
         start = tw.get_twiss_init(self.startb[beam])
         end = tw.get_twiss_init(self.endb[beam])
         start.mux = 0
@@ -61,11 +61,19 @@ class LHCArc(LHCSection):
     def twiss_cell(self, beam=None, strengths=True):
         """Get twiss table of periodic cell."""
         if beam is None:
-            return [self.twiss_cell(beam=1, strengths=strengths), self.twiss_cell(beam=2, strengths=strengths)]
+            return [
+                self.twiss_cell(beam=1, strengths=strengths),
+                self.twiss_cell(beam=2, strengths=strengths),
+            ]
         sequence = self.model.sequence[beam]
         start_cell = self.start_cell[beam]
         end_cell = self.end_cell[beam]
-        return sequence.twiss(start=start_cell, end=end_cell, init="periodic", strengths=strengths)
+        return sequence.twiss(
+            start=start_cell,
+            end=end_cell,
+            init="periodic",
+            strengths=strengths,
+        )
 
     def twiss_init_cell(self, beam, strengths=True):
         """Get twiss init at the beginning of the cell."""
@@ -77,25 +85,33 @@ class LHCArc(LHCSection):
             end=end_cell,
             init="periodic",
             only_twiss_init=True,
-            strengths=strengths
+            strengths=strengths,
         )
         return twinit_cell
 
     def twiss_full(self, beam=None, strengths=True):
         """Get twiss table of full arc of the full LHC periodic solution"""
         if beam is None:
-            return [self.twiss_full(beam=1, strengths=strengths), self.twiss_full(beam=2, strengths=strengths)]
+            return [
+                self.twiss_full(beam=1, strengths=strengths),
+                self.twiss_full(beam=2, strengths=strengths),
+            ]
         else:
             sequence = self.model.sequence[beam]
             start = self.startb12[beam]
             end = self.endb12[beam]
             init = sequence.twiss(strengths=False).get_twiss_init(start)
-            return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
+            return sequence.twiss(
+                start=start, end=end, init=init, strengths=strengths
+            )
 
     def twiss_periodic(self, beam=None, strengths=True):
         """Get twiss table of matched arc."""
         if beam is None:
-            return [self.twiss(beam=1, strengths=strengths), self.twiss(beam=2, strengths=strengths)]
+            return [
+                self.twiss(beam=1, strengths=strengths),
+                self.twiss(beam=2, strengths=strengths),
+            ]
         else:
             twinit_cell = self.twiss_init_cell(beam, strengths=strengths)
             start_arc = self.startb[beam]
@@ -103,7 +119,10 @@ class LHCArc(LHCSection):
 
             sequence = self.model.sequence[beam]
             res = sequence.twiss(
-                start=start_arc, end=end_arc, init=twinit_cell, strengths=strengths
+                start=start_arc,
+                end=end_arc,
+                init=twinit_cell,
+                strengths=strengths,
             )
 
             res["mux"] = res["mux"] - res["mux", start_arc]
@@ -153,7 +172,6 @@ class LHCArc(LHCSection):
                         action=ActionArcPhaseAdvance(self, beam),
                         tar=mu,
                         value=self.params[f"{mu}{self.name}b{beam}"],
-                        tol=1e-2,
                         tag=mu,
                     )
                 )
@@ -170,7 +188,7 @@ class LHCArc(LHCSection):
         )
         limits[0] *= 1 + kmax_marg
         limits[1] *= 1 - kmax_marg
-        tag=beam if beam else "common"
+        tag = beam if beam else "common"
         return xt.Vary(name=kname, limits=limits, step=1e-8, tag=tag)
 
     def match(self, b1=True, b2=True):
@@ -204,20 +222,19 @@ class LHCArc(LHCSection):
             strengths=False,
         )
         return opt
-    
 
     def shift_phase(self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0):
-        arc=self.name
-        a=int(arc[1])
-        b=int(arc[2])
-        self.params[f"mux{arc}b1"]+=dmuxb1
-        self.params[f"muy{arc}b1"]+=dmuyb1
-        self.params[f"mux{arc}b2"]+=dmuxb2
-        self.params[f"muy{arc}b2"]+=dmuyb2
+        arc = self.name
+        a = int(arc[1])
+        b = int(arc[2])
+        self.params[f"mux{arc}b1"] += dmuxb1
+        self.params[f"muy{arc}b1"] += dmuyb1
+        self.params[f"mux{arc}b2"] += dmuxb2
+        self.params[f"muy{arc}b2"] += dmuyb2
         print(f"Match {self}")
         self.match().solve()
-        ira=getattr(self.parent, f"ir{a}")
-        irb=getattr(self.parent, f"ir{b}")
+        ira = getattr(self.parent, f"ir{a}")
+        irb = getattr(self.parent, f"ir{b}")
         print(f"Match {ira}")
         ira.match().solve()
         print(f"Match {irb}")
@@ -230,7 +247,7 @@ class ActionArcPhaseAdvance(xt.Action):
         self.beam = beam
 
     def run(self):
-        tw_arc = self.arc.twiss(self.beam)
+        tw_arc = self.arc.twiss(self.beam, strengths=False)
 
         return {
             "table": tw_arc,
