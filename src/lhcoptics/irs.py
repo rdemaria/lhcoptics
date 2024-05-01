@@ -106,9 +106,9 @@ class LHCIR(LHCSection):
 
     def __repr__(self):
         if self.parent is not None:
-            return f"<LHCIR{self.irn} in {self.parent.name}>"
+            return f"<LHCIR{self.irn} in {self.parent.name!r}>"
         elif self.filename is not None:
-            return f"<LHCIR{self.irn} from {self.filename}>"
+            return f"<LHCIR{self.irn} from {self.filename!r}>"
         else:
             return f"<LHCIR{self.irn}>"
 
@@ -126,7 +126,7 @@ class LHCIR(LHCSection):
     @property
     def quads(self):
         return {
-            k: v for k, v in self.strengths.items() if "kq" in k or "ktq" in k
+            k: v for k, v in self.strengths.items() if re.match("kt?q[^s]",k)
         }
 
     @property
@@ -354,7 +354,7 @@ class LHCIR(LHCSection):
         varylst = []
         for kk in self.quads:
             limits = self.parent.circuits.get_klimits(
-                kk, self.parent.params["pc0"]
+                kk, self.parent.params["p0c"]
             )
             limits[0] *= 1 + kmin_marg
             limits[1] *= 1 - kmax_marg

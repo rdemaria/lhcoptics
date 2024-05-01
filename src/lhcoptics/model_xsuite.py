@@ -3,17 +3,19 @@ from .knob import Knob
 
 import xdeps
 
-def termlist(ex,lst=[]):
-    if isinstance(ex,xdeps.refs.AddExpr):
-        return lst+termlist(ex._lhs)+termlist(ex._rhs)
-    if isinstance(ex,xdeps.refs.SubExpr):
-        if isinstance(ex._rhs,xdeps.refs.MulExpr):
-            ex=ex._lhs+(-1*ex._rhs._lhs)*ex._rhs._rhs
+
+def termlist(ex, lst=[]):
+    if isinstance(ex, xdeps.refs.AddExpr):
+        return lst + termlist(ex._lhs) + termlist(ex._rhs)
+    if isinstance(ex, xdeps.refs.SubExpr):
+        if isinstance(ex._rhs, xdeps.refs.MulExpr):
+            ex = ex._lhs + (-1 * ex._rhs._lhs) * ex._rhs._rhs
         else:
-            ex=ex._lhs+(-1)*ex._rhs
-        return lst+termlist(ex._lhs)+termlist(ex._rhs)
+            ex = ex._lhs + (-1) * ex._rhs
+        return lst + termlist(ex._lhs) + termlist(ex._rhs)
     else:
         return [ex]
+
 
 def pprint(expr):
     return "\n + ".join([str(t) for t in termlist(expr)])
@@ -128,6 +130,15 @@ class LHCXsuiteModel:
     def b2s(self):
         return self.multiline.b2s
 
+    @property
+    def p0c(self):
+        return self.multiline.b1.p0c
+
+    @p0c.setter
+    def p0c(self, value):
+        self.multiline.b1.particle_ref.p0c = value
+        self.multiline.b2.particle_ref.p0c = value
+
     def __getitem__(self, key):
         return self._var_values[key]
 
@@ -223,13 +234,13 @@ class LHCXsuiteModel:
         for wname in knob.weights:
             weights[wname] = self._var_values[f"{wname}_from_{knob.name}"]
         return Knob(knob.name, value, weights)
- 
+
     def show_knob(self, knobname):
         print(f"Knob: {knobname} = {self[knobname]:15.6g}")
         for deps in self.mgr.rdeps.get(self.vars[knobname], {}):
             print("Target:", deps._key)
             print("     Expr:", pprint(deps._expr))
-            wname=f"{deps._key}_from_{knobname}"
+            wname = f"{deps._key}_from_{knobname}"
             if wname in self:
                 print(f"    Weight {wname} = {self[wname]:15.6g}")
 

@@ -1,6 +1,7 @@
 from cpymad.madx import Madx
 import json
 from pathlib import Path
+from copy import deepcopy
 
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
@@ -68,9 +69,18 @@ class LHCOptics:
     ]
     knobs += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
 
-    def __init__(self, name, irs, arcs, params=None, knobs=None, model=None):
+    def __init__(
+        self,
+        name,
+        irs,
+        arcs,
+        params=None,
+        knobs=None,
+        model=None,
+        circuits=None,
+    ):
         if name is None:
-            name="lhcoptics"
+            name = "lhcoptics"
         self.name = name
         for ir in irs:
             setattr(self, ir.name, ir)
@@ -85,6 +95,7 @@ class LHCOptics:
         self.params = params
         self.knobs = knobs
         self.model = model
+        self.circuits = circuits
 
     @property
     def irs(self):
@@ -170,17 +181,45 @@ class LHCOptics:
         return out
 
     @classmethod
-    def from_json(cls, filename, name=None, xsuite_model=None, circuits=None,verbose=False):
+    def from_json(
+        cls,
+        filename,
+        name=None,
+        xsuite_model=None,
+        circuits=None,
+        verbose=False,
+    ):
         with open(filename) as f:
             data = json.load(f)
             out = cls.from_dict(
-                data, xsuite_model=xsuite_model, circuits=circuits,
-                verbose=verbose
+                data,
+                xsuite_model=xsuite_model,
+                circuits=circuits,
+                verbose=verbose,
             )
             return out
 
     def __repr__(self) -> str:
         return f"<LHCOptics {self.name!r}>"
+
+    def __getitem__(self, k):
+        if k in self.params:
+            return self.params[k]
+        if k in self.knobs:
+            return self.knobs[k]
+        raise KeyError(f"{k} not found in {self}")
+
+    def __contains__(self, k):
+        return k in self.params or k in self.knobs
+
+    def get(self, k, default=None, full=True):
+        if k in self:
+            return self[k]
+        if full:
+            for ss in self.irs + self.arcs:
+                if k in ss:
+                    return ss[k]
+        raise KeyError(f"{k} not found in {self}")
 
     def to_dict(self):
         return {
@@ -192,10 +231,14 @@ class LHCOptics:
         }
 
     def copy(self):
-        other = self.__class__.from_dict(self.to_dict())
-        # if hasattr(self.model,"copy"):
-        #    other.model=self.model.copy()
-        other.circuits = self.circuits
+        other = self.__class__(
+            self.name,
+            params=self.params.copy(),
+            knobs={k: v.copy() for k, v in self.knobs.items()},
+            irs=[ir.copy() for ir in self.irs],
+            arcs=[arc.copy() for arc in self.arcs],
+            circuits=self.circuits,
+        )
         return other
 
     def to_json(self, filename):
@@ -256,17 +299,32 @@ class LHCOptics:
 
     def update(self, src=None, verbose=False, full=True):
         if full:
-            for ss in self.irs + self.arcs:
-                ss.update(src, verbose=verbose)
-        self.update_knobs(src, verbose=verbose,full=False)
-        self.update_params(src, verbose=verbose,full=False)
+            if src is None:
+                if verbose:
+                    print(f"Update {self} from model")
+                for ss in self.irs + self.arcs:
+                    ss.update(src, verbose=verbose)
+            else:
+                for ss in self.irs + self.arcs:
+                    if hasattr(src, ss.name):
+                        src_ss = getattr(src, ss.name)
+                        if verbose:
+                            print(f"Update {ss.name} from {src}.{ss.name}")
+                        ss.update(src=src_ss, verbose=verbose)
+                    elif ss.name in src:
+                        src_ss = src[ss.name]
+                        if verbose:
+                            print(f"Update {ss.name} from {src}[{ss.name}]")
+                        ss.update(src=src_ss, verbose=verbose)
+        self.update_params(src, verbose=verbose, full=False)
+        self.update_knobs(src, verbose=verbose, full=False)
         return self
 
-    def update_params(self, src=None, add=False, verbose=False,full=True):
+    def update_params(self, src=None, add=False, verbose=False, full=True):
         """
         Update existing params from self.model or src.params or src
         """
-        #if verbose:
+        # if verbose:
         #    print(f"Update params in {self}")
         if src is None:
             src = self.get_params()
@@ -278,14 +336,16 @@ class LHCOptics:
             for k in self.params:
                 if k in src:
                     if verbose and self.params[k] != src[k]:
-                        print(f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}")
+                        print(
+                            f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}"
+                        )
                     self.params[k] = src[k]
         if full:
             for ss in self.irs + self.arcs:
-                #if verbose:
-                   #print(f"Update params in {ss}")
-                ssrc=src.get(ss.name)
-                ss.update_params(ssrc,verbose=verbose)
+                # if verbose:
+                # print(f"Update params in {ss}")
+                ssrc = src.get(ss.name)
+                ss.update_params(ssrc, verbose=verbose)
         return self
 
     def set_xsuite_model(self, model, verbose=False):
@@ -319,7 +379,7 @@ class LHCOptics:
 
     def get_params_from_twiss(self, tw1, tw2):
         params = {
-            "pc0": tw1.p0c,
+            "p0c": tw1.p0c,
             "qxb1": tw1.qx,
             "qyb1": tw1.qy,
             "qxb2": tw2.qx,
@@ -375,10 +435,10 @@ class LHCOptics:
         header = True
         cols = "betx bety dx dpx px*1e6 py*1e6 x*1e3 y*1e3"
         for ip in ["ip1", "ip2", "ip5", "ip8"]:
-            tw1.rows[ip].cols[cols].show(digits=3, fixed="f", header=header)
+            tw1.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
             if header:
                 header = False
-            tw2.rows[ip].cols[cols].show(digits=3, fixed="f", header=header)
+            tw2.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
         print(
             f"Tunes:  {tw1.qx:5.3f} {tw2.qx:5.3f} {tw1.qy:5.3f}  {tw2.qy:5.3f}"
         )
@@ -416,12 +476,12 @@ class LHCOptics:
 
     def match_phase_arcs(self, newphases):
         for arc in self.arcs:
-            phases=[k for k in newphases if arc.name in k]
-            if len(phases)>0:
+            phases = [k for k in newphases if arc.name in k]
+            if len(phases) > 0:
                 for k in phases:
                     print(f"Set {k!r} from {arc.params[k]} to {newphases[k]}")
-                dct={k:newphases[k] for k in phases}
-                arc.params.update({k:newphases[k] for k in phases})
+                dct = {k: newphases[k] for k in phases}
+                arc.params.update({k: newphases[k] for k in phases})
                 arc.match_phase()
 
     def diff(self, other, full=True):
@@ -451,5 +511,5 @@ class LHCOptics:
             phases.update(arc.get_phase())
         return phases
 
-    def to_table(self,*rows):
-        return LHCOpticsTable([self]+list(rows))
+    def to_table(self, *rows):
+        return LHCOpticsTable([self] + list(rows))

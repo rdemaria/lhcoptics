@@ -165,15 +165,15 @@ class LHCSection:
         else:
             raise ValueError(f"Unknown output type {output}")
 
-    def copy(self, src=None):
-        other = self.__class__(
+    def copy(self):
+        return self.__class__(
+            name=self.name,
+            start=self.start,
+            end=self.end,
             strengths=self.strengths.copy(),
             params=self.params.copy(),
-            knobs={k: v.copy() for k, v in self.knobs.items()},
+            knobs={k: knob.copy() for k,knob in self.knobs.items()},
         )
-        if src is not None:
-            other.update(src)
-        return other
 
     def set_params(self):
         """
@@ -301,10 +301,13 @@ class LHCSection:
         else:
             raise KeyError(f"{key} not found in {self}")
 
-    def get_current(self, kname, pc0=7e12):
+    def __contains__(self, key):
+        return key in self.strengths or key in self.params or key in self.knobs
+
+    def get_current(self, kname, p0c=7e12):
         if self.parent.circuit is None:
             raise ValueError("Circuit not set")
-        return self.parent.circuit.get_current(kname, self[kname], pc0)
+        return self.parent.circuit.get_current(kname, self[kname], p0c)
 
     def disable_bumps(self):
         pass

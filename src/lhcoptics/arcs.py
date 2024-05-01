@@ -69,6 +69,12 @@ class LHCArc(LHCSection):
             f"muy{self.name}b2",
         ]
 
+    def __repr__(self):
+        if self.parent is None:
+            return f"<LHCArc {self.name}>"
+        else:
+            return f"<LHCArc {self.name} in {self.parent.name!r}>"
+
     def twiss_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
         tw = self.twiss(beam, strengths=False)
@@ -206,7 +212,7 @@ class LHCArc(LHCSection):
         else:
             kname = f"kq{fd}.{self.name}"
         limits = self.parent.circuits.get_klimits(
-            kname, self.parent.params["pc0"]
+            kname, self.parent.params["p0c"]
         )
         limits[0] *= 1 + kmax_marg
         limits[1] *= 1 - kmax_marg
