@@ -13,7 +13,7 @@ from .section import (
 )
 from .model_madx import LHCMadModel
 
-from .irtable import LHCIRTable
+from .opttable import LHCIRTable
 
 
 class LHCIR(LHCSection):
@@ -45,6 +45,7 @@ class LHCIR(LHCSection):
             if "kqt5.r7" in quads:
                 quads.remove("kqt5.r7")
         strength_names += sort_n(quads)
+        strength_names += madmodel.filter(f"kqs\..*[lr]{irn}b[12]$")
         acb = madmodel.filter(f"acbx.*[lr]{irn}$")
         acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)
@@ -55,20 +56,21 @@ class LHCIR(LHCSection):
         params = {}
         for param in "betx bety alfx alfy dx dpx".split():
             for beam in "12":
-                ppname=f"{param}ip{irn}b{beam}"
+                ppname = f"{param}ip{irn}b{beam}"
                 if ppname in madx.globals:
-                   params[ppname] = madx.globals[ppname]
+                    params[ppname] = madx.globals[ppname]
         for param in "mux muy".split():
             for beam in "12":
                 for suffix in ["", "_l", "_r"]:
-                    ppname=f"{param}ip{irn}b{beam}{suffix}"
+                    ppname = f"{param}ip{irn}b{beam}{suffix}"
                     if ppname in madx.globals:
-                       params[ppname] = madx.globals[ppname]
+                        params[ppname] = madx.globals[ppname]
         return cls(name, strengths, params, knobs)
 
     @classmethod
-    def from_madxfile(cls, filename, name=None,stdout=False):
+    def from_madxfile(cls, filename, name=None, stdout=False):
         from cpymad.madx import Madx
+
         madx = Madx(stdout=stdout)
         madx.call(filename)
         return cls.from_madx(madx, name)
@@ -111,7 +113,7 @@ class LHCIR(LHCSection):
             return f"<LHCIR{self.irn}>"
 
     def to_table(self, *rows):
-        return LHCIRTable(list(rows))
+        return LHCIRTable([self]+list(rows))
 
     @property
     def arc_left(self):
@@ -126,14 +128,14 @@ class LHCIR(LHCSection):
         return {
             k: v for k, v in self.strengths.items() if "kq" in k or "ktq" in k
         }
-    
+
     @property
     def kqxl(self):
-        return [k for k in self.quads if "l" in k and 'x' in k]
-    
+        return [k for k in self.quads if "l" in k and "x" in k]
+
     @property
     def kqxr(self):
-        return [k for k in self.quads if "r" in k and 'x' in k]
+        return [k for k in self.quads if "r" in k and "x" in k]
 
     def set_init(self):
         arcleft = self.arc_left
@@ -198,7 +200,7 @@ class LHCIR(LHCSection):
             start=start, end=end, init=init, strengths=strengths
         )
 
-    def twiss(self, beam=None, method="init",strengths=True):
+    def twiss(self, beam=None, method="init", strengths=True):
         if method == "init":
             return self.twiss_from_init(beam, strengths=strengths)
         elif method == "full":
@@ -376,8 +378,15 @@ class LHCIR(LHCSection):
                 self.parent.model[k] = 0
 
     def match(
-        self, kmin_marg=0.0, kmax_marg=0.0, b1=True, b2=True, common=True,
-        hold_init=False, sym_triplets=True, lrphase=False
+        self,
+        kmin_marg=0.0,
+        kmax_marg=0.0,
+        b1=True,
+        b2=True,
+        common=True,
+        hold_init=False,
+        sym_triplets=True,
+        lrphase=False,
     ):
         if self.parent.model is None:
             raise ValueError("Model not set for {self)")
@@ -407,10 +416,8 @@ class LHCIR(LHCSection):
             kmin_marg=kmin_marg,
             kmax_marg=kmax_marg,
         )
-        if self.name=="ir1":
-             varylst = [v for v in varylst if not v.name.startswith("kq4")]
-
-
+        if self.name == "ir1":
+            varylst = [v for v in varylst if not v.name.startswith("kq4")]
 
         match = lhc.match(
             solve=False,
@@ -426,20 +433,19 @@ class LHCIR(LHCSection):
             strengths=False,
         )
         if lrphase is False:
-           match.disable(target="mu.*_l")
+            match.disable(target="mu.*_l")
         if sym_triplets:
-            for kl, kr in zip(self.kqxl,self.kqxr):
-               self.parent.model.vref[kl]=-self.parent.model.vref[kr]
-               match.disable(vary_name=kl)
+            for kl, kr in zip(self.kqxl, self.kqxr):
+                self.parent.model.vars[kl] = -self.parent.model.vars[kr]
+                match.disable(vary_name=kl)
         self.optimizer = match
         return match
 
-
     def set_betastar(self, beta=None, ratio=1.0):
-        if self.irn in [1,2,5,8]:
+        if self.irn in [1, 2, 5, 8]:
             self.params[f"betx{self.ipname}b1"] = beta
             self.params[f"betx{self.ipname}b2"] = beta
-            self.params[f"bety{self.ipname}b1"] = beta/ratio
-            self.params[f"bety{self.ipname}b2"] = beta/ratio
+            self.params[f"bety{self.ipname}b1"] = beta / ratio
+            self.params[f"bety{self.ipname}b2"] = beta / ratio
         else:
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")

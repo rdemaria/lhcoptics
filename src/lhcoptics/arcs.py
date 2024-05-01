@@ -1,7 +1,23 @@
 from .section import LHCSection
 from .model_xsuite import LHCMadModel
 import xtrack as xt
+import re
 
+from .opttable import LHCArcTable
+
+class ActionArcPhaseAdvance(xt.Action):
+    def __init__(self, arc, beam):
+        self.arc = arc
+        self.beam = beam
+
+    def run(self):
+        tw_arc = self.arc.twiss(self.beam, strengths=False)
+
+        return {
+            "table": tw_arc,
+            "mux": tw_arc["mux", -1] - tw_arc["mux", 0],
+            "muy": tw_arc["muy", -1] - tw_arc["muy", 0],
+        }
 
 class LHCArc(LHCSection):
 
@@ -46,6 +62,12 @@ class LHCArc(LHCSection):
         self.end_cell = {1: f"e.cell.{i1}{i2}.b1", 2: f"e.cell.{i1}{i2}.b2"}
         self.startb = {1: f"e.ds.r{i1}.b1", 2: f"e.ds.r{i1}.b2"}
         self.endb = {1: f"s.ds.l{i2}.b1", 2: f"s.ds.l{i2}.b2"}
+        self.phase_names = [
+            f"mux{self.name}b1",
+            f"muy{self.name}b1",
+            f"mux{self.name}b2",
+            f"muy{self.name}b2",
+        ]
 
     def twiss_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
@@ -204,7 +226,7 @@ class LHCArc(LHCSection):
             if b1 and b2:
                 varylst.append(self.get_match_kq_vary(fd))
                 varylst.append(self.get_match_kq_vary(fd, "b1"))
-                self.model.vref[f"kqt{fd}.{self.name}b2"] = -self.model.vref[
+                self.model.vars[f"kqt{fd}.{self.name}b2"] = -self.model.vars[
                     f"kqt{fd}.{self.name}b1"
                 ]
             elif b1:
@@ -223,34 +245,33 @@ class LHCArc(LHCSection):
         )
         return opt
 
+    def get_close_irs(self):
+        ira = getattr(self.parent, f"ir{self.i1}")
+        irb = getattr(self.parent, f"ir{self.i2}")
+        return ira, irb
+
     def shift_phase(self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0):
         arc = self.name
-        a = int(arc[1])
-        b = int(arc[2])
         self.params[f"mux{arc}b1"] += dmuxb1
         self.params[f"muy{arc}b1"] += dmuyb1
         self.params[f"mux{arc}b2"] += dmuxb2
         self.params[f"muy{arc}b2"] += dmuyb2
+        self.match_phase()
+
+    def match_phase(self):
         print(f"Match {self}")
         self.match().solve()
-        ira = getattr(self.parent, f"ir{a}")
-        irb = getattr(self.parent, f"ir{b}")
+        ira, irb = self.get_close_irs()
         print(f"Match {ira}")
         ira.match().solve()
         print(f"Match {irb}")
         irb.match().solve()
 
+    def get_phase(self):
+        params = self.get_params()
+        return {k: params[k] for k in self.phase_names}
 
-class ActionArcPhaseAdvance(xt.Action):
-    def __init__(self, arc, beam):
-        self.arc = arc
-        self.beam = beam
+    def to_table(self, *rows):
+        return LHCArcTable([self]+list(rows))
 
-    def run(self):
-        tw_arc = self.arc.twiss(self.beam, strengths=False)
 
-        return {
-            "table": tw_arc,
-            "mux": tw_arc["mux", -1] - tw_arc["mux", 0],
-            "muy": tw_arc["muy", -1] - tw_arc["muy", 0],
-        }

@@ -219,7 +219,7 @@ class LHCSection:
         for k in self.strengths:
             if k in src:
                 if verbose and self.strengths[k] != src[k]:
-                    print(f"Updating {k} from {self.strengths[k]} to {src[k]}")
+                    print(f"Updating {k!r} from {self.strengths[k]} to {src[k]}")
                 self.strengths[k] = src[k]
         return self
 
@@ -237,7 +237,7 @@ class LHCSection:
             if k in src:
                 self.knobs[k] = Knob.from_src(src[k])
             if verbose:
-                print(f"Updating {k} = {self.knobs[k]}")
+                print(f"Updating {k!r:15} = {self.knobs[k]}")
         return self
 
     def update_params(self, src=None, add=False, verbose=False):
@@ -252,13 +252,13 @@ class LHCSection:
             for k in src:
                 if k not in self.params:
                     if verbose:
-                        print(f"Adding {k} = {src[k]}")
+                        print(f"Adding {k!r:18} = {src[k]}")
                     self.params[k] = src[k]
         else:
             for k in self.params:
                 if k in src:
                     if verbose and self.params[k] != src[k]:
-                        print(f"Updating {k} from {self.params[k]} to {src[k]}")
+                        print(f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}")
                     self.params[k] = src[k]
         return self
 
