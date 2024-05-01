@@ -204,7 +204,7 @@ class LHCArc(LHCSection):
             if b1 and b2:
                 varylst.append(self.get_match_kq_vary(fd))
                 varylst.append(self.get_match_kq_vary(fd, "b1"))
-                self.model.vref[f"ktq{fd}.{self.name}b2"] = -self.model.vref[
+                self.model.vref[f"kqt{fd}.{self.name}b2"] = -self.model.vref[
                     f"kqt{fd}.{self.name}b1"
                 ]
             elif b1:

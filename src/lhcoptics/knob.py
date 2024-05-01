@@ -1,3 +1,5 @@
+from .utils import print_diff_dict_float
+
 class Knob:
     @classmethod
     def from_dict(cls, data):
@@ -31,3 +33,8 @@ class Knob:
             "value": self.value,
             "weights": self.weights,
         }
+
+    def diff(self, other):
+        if self.value != other.value:
+            print(f"{self.name} {self.value} != {other.value}")
+        print_diff_dict_float(self.weights, other.weights)

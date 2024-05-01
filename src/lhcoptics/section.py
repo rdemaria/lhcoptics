@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .model_madx import LHCMadModel
 from .knob import Knob
+from .utils import print_diff_dict_objs, print_diff_dict_float
 
 _lb = [(l, b) for l in "lr" for b in "12"]
 _ac = {
@@ -181,7 +182,12 @@ class LHCSection:
         self.params.update(self.get_params())
         return self
 
-    def update_model(self, src=None):
+    def update_model(self, src=None, verbose=False):
+        """ Update the model with the local strengths, knobs
+        If a src is provided, it will be used to update the local values, else self will be used.
+        If src is a dict containing strengths, knobs or a LHCSection, they will be used to update the model.
+        if src is dict of values, they will be used to update the model variables.
+        """
         if self.model is None:
             raise ValueError("Model not set")
         if src is None:
@@ -192,15 +198,14 @@ class LHCSection:
             strength = src["strengths"]
         else:
             strength = src
-        self.model.update_vars(strength)
+        self.model.update_vars(strength, verbose=verbose)
         if hasattr(src, "knobs"):
             knobs = src.knobs
         elif "knobs" in src:
             knobs = src["knobs"]
         else:
             knobs = {}
-        self.model.update_vars(strength)
-        self.model.update_knobs(knobs)
+        self.model.update_knobs(knobs, verbose=verbose)
         return self
 
     def update_strengths(self, src=None, verbose=False):
@@ -307,3 +312,18 @@ class LHCSection:
     def knobs_off(self):
         for k in self.knobs:
             self.parent.model[k] = 0
+
+
+    def diff(self, other):
+        self.diff_strengths(other)
+        self.diff_knobs(other)
+        self.diff_params(other)
+
+    def diff_strengths(self, other):
+        print_diff_dict_float(self.strengths, other.strengths)
+
+    def diff_params(self, other):
+        print_diff_dict_float(self.params, other.params)
+
+    def diff_knobs(self, other):
+        print_diff_dict_objs(self.knobs, other.knobs)

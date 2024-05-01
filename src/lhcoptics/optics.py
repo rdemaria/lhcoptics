@@ -15,6 +15,7 @@ from .arcs import LHCArc
 from .section import Knob
 from .model_xsuite import LHCXsuiteModel, LHCMadModel
 from .circuits import LHCCircuits
+from .utils import print_diff_dict_objs, print_diff_dict_float
 
 irs = [LHCIR1, LHCIR2]
 
@@ -74,8 +75,6 @@ class LHCOptics:
         for arc in arcs:
             setattr(self, arc.name, arc)
             arc.parent = self
-        self.irs = irs
-        self.arcs = arcs
         if params is None:
             params = {}
         if knobs is None:
@@ -83,6 +82,14 @@ class LHCOptics:
         self.params = params
         self.knobs = knobs
         self.model = model
+
+    @property
+    def irs(self):
+        return [getattr(self, ir.name) for ir in self._irs]
+
+    @property
+    def arcs(self):
+        return [getattr(self, arc) for arc in self._arcs]
 
     @classmethod
     def from_madxfile(
@@ -125,7 +132,7 @@ class LHCOptics:
             xsuite_model = LHCXsuiteModel.from_madx(madx, sliced=sliced)
         elif gen_model == "madx":
             self.model = madmodel
-        elif xsuite_model is not None:
+        if xsuite_model is not None:
             self.set_xsuite_model(xsuite_model)
         if circuits is not None:
             self.set_circuits_from_json(circuits)
@@ -186,9 +193,10 @@ class LHCOptics:
         with open(filename, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
-    def update_model(self, src=None, full=True):
+    def update_model(self, src=None, full=True,verbose=False):
         """
-        Update model knobs, if full incluiding all sections strengths and knobs
+        Update model from an optics or a dict.
+        If full incluiding all sections strengths and knobs.
         """
         if self.model is None:
             raise ValueError("Model not set")
@@ -198,11 +206,15 @@ class LHCOptics:
         if full:
             for ss in self.irs + self.arcs:
                 if hasattr(src, ss.name):
+                    if verbose:
+                        print(f"Update {ss.name} from {src}.{ss.name}")
                     src_ss = getattr(src, ss.name)
-                    ss.update_model(src=src_ss)
+                    ss.update_model(src=src_ss,verbose=verbose)
                 elif ss.name in src:
+                    if verbose:
+                        print(f"Update {ss.name} from {src}[{ss.name}]")
                     src_ss = src[ss.name]
-                    ss.update_model(src=src_ss)
+                    ss.update_model(src=src_ss,verbose=verbose)
         return self
 
     def update_knobs(self, src=None, full=True, verbose=False):
@@ -354,7 +366,7 @@ class LHCOptics:
             opt=ss.match()
             print(f"{ss.name} {opt.within_tol}")
 
-    def retune(self,qx=62.31,qy=60.32,arcs="all"):
+    def match_tune(self,qx=62.31,qy=60.32,arcs="all"):
         tw1, tw2 = self.twiss(strengths=False)
         dmuxb1=qx-tw1.qx
         dmuyb1=qy-tw1.qy
@@ -371,3 +383,27 @@ class LHCOptics:
         for arc in arcs:
             arc.shift_phase(dmuxb1/narcs, dmuyb1/narcs, dmuxb2/narcs, dmuyb2/narcs)
             self.check()
+
+    def diff(self,other,full=True):
+        self.diff_knobs(other)
+        self.diff_params(other)
+        if full:
+            for ss,so in zip(self.irs + self.arcs,other.irs + other.arcs):
+                ss.diff_strengths(so)
+                ss.diff_knobs(so)
+                ss.diff_params(so)
+
+    def diff_knobs(self,other):
+        print_diff_dict_objs(self.knobs,other.knobs)
+
+    def diff_params(self,other):
+        print_diff_dict_float(self.params,other.params)
+
+    def get_all_strengths(self):
+        strengths={}
+        for ss in self.irs + self.arcs:
+            strengths.update(ss.strengths)
+        return strengths
+
+
+

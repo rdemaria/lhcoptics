@@ -112,12 +112,16 @@ class LHCXsuiteModel:
     def __setitem__(self, key, value):
         self.vref[key] = value
 
-    def update_vars(self, strengths):
+    def update_vars(self, strengths,verbose=False):
         for k, v in strengths.items():
+            if verbose:
+                print(f"{k:20} {v:15.6g}")
             self[k] = v
 
-    def update_knobs(self, knobs):
+    def update_knobs(self, knobs,verbose=False):
         for k, knob in knobs.items():
+            if verbose:
+                print(f"{k:20} {knob.value:15.6g}")
             self[k] = knob.value
             for wn, value in knob.weights.items():
                 name = f"{wn}_from_{k}"
@@ -194,3 +198,13 @@ class LHCXsuiteModel:
             jsonfile=self.jsonfile,
             madxfile=self.madxfile,
         )
+
+    def diff(self,other):
+        allk= set(self._var_values.keys()) | set(other._var_values.keys())
+        for k in allk:
+            if k not in self._var_values:
+                print(f"{k:20} {other._var_values[k]:15.6g} only in other")
+            elif k not in other._var_values:
+                print(f"{k:20} {self._var_values[k]:15.6g} only in self")
+            elif self._var_values[k] != other._var_values[k]:
+                print(f"{k:20} {self._var_values[k]:15.6g} {other._var_values[k]:15.6g}")

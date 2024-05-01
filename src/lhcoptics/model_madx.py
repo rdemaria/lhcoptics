@@ -103,12 +103,16 @@ use, sequence=lhcb2;
     def filter(self, pattern):
         return [k for k in self.madx.globals if re.match(pattern, k)]
 
-    def update_vars(self, strengths):
+    def update_vars(self, strengths,verbose=False):
         for k, v in strengths.items():
+            if verbose:
+                print(f"{k:20} {self[k]:15.6g} -> {v:15.6g}")
             self[k] = v
 
-    def update_knobs(self, knobs):
+    def update_knobs(self, knobs,verbose=False):
         for k, knob in knobs.items():
+            if verbose:
+                print(f"{k:20} {self[k]:15.6g} -> {knob.value:15.6g}")
             self[k] = knob.value
             for wn, value in knob.weights.items():
                 name = f"{wn}_from_{k}"
