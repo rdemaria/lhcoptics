@@ -17,7 +17,7 @@ inj.set_xsuite_model("examples/data/lhc.json") # set an xsuite model
 inj.ir5.plot()
 ```
 
-NB: Currently needs `github.com/rdemaria/xtrack` branch `attr_in_twiss`.
+NB: Currently needs `github.com/rdemaria/xdeps` branch `upstream/feature/check_limits`.
 
 ## LHCOptics
 An `LHCOptics` contains data for specifying a full LHC Optics. It contains global params and knobs and a list of LHC sections (`ir1`, `ir2`, ... , `ir8`, `a12`, `a23`, ..., `a78`) that contains strengths, local params and local knobs. The optics can contain a `model` that allows to compute twiss, plot and rematch the optics.
