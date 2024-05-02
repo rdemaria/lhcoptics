@@ -97,7 +97,8 @@ class LHCSectionTable:
         if order == 0: # Nearest
             return np.interp(x, xx, yy)
         if order == 1:
-            return scipy.interpolate.interp1d(xx, yy, kind="linear")(x)
+            #return scipy.interpolate.interp1d(xx, yy, kind="linear")(x)
+            return np.interp(x, xx, yy)
         if order > 1:
             x0 = [xx[0], xx[-1]]
             y0 = [yy[0], yy[-1]]
@@ -300,6 +301,7 @@ class LHCOpticsTable(LHCSectionTable):
         self.rows.clear()
         for ss in self.irs + self.arcs:
             ss.clear()
+        return self
 
     def append(self, row):
         self.rows.append(row)
