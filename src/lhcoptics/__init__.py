@@ -16,6 +16,11 @@ from .ir5 import LHCIR5
 from .ir6 import LHCIR6
 from .ir7 import LHCIR7
 from .ir8 import LHCIR8
-from .model_xsuite import LHCXsuiteModel, LHCMadModel
+from .model_xsuite import LHCXsuiteModel
+from .model_madx import  LHCMadModel
 from .circuits import LHCCircuits, get_lsa
 from .repo import LHC
+from .knob import Knob
+from .rdmsignal import poly_fit, poly_val
+from .opttable import LHCOpticsTable
+
