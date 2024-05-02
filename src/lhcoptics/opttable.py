@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 import xdeps as xd
+import scipy.interpolate
 
 from .rdmsignal import poly_fit, poly_val
 
@@ -93,6 +94,10 @@ class LHCSectionTable:
     def interp_val(self, x, kname, order=1, xname="id", soft=False):
         xx = self[xname]
         yy = self[kname]
+        if order == 0: # Nearest
+            return np.interp(x, xx, yy)
+        if order == 1:
+            return scipy.interpolate.interp1d(xx, yy, kind="linear")(x)
         if order > 1:
             x0 = [xx[0], xx[-1]]
             y0 = [yy[0], yy[-1]]
@@ -147,16 +152,16 @@ class LHCIRTable(LHCSectionTable):
             fig, ax = plt.subplots(num=figname)
         xx = self[xaxis]
         if n == 1:
-            kqxl =self[f"kqx.l{self.rows[0].irn}"]*brho
-            kqxr =self[f"kqx.r{self.rows[0].irn}"]*brho
-            ktqx1l=self[f"ktqx1.l{self.rows[0].irn}"]*brho
-            ktqx1r=self[f"ktqx1.r{self.rows[0].irn}"]*brho
-            ktqx2l=self[f"ktqx2.l{self.rows[1].irn}"]*brho
-            ktqx2r=self[f"ktqx2.r{self.rows[1].irn}"]*brho
-            kqx1l=kqxl+ktqx1l
-            kqx1r=kqxr+ktqx1r
-            kqx2l=kqxl+ktqx2l
-            kqx2r=kqxr+ktqx2r
+            kqxl = self[f"kqx.l{self.rows[0].irn}"] * brho
+            kqxr = self[f"kqx.r{self.rows[0].irn}"] * brho
+            ktqx1l = self[f"ktqx1.l{self.rows[0].irn}"] * brho
+            ktqx1r = self[f"ktqx1.r{self.rows[0].irn}"] * brho
+            ktqx2l = self[f"ktqx2.l{self.rows[1].irn}"] * brho
+            ktqx2r = self[f"ktqx2.r{self.rows[1].irn}"] * brho
+            kqx1l = kqxl + ktqx1l
+            kqx1r = kqxr + ktqx1r
+            kqx2l = kqxl + ktqx2l
+            kqx2r = kqxr + ktqx2r
             ax.plot(xx, abs(kqx1l), label=f"kqx1.l{self.rows[0].irn}")
             ax.plot(xx, abs(kqx1r), label=f"kqx1.r{self.rows[0].irn}")
             ax.plot(xx, abs(kqx2l), label=f"kqx2.l{self.rows[1].irn}")
@@ -210,11 +215,13 @@ class LHCIRTable(LHCSectionTable):
         self, xaxis="id", fig=None, title=None, figname=None, p0c=6.8e12
     ):
         nq = []
-        for n in range(1, 13):
+        for n in range(1, 14):
             if len(self.get_quads(n)) > 0:
                 nq.append(n)
-        rows = len(nq) // 3
-        cols = len(nq) // rows
+        rows = int(np.ceil(len(nq) / 3))
+        cols = int(np.ceil(len(nq) / rows))
+        assert cols * rows >= len(nq)
+        # print(f"cols={cols}, rows={rows}")
         # if hasattr(self, "fig") and self.fig is not None:
         #    fig = self.fig
         if fig is None:
@@ -222,10 +229,8 @@ class LHCIRTable(LHCSectionTable):
                 title = f"{self.rows[0].name.upper()} Quads"
             if figname is None:
                 figname = f"{self.rows[0].name.upper()} Quads"
-            plt.figure(num=figname).clear()
-            fig, axs = plt.subplots(
-                cols, rows, num=figname, figsize=(2.5 * cols, 2.5 * cols)
-            )
+            plt.figure(num=figname, figsize=(4 * rows, 4 * cols)).clear()
+            fig, axs = plt.subplots(cols, rows, num=figname)
             self.fig = fig
             axs = axs.flatten()
         else:
@@ -291,9 +296,14 @@ class LHCOpticsTable(LHCSectionTable):
             name=f"{xaxis}={n}", params=params, irs=irs, arcs=arcs
         )
 
+    def clear(self):
+        self.rows.clear()
+        for ss in self.irs + self.arcs:
+            ss.clear()
+
     def append(self, row):
         self.rows.append(row)
-        for ss, ss_row in zip(self.irs+self.arcs, row.irs+row.arcs):
+        for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
             ss.rows.append(ss_row)
         return self
 
@@ -308,7 +318,6 @@ class LHCOpticsTable(LHCSectionTable):
     def remove(self, row):
         self.rows.remove(row)
         return self
-
 
     def plot_quads(self):
         for ir in self.irs:

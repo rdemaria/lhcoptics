@@ -190,8 +190,8 @@ class LHCIR7(LHCIR):
             b1=b1,
             b2=b2,
             common=common,
-            kmin_marg=kmin_marg,
-            kmax_marg=kmax_marg,
+            dkmin=kmin_marg,
+            dkmax=kmax_marg,
         )
 
         opt = lhc.match(

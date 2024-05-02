@@ -270,6 +270,8 @@ class LHCOptics:
         if verbose:
             print(f"Update knobs from {src}")
         self.model.update_knobs(src.knobs, verbose=verbose)
+        if 'p0c' in self.params:
+            self.model.p0c = self.params['p0c']
         return self
 
     def update_knobs(self, src=None, full=True, verbose=False):

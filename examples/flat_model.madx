@@ -1,0 +1,10 @@
+call, file="acc-models-lhc/lhc.seq";
+
+beam, sequence=lhcb1, bv= 1, particle=proton, charge=1, mass=0.938272046,
+pc= 450.0,   npart=1.2e11,kbunch=2556, ex=5.2126224777777785e-09,ey=5.2126224777777785e-09;
+beam, sequence=lhcb2, bv=-1, particle=proton, charge=1, mass=0.938272046,
+pc= 450.0,   npart=1.2e11,kbunch=2556, ex=5.2126224777777785e-09,ey=5.2126224777777785e-09;
+
+call,file="acc-models-lhc/operation/optics/R2024aRP_A11mC11mA10mL10m_PhaseKnob100ON.madx";
+phase_change.b1=0;
+phase_change.b2=0;

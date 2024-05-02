@@ -349,15 +349,22 @@ class LHCIR(LHCSection):
         return targets
 
     def get_match_vary(
-        self, b1=True, b2=True, common=True, kmin_marg=0.0, kmax_marg=0.0
+        self, b1=True, b2=True, common=True, dkmin=0.0, dkmax=0.0
     ):
         varylst = []
         for kk in self.quads:
             limits = self.parent.circuits.get_klimits(
                 kk, self.parent.params["p0c"]
             )
-            limits[0] *= 1 + kmin_marg
-            limits[1] *= 1 - kmax_marg
+            if abs(limits[0])>abs(limits[1])*1.2:
+                limits[0]*= 1 - dkmax
+                limits[1]*= 1 + dkmin
+            elif abs(limits[0])<abs(limits[1])*.8:
+                limits[0]*= 1 + dkmin
+                limits[1]*= 1 - dkmax
+            else:
+               limits[0] *= 1 - dkmax
+               limits[1] *= 1 - dkmax
             if "b1" in kk and b1:
                 tag = "b1"
                 add = True
@@ -379,8 +386,8 @@ class LHCIR(LHCSection):
 
     def match(
         self,
-        kmin_marg=0.0,
-        kmax_marg=0.0,
+        dkmin=None,
+        dkmax=None,
         b1=True,
         b2=True,
         common=True,
@@ -402,6 +409,11 @@ class LHCIR(LHCSection):
         if lhc.b2.tracker is None:
             lhc.b2.build_tracker()
 
+        if dkmin is None:
+            dkmin = self.parent.params.get("match_dkmin",0.01)
+        if dkmax is None:
+            dkmax = self.parent.params.get("match_dkmax",0.01)
+
         inits = [self.init_left[1], self.init_left[2]]
         starts = [self.startb12[1], self.startb12[2]]
         ends = [self.endb12[1], self.endb12[2]]
@@ -413,8 +425,8 @@ class LHCIR(LHCSection):
             b1=b1,
             b2=b2,
             common=common,
-            kmin_marg=kmin_marg,
-            kmax_marg=kmax_marg,
+            dkmin=dkmin,
+            dkmax=dkmax,
         )
         if self.name == "ir1":
             varylst = [v for v in varylst if not v.name.startswith("kq4")]
@@ -434,10 +446,36 @@ class LHCIR(LHCSection):
         )
         if lrphase is False:
             match.disable(target="mu.*_l")
+
         if sym_triplets:
             for kl, kr in zip(self.kqxl, self.kqxr):
                 self.parent.model.vars[kl] = -self.parent.model.vars[kr]
                 match.disable(vary_name=kl)
+
+        if self.parent.params["match_inj"]:
+            if self.name == "ir2" or self.name == "ir8":
+                match.disable(vary_name="kqt?x")
+                self.parent.model[f"kqx.l{self.irn}"]=0.950981581300E-02
+                self.parent.model[f"kqx.r{self.irn}"]=-0.950981581300E-02
+                self.parent.model[f"ktqx1.l{self.irn}"]=0.0
+                self.parent.model[f"ktqx1.r{self.irn}"]=0.0
+                self.parent.model[f"ktqx2.l{self.irn}"]=0.0
+                self.parent.model[f"ktqx2.r{self.irn}"]=0.0
+            if self.name == "ir2":
+                match.disable(vary_name="kq[45]\.2[lr]b1")
+                self.parent.model["kq4.l2b1"]=-0.549274522900E-02
+                self.parent.model["kq4.r2b1"]=0.471284923000E-02
+                self.parent.model["kq5.l2b1"]=0.482678438300E-02
+                self.parent.model["kq5.r2b1"]=-0.461752389200E-02
+            if self.name == "ir8":
+                match.disable(vary_name="kq[45]\.8[lr]b2")
+                self.parent.model["kq4.l8b2"]= 0.449559181916E-02
+                self.parent.model["kq4.r8b2"]=-0.447368899600E-02
+                self.parent.model["kq5.l8b2"]=-0.538821723331E-02
+                self.parent.model["kq5.r8b2"]= 0.425682473400E-02
+        if self.name=="ir6":
+            match.disable(vary_name="kq4.l6b1")
+            match.disable(vary_name="kq4.r6b2")
         self.optimizer = match
         return match
 
