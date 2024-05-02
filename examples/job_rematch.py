@@ -30,22 +30,19 @@ ktqx1.l1   := kqx3.l1-ktqx1.l1;
 
 from lhcoptics import LHCOptics
 
-inj=LHCOptics.from_json("data/opt_inj.json",xsuite_model="data/lhc.json")
+inj = LHCOptics.from_json("data/opt_inj.json", xsuite_model="data/lhc.json")
 inj.set_circuits_from_json("data/lhccircuits.json")
-inj.model['phase_change.b1']=0
-inj.model['phase_change.b2']=0
+inj.model["phase_change.b1"] = 0
+inj.model["phase_change.b2"] = 0
 inj.disable_bumps()
 inj.update()
 
-#IR1
-mtc=inj.ir1.match()
+# IR1
+mtc = inj.ir1.match()
 mtc.vary_status()
 mtc.target_status()
 
-#ARC
-mtc=inj.a12.match()
+# ARC
+mtc = inj.a12.match()
 mtc.vary_status()
 mtc.target_status()
-
-
-

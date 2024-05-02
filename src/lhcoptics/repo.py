@@ -19,7 +19,14 @@ def read_yaml(filename):
 class LHC:
     """LHC optics repository"""
 
-    def __init__(self, name, basedir=None, cycles=None, beam_processes=None,collections=None):
+    def __init__(
+        self,
+        name,
+        basedir=None,
+        cycles=None,
+        beam_processes=None,
+        collections=None,
+    ):
         name = str(name)
         self.name = name
         self._set_basedir(name, basedir)
@@ -47,7 +54,7 @@ class LHC:
 
     def _set_basedir(self, name, basedir):
         if basedir is not None:
-            self.basedir=Path(basedir)
+            self.basedir = Path(basedir)
         else:
             import subprocess
 
@@ -71,21 +78,24 @@ class LHC:
                         "acc-models-lhc",
                     ]
                 )
-            self.basedir=accmodels
+            self.basedir = accmodels
 
     def set_cycles(self):
         listfile = self.basedir / "scenarios/cycle/list.yaml"
         if listfile.exists():
             cycle_list = read_yaml(listfile)
-            cycle= {name: LHCCycle(name, basedir=self.basedir) for name in cycle_list}
+            cycle = {
+                name: LHCCycle(name, basedir=self.basedir)
+                for name in cycle_list
+            }
         else:
             cycle = {}
-            cycle_list=[]
+            cycle_list = []
         self.cycle = cycle
         self.cycle_list = cycle_list
 
     def new_cycle(self, name):
-        cycle = LHCCycle(name,self)
+        cycle = LHCCycle(name, self)
         self.insert_cycle(cycle)
         return cycle
 
@@ -100,19 +110,25 @@ class LHC:
     def set_beam_processes(self):
         bpfile = self.basedir / "scenarios/bp/list.yaml"
         if bpfile.exists():
-            beam_processes = {name: LHCProcess(name,bp,basedir=self.basedir) for name,bp in read_yaml(bpfile)}
+            beam_processes = {
+                name: LHCProcess(name, bp, basedir=self.basedir)
+                for name, bp in read_yaml(bpfile)
+            }
         else:
             beam_processes = {}
         self.beam_processes = beam_processes
 
+
 class LHCCycle:
-    def __init__(self, name, parent, processes=None, label=None, description=None):
+    def __init__(
+        self, name, parent, processes=None, label=None, description=None
+    ):
         self.name = name
         self.parent = parent
         self.label = label
         self.description = description
         self.cycledir = self.basedir / "scenarios" / "cycle" / self.name
-        self.descfile = self.cycledir/ "desc.yaml"
+        self.descfile = self.cycledir / "desc.yaml"
         self.read_data(self)
 
     def read_data(self):
@@ -137,15 +153,22 @@ class LHCCycle:
     def __getattr__(self, name):
         return self.processes[name]
 
-    def _set_processes(self,processes):
-        self.process_list=[]
-        self.process={}
+    def _set_processes(self, processes):
+        self.process_list = []
+        self.process = {}
         if processes is None:
             self.processes = {}
-        bpfile=self.basedir / "scenarios/cycle" / self.name / "beam_processes.yaml"
+        bpfile = (
+            self.basedir
+            / "scenarios/cycle"
+            / self.name
+            / "beam_processes.yaml"
+        )
         for bp in read_yaml(self.cycledir / f"beam_processes.yaml"):
             ((name, beamprocess),) = bp.items()
-            dct[name] = LHCProcess(name=name, beamprocess=beamprocess, parent=self)
+            dct[name] = LHCProcess(
+                name=name, beamprocess=beamprocess, parent=self
+            )
         self.processes = dct
 
     def get_fills(self, lhcrun):
@@ -163,9 +186,7 @@ class LHCProcess:
         self.name = name
         self.basedir = basedir
         self.beamprocess = beamprocess
-        self.beamprocessdir = (
-            self.basedir / "bp" / self.beamprocess
-        )
+        self.beamprocessdir = self.basedir / "bp" / self.beamprocess
         self.optics_table = (
             self.get_optics_table() if optics is None else optics
         )
@@ -257,7 +278,7 @@ class LHCKnobDefs:
 
     def get_settings(self):
         return list(self.lsa.keys())
-    
+
     def __repr__(self):
         return f"<LHCKnobDefs {len(self.lsa)} knobs>"
 
@@ -277,7 +298,7 @@ class LHCKnobDef:
 
     def to_mad(self, lsa_value):
         return f"{self.mad}={self.mad_value(lsa_value)};"
-    
+
     def __repr__(self):
         return f"<Knob {self.lsa}:{self.mad}>"
 

@@ -16,7 +16,11 @@ from .arcs import LHCArc
 from .section import Knob
 from .model_xsuite import LHCXsuiteModel, LHCMadModel
 from .circuits import LHCCircuits
-from .utils import print_diff_dict_objs, print_diff_dict_float
+from .utils import (
+    print_diff_dict_objs,
+    print_diff_dict_float,
+    deliver_list_str,
+)
 from .opttable import LHCOpticsTable
 
 irs = [LHCIR1, LHCIR2]
@@ -219,7 +223,7 @@ class LHCOptics:
             for ss in self.irs + self.arcs:
                 if k in ss:
                     return ss[k]
-        raise KeyError(f"{k} not found in {self}")
+        return default
 
     def to_dict(self):
         return {
@@ -270,8 +274,8 @@ class LHCOptics:
         if verbose:
             print(f"Update knobs from {src}")
         self.model.update_knobs(src.knobs, verbose=verbose)
-        if 'p0c' in self.params:
-            self.model.p0c = self.params['p0c']
+        if "p0c" in self.params:
+            self.model.p0c = self.params["p0c"]
         return self
 
     def update_knobs(self, src=None, full=True, verbose=False):
@@ -501,11 +505,6 @@ class LHCOptics:
     def diff_params(self, other):
         print_diff_dict_float(self.params, other.params)
 
-    def get_all_strengths(self):
-        strengths = {}
-        for ss in self.irs + self.arcs:
-            strengths.update(ss.strengths)
-        return strengths
 
     def get_phase_arcs(self):
         phases = {}
@@ -515,3 +514,39 @@ class LHCOptics:
 
     def to_table(self, *rows):
         return LHCOpticsTable([self] + list(rows))
+
+    def get_all_strengths(self):
+        strengths = {}
+        for ss in self.irs + self.arcs:
+            strengths.update(ss.strengths)
+        return strengths
+
+    def get_all_knobs(self):
+        knobs = {}
+        for ss in self.irs + self.arcs:
+            knobs.update(ss.knobs)
+        knobs.update(self.knobs)
+        return knobs
+
+    def to_madx(self, output=None):
+        out = []
+        out.append(f"! {self.name.upper()}\n")
+
+        if len(self.params) > 0:
+            out.append(f"! Main Parameters")
+            for k, v in self.params.items():
+                out.append(f"{k:30} = {v:19.16f};")
+            out.append("")
+
+
+        for ss in self.irs + self.arcs:
+            out.extend(ss.to_madx(output=list,knobs=False))
+
+        knobs = self.get_all_knobs()
+        if len(knobs) > 0:
+            strengths = self.get_all_strengths()
+            out.append(f"! Knobs")
+            for expr in LHCMadModel.knobs_to_expr(self.knobs, strengths):
+                out.append(expr)
+            out.append("")
+        return deliver_list_str(out, output)

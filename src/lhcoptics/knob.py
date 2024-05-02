@@ -1,5 +1,6 @@
 from .utils import print_diff_dict_float
 
+
 class Knob:
     @classmethod
     def from_dict(cls, data):
@@ -7,7 +8,11 @@ class Knob:
 
     @classmethod
     def from_src(cls, src):
-        if  hasattr(src, "name") and hasattr(src, "value") and hasattr(src, "weights"):
+        if (
+            hasattr(src, "name")
+            and hasattr(src, "value")
+            and hasattr(src, "weights")
+        ):
             return cls(src.name, src.value, src.weights)
         else:
             return cls.from_dict(src)

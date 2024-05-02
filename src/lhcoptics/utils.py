@@ -1,5 +1,8 @@
-def print_diff_dict_float(dct1,dct2):
-    allk= set(dct1.keys()) | set(dct2.keys())
+from pathlib import Path
+
+
+def print_diff_dict_float(dct1, dct2):
+    allk = set(dct1.keys()) | set(dct2.keys())
     for k in allk:
         if k not in dct1:
             print(f"{k:20} {dct2[k]:15.6g} only in other")
@@ -8,8 +11,9 @@ def print_diff_dict_float(dct1,dct2):
         elif dct1[k] != dct2[k]:
             print(f"{k:20} {dct1[k]:15.6g} != {dct2[k]:15.6g}")
 
-def print_diff_dict_objs(dct1,dct2):
-    allk= set(dct1.keys()) | set(dct2.keys())
+
+def print_diff_dict_objs(dct1, dct2):
+    allk = set(dct1.keys()) | set(dct2.keys())
     for k in allk:
         if k not in dct1:
             print(f"{k:20} only in other")
@@ -18,3 +22,22 @@ def print_diff_dict_objs(dct1,dct2):
         else:
             dct1[k].diff(dct2[k])
 
+
+def deliver_list_str(out, output=None):
+    if output is str:
+        return "\n".join(out)
+    elif output is list:
+        return out
+    elif hasattr(output, "input"):
+        for ll in out:
+            if ll[0] != "!":
+                output.input(ll)
+    elif hasattr(output, "writelines"):
+        output.writelines(out)
+    elif isinstance(output, str) or isinstance(output, Path):
+        with open(output, "w") as f:
+            f.writelines(out)
+    elif output is None:
+        print("\n".join(out))
+    else:
+        raise ValueError(f"Unknown output type {output}")

@@ -270,11 +270,16 @@ use, sequence=lhcb2;
         weights = {}
         for knob in knobs.values():
             for st, val in knob.weights.items():
-                weights.setdefault(st, []).append(f"{val:+.15g}*{knob.name}")
+                weights.setdefault(st, []).append(f"{val:+.15g} * {knob.name}")
         for st in weights:
-            if st in strengths:
-                weights[st].insert(0, f"{strengths[st]:+.15g}")
-        return [f"{st}:={''.join(weights[st])};" for st in weights]
+            basevalue = strengths.get(st)
+            if basevalue is not None:
+                weights[st].insert(0, f"{basevalue:+.15g}")
+        out=[]
+        for st in weights:
+            rhs='\n  '.join(weights[st])
+            out.append(f"{st} :=\n  {rhs};")
+        return out
 
     @classmethod
     def from_madxfile(cls, madxfile):
@@ -320,7 +325,7 @@ use, sequence=lhcb2;
                             f"{wn} depends on {k} but not on {name}"
                         )
                 if expr is None:
-                    wnvalue=self[wn]
+                    wnvalue = self[wn]
                     self.madx.input(f"{wn} := {wnvalue} + ({name} * {k});")
                 elif expr is not None and k not in expr:
                     self.madx.input(f"{wn} := {expr} + ({name} * {k});")
@@ -400,3 +405,4 @@ use, sequence=lhcb2;
             k: v for k, v in other.madx.globals.items() if type(v) == float
         }
         print_diff_dict_float(selfvar, othervar)
+

@@ -26,11 +26,11 @@ class LHCCircuits:
     @staticmethod
     def get_calibs_from_lsa(calibnames):
         lsa = get_lsa()
-        #req = lsa._cern.lsa.domain.devices.CalibrationsRequest.byCalibrationNames(
+        # req = lsa._cern.lsa.domain.devices.CalibrationsRequest.byCalibrationNames(
         #    calibnames
-        #)
-        #temp fix for the triplets
-        req=lsa._cern.lsa.domain.devices.CalibrationsRequest.ALL
+        # )
+        # temp fix for the triplets
+        req = lsa._cern.lsa.domain.devices.CalibrationsRequest.ALL
         calibs = lsa._deviceService.findCalibrations(req)
         calibrations = {}
         for lsacalib in calibs:
@@ -119,53 +119,73 @@ class LHCCircuits:
         return self.pcname[kname].get_field(current)
 
     def get_klimits(self, kname, pc=7e12):
-        if kname.startswith('kqx') or kname.startswith('ktqx'):
+        if kname.startswith("kqx") or kname.startswith("ktqx"):
             brho = pc / 299792458
-            return [-205/brho, 205/brho]
+            return [-205 / brho, 205 / brho]
         else:
             return self.madname[kname].get_klimits(pc)
 
     def get_current_triplet(self, side, kqx, ktqx1, ktqx2, pc=7e12):
-        k3=kqx
-        k1=ktqx1+kqx
-        k2=-ktqx2-kqx
-        return self.get_current_triplet(side,k1,k2,k3,pc)
+        k3 = kqx
+        k1 = ktqx1 + kqx
+        k2 = -ktqx2 - kqx
+        return self.get_current_triplet(side, k1, k2, k3, pc)
 
     def get_current_triplet(self, side, k1, k2, k3, pc=7e12):
-        side=side.upper()
-        n1=f"MQXA1.{side}"
-        n2=f"MQXB2.{side}"
-        n3=f"MQXA3.{side}"
-        i1=self.calibrations[n1].get_current(k1,pc)
-        i2=self.calibrations[n2].get_current(k2,pc)
-        i3=self.calibrations[n3].get_current(k3,pc)
-        return i1,i2,i3
+        side = side.upper()
+        n1 = f"MQXA1.{side}"
+        n2 = f"MQXB2.{side}"
+        n3 = f"MQXA3.{side}"
+        i1 = self.calibrations[n1].get_current(k1, pc)
+        i2 = self.calibrations[n2].get_current(k2, pc)
+        i3 = self.calibrations[n3].get_current(k3, pc)
+        return i1, i2, i3
 
     def get_field_triplet(self, side, i1, i2, i3):
-        side=side.upper()
-        n1=f"MQXA1.{side}"
-        n2=f"MQXB2.{side}"
-        n3=f"MQXA3.{side}"
-        f1=self.calibrations[n1].get_field(i1)
-        f2=self.calibrations[n2].get_field(i2)
-        f3=self.calibrations[n3].get_field(i3)
-        return f1,f2,f3
+        side = side.upper()
+        n1 = f"MQXA1.{side}"
+        n2 = f"MQXB2.{side}"
+        n3 = f"MQXA3.{side}"
+        f1 = self.calibrations[n1].get_field(i1)
+        f2 = self.calibrations[n2].get_field(i2)
+        f3 = self.calibrations[n3].get_field(i3)
+        return f1, f2, f3
 
     def get_current_triplet_trims(self, side, k1, k2, k3, pc=7e12):
-        i1,i2,i3=self.get_current_triplet(side,k1,k2,k3,pc)
-        return {f"RQX.{side}":i3,f"RTQX1.{side}":i3-i1,f"RQTX2.{side}":i2-i3}
+        i1, i2, i3 = self.get_current_triplet(side, k1, k2, k3, pc)
+        return {
+            f"RQX.{side}": i3,
+            f"RTQX1.{side}": i3 - i1,
+            f"RQTX2.{side}": i2 - i3,
+        }
 
     def find_calib(self, name):
-        return [calib for cname,calib in self.calibrations.items() if re.match(name,cname)]
+        return [
+            calib
+            for cname, calib in self.calibrations.items()
+            if re.match(name, cname)
+        ]
 
     def find_pc(self, madname=None, pcname=None, shortname=None):
-        out=[]
+        out = []
         if madname:
-            out+=[pc for pc in self.pcname.values() if pc.madname and re.match(madname,pc.madname)]
+            out += [
+                pc
+                for pc in self.pcname.values()
+                if pc.madname and re.match(madname, pc.madname)
+            ]
         if pcname:
-            out+=[pc for pc in self.pcname.values() if re.match(pcname,pc.pcname)]
+            out += [
+                pc
+                for pc in self.pcname.values()
+                if re.match(pcname, pc.pcname)
+            ]
         if shortname:
-            out+=[pc for pc in self.pcname.values() if re.match(shortname,pc.shortname)]
+            out += [
+                pc
+                for pc in self.pcname.values()
+                if re.match(shortname, pc.shortname)
+            ]
         return out
 
 
@@ -213,10 +233,10 @@ class LHCCircuit:
         if "RTQX" in pcname:
             pc.madname = f"ktqx{pcname[-4:].lower()}"
         elif ".RQF." in pcname:
-            pc.calibname = lh.getName()+"B1"
+            pc.calibname = lh.getName() + "B1"
             pc.calibsign = 1
         elif ".RQD." in pcname:
-            pc.calibname = lh.getName()+"B1"
+            pc.calibname = lh.getName() + "B1"
             pc.calibsign = -1
         return pc
 
@@ -374,11 +394,15 @@ class LHCCalibration:
 
     def plot(self):
         plt.figure(num=self.name)
-        plt.plot(self.current, self.field,'k',label="Field")
+        plt.plot(self.current, self.field, "k", label="Field")
         plt.xlabel("Current [A]")
         plt.ylabel("Field [T/m^n]")
-        dfdi=(self.field[-1]-self.field[0])/(self.current[-1]-self.current[0])
-        plt.plot(self.current,dfdi*self.current,'r',label="Field Deviation")
+        dfdi = (self.field[-1] - self.field[0]) / (
+            self.current[-1] - self.current[0]
+        )
+        plt.plot(
+            self.current, dfdi * self.current, "r", label="Field Deviation"
+        )
         plt.title(self.name)
         plt.grid(True)
         plt.legend()

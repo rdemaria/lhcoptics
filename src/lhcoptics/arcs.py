@@ -5,6 +5,7 @@ import re
 
 from .opttable import LHCArcTable
 
+
 class ActionArcPhaseAdvance(xt.Action):
     def __init__(self, arc, beam):
         self.arc = arc
@@ -18,6 +19,7 @@ class ActionArcPhaseAdvance(xt.Action):
             "mux": tw_arc["mux", -1] - tw_arc["mux", 0],
             "muy": tw_arc["muy", -1] - tw_arc["muy", 0],
         }
+
 
 class LHCArc(LHCSection):
 
@@ -278,6 +280,4 @@ class LHCArc(LHCSection):
         return {k: params[k] for k in self.phase_names}
 
     def to_table(self, *rows):
-        return LHCArcTable([self]+list(rows))
-
-
+        return LHCArcTable([self] + list(rows))

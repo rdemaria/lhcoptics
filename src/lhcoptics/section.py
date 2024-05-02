@@ -5,7 +5,11 @@ from pathlib import Path
 
 from .model_madx import LHCMadModel
 from .knob import Knob
-from .utils import print_diff_dict_objs, print_diff_dict_float
+from .utils import (
+    print_diff_dict_objs,
+    print_diff_dict_float,
+    deliver_list_str,
+)
 
 _lb = [(l, b) for l in "lr" for b in "12"]
 _ac = {
@@ -131,39 +135,25 @@ class LHCSection:
             json.dump(self.to_dict(), f)
         return self
 
-    def to_madx(self, output=None):
+    def to_madx(self, output=None, knobs=True):
         out = []
         out.append(f"! {self.name.upper()}\n")
         if len(self.strengths) > 0:
-            out.append(f"! Strengths")
+            out.append(f"! Strengths of {self.name.upper()}")
             for k, v in self.strengths.items():
                 out.append(f"{k:30} = {v:19.16f};")
             out.append("")
         if len(self.params) > 0:
-            out.append(f"! Parameters")
+            out.append(f"! Parameters of {self.name.upper()}")
             for k, v in self.params.items():
                 out.append(f"{k:30} = {v:19.16f};")
             out.append("")
-        if len(self.knobs) > 0:
-            out.append(f"! Knobs")
+        if knobs and len(self.knobs) > 0:
+            out.append(f"! Knobs of {self.name.upper()}")
             for expr in LHCMadModel.knobs_to_expr(self.knobs, self.strengths):
                 out.append(expr)
             out.append("")
-        if output is str:
-            return "\n".join(out)
-        elif hasattr(output, "input"):
-            for ll in out:
-                if ll[0] != "!":
-                    output.input(ll)
-        elif hasattr(output, "writelines"):
-            output.writelines(out)
-        elif isinstance(output, str) or isinstance(output, Path):
-            with open(output, "w") as f:
-                f.writelines(out)
-        elif output is None:
-            print("\n".join(out))
-        else:
-            raise ValueError(f"Unknown output type {output}")
+        return deliver_list_str(out, output)
 
     def copy(self):
         return self.__class__(
@@ -172,7 +162,7 @@ class LHCSection:
             end=self.end,
             strengths=self.strengths.copy(),
             params=self.params.copy(),
-            knobs={k: knob.copy() for k,knob in self.knobs.items()},
+            knobs={k: knob.copy() for k, knob in self.knobs.items()},
         )
 
     def set_params(self):
@@ -183,7 +173,7 @@ class LHCSection:
         return self
 
     def update_model(self, src=None, verbose=False):
-        """ Update the model with the local strengths, knobs
+        """Update the model with the local strengths, knobs
         If a src is provided, it will be used to update the local values, else self will be used.
         If src is a dict containing strengths, knobs or a LHCSection, they will be used to update the model.
         if src is dict of values, they will be used to update the model variables.
@@ -219,7 +209,9 @@ class LHCSection:
         for k in self.strengths:
             if k in src:
                 if verbose and self.strengths[k] != src[k]:
-                    print(f"Updating {k!r} from {self.strengths[k]} to {src[k]}")
+                    print(
+                        f"Updating {k!r} from {self.strengths[k]} to {src[k]}"
+                    )
                 self.strengths[k] = src[k]
         return self
 
@@ -258,35 +250,39 @@ class LHCSection:
             for k in self.params:
                 if k in src:
                     if verbose and self.params[k] != src[k]:
-                        print(f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}")
+                        print(
+                            f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}"
+                        )
                     self.params[k] = src[k]
         return self
 
-    def update(self, src=None,verbose=False,knobs=True,strengths=True,params=True):
+    def update(
+        self, src=None, verbose=False, knobs=True, strengths=True, params=True
+    ):
         """
         Update existing strengths, knobs, params from self. model or src.params or src
         """
         if isinstance(src, str):
             src = self.__class__.from_json(src)
         if strengths:
-            self.update_strengths(src,verbose=verbose)
+            self.update_strengths(src, verbose=verbose)
         if knobs:
-            self.update_knobs(src,verbose=verbose)
+            self.update_knobs(src, verbose=verbose)
         if params:
-            self.update_params(src,verbose=verbose)
+            self.update_params(src, verbose=verbose)
         return self
 
     def twiss(self, beam=None, method=None, strengths=True):
         """Return twiss table from the model using specific methods."""
         if method is None:
             method = self.default_twiss_method
-        return getattr(self, "twiss_" + method)(beam,strengths=strengths)
+        return getattr(self, "twiss_" + method)(beam, strengths=strengths)
 
     def plot(self, beam=None, method="periodic", figlabel=None):
         if beam is None:
             return [self.plot(beam=1), self.plot(beam=2)]
         else:
-            twiss = self.twiss(beam, method=method,strengths=True)
+            twiss = self.twiss(beam, method=method, strengths=True)
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
             return twiss.plot(figlabel=figlabel)
@@ -315,7 +311,6 @@ class LHCSection:
     def knobs_off(self):
         for k in self.knobs:
             self.parent.model[k] = 0
-
 
     def diff(self, other):
         self.diff_strengths(other)

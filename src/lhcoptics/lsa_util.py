@@ -1,5 +1,6 @@
 _lsa = None
 
+
 def get_lsa():
     global _lsa
     if _lsa is None:

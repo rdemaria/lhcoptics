@@ -184,7 +184,6 @@ class LHCIR7(LHCIR):
                     colltargets.append(tt)
             targets += sp_targets + colltargets
 
-
         varylst = LHCIR.get_match_vary(
             self,
             b1=b1,

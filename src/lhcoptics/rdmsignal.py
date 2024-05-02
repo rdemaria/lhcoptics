@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp1d
 
+
 class Piecewise:
     def __init__(self, t, v):
         self.t = t
@@ -9,11 +10,13 @@ class Piecewise:
     def __call__(self, t):
         return np.interp(t, self.t, self.v)
 
+
 class Polynomial:
     @classmethod
-    def from_fit(cls, t, v, n, t0=None, v0=None, t1=None, v1=None, t2=None, v2=None):
-        """Fit best polynomial of degree n to data points (t, v) and optional fixed point (t0, v0) and derivative (t1, v1) and second derivative (t2, v2)
-        """
+    def from_fit(
+        cls, t, v, n, t0=None, v0=None, t1=None, v1=None, t2=None, v2=None
+    ):
+        """Fit best polynomial of degree n to data points (t, v) and optional fixed point (t0, v0) and derivative (t1, v1) and second derivative (t2, v2)"""
         coeffs = np.polyfit(t, v, n)
         return cls(coeffs)
 
@@ -21,12 +24,13 @@ class Polynomial:
         self.coeffs = coeffs
 
     def __call__(self, x):
-        return sum(c * x ** i for i, c in enumerate(self.coeffs))
+        return sum(c * x**i for i, c in enumerate(self.coeffs))
+
 
 class Spline:
     @classmethod
     def from_fit(cls, t, v):
-        spline=interp1d(t, v, kind="cubic")
+        spline = interp1d(t, v, kind="cubic")
         return cls(spline)
 
     def __init__(self, spline):
@@ -34,6 +38,7 @@ class Spline:
 
     def __call__(self, t):
         self.spline(t)
+
 
 def solveconst(A, b, C, d):
     """Solve constrained least square problem using Lagrange multipliers
@@ -62,7 +67,9 @@ def makeA(x, N):
 
 
 def makeAp(x, N):
-    return np.column_stack([np.zeros(len(x))] + [i * x ** (i - 1) for i in range(1, N + 1)])
+    return np.column_stack(
+        [np.zeros(len(x))] + [i * x ** (i - 1) for i in range(1, N + 1)]
+    )
 
 
 def makeApp(x, N):
@@ -84,7 +91,9 @@ def poly_print(p, x="x", power="**", mul="*"):
     return "".join(res)
 
 
-def poly_fit(order, xdata, ydata, x0=[], y0=[], xp0=[], yp0=[], xpp0=[], ypp0=[]):
+def poly_fit(
+    order, xdata, ydata, x0=[], y0=[], xp0=[], yp0=[], xpp0=[], ypp0=[]
+):
     A = makeA(xdata, order)
     b = ydata
     C0 = makeA(np.array(x0), order)
@@ -94,5 +103,3 @@ def poly_fit(order, xdata, ydata, x0=[], y0=[], xp0=[], yp0=[], xpp0=[], ypp0=[]
     d = np.hstack([y0, yp0, ypp0])
     p = solveconst(A, b, C, d)
     return p
-
-

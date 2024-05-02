@@ -3,12 +3,32 @@ import xtrack as xt
 
 from .irs import LHCIR
 
+
 class LHCIR3(LHCIR):
     name = "ir3"
 
-    colls_ir3b1=['tcp.6l3.b1','tcsg.5l3.b1','tcsg.4r3.b1','tcsg.a5r3.b1','tcsg.b5r3.b1','tcla.a5r3.b1','tcla.b5r3.b1','tcla.6r3.b1','tcla.7r3.b1']
-    colls_ir3b2=['tcp.6r3.b2','tcsg.5r3.b2','tcsg.4l3.b2','tcsg.a5l3.b2','tcsg.b5l3.b2','tcla.a5l3.b2','tcla.b5l3.b2','tcla.6l3.b2','tcla.7l3.b2']
-
+    colls_ir3b1 = [
+        "tcp.6l3.b1",
+        "tcsg.5l3.b1",
+        "tcsg.4r3.b1",
+        "tcsg.a5r3.b1",
+        "tcsg.b5r3.b1",
+        "tcla.a5r3.b1",
+        "tcla.b5r3.b1",
+        "tcla.6r3.b1",
+        "tcla.7r3.b1",
+    ]
+    colls_ir3b2 = [
+        "tcp.6r3.b2",
+        "tcsg.5r3.b2",
+        "tcsg.4l3.b2",
+        "tcsg.a5l3.b2",
+        "tcsg.b5l3.b2",
+        "tcla.a5l3.b2",
+        "tcla.b5l3.b2",
+        "tcla.6l3.b2",
+        "tcla.7l3.b2",
+    ]
 
     knobsRematched13b_mu = {
         "kqt4.l3": 0.0006887129999999986,
