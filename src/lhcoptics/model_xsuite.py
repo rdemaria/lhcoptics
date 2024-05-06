@@ -25,6 +25,8 @@ def pprint(expr):
 
 
 class LHCXsuiteModel:
+    _xt=xt
+
     @classmethod
     def from_madxfile(cls, madxfile, sliced=False):
         """
@@ -162,6 +164,10 @@ class LHCXsuiteModel:
                 print(f"Update knob {k:20} {knob.value:15.6g}")
             self.update_knob(knob)
 
+    def knob_delete_all(self):
+        for vv in self._var_values:
+            self[vv] = self[vv]
+
     def knob_check(self, knob, verbose=False):
         """
         Return True has the expeceted structure
@@ -207,7 +213,7 @@ class LHCXsuiteModel:
         check = self.knob_check(knob)
         if check is False:
             self.knob_check(knob, verbose=verbose)
-            raise ValueError(f"Knob {knobname} has different structure")
+            raise ValueError(f"Knob {knobname} has different structure in {self}")
         else:
             self[knobname] = knob.value
             for wtarget, value in knob.weights.items():
@@ -246,14 +252,28 @@ class LHCXsuiteModel:
             if wname in self:
                 print(f"    Weight {wname} = {self[wname]:15.6g}")
 
-    def get_knob_by_naming(self, name):
+    def get_knob_by_weight_names(self, name):
         weights = {}
+        value = self._var_values[name]
         wname = f"_from_{name}"
         for k in self._var_values:
             if k.endswith(wname):
                 weights[k] = self._var_values[k]
-        value = self._var_values[name]
         return Knob(name, value, weights)
+
+    def get_knob_by_probing(self, name):
+        weights = {}
+        oldvars=self._var_values.copy()
+        oldvalue = self._var_values[name]
+        self._var_values[name] = oldvalue + 1
+        for k in self._var_values:
+            vnew=self._var_values[k]
+            if hasattr(vnew, "__sub__"):
+               dvar=self._var_values[k]-oldvars[k]
+               if dvar != 0:
+                   weights[k] = dvar
+        self._var_values[name] = oldvalue
+        return Knob(name, oldvalue, weights)
 
     def update(self, src):
         if hasattr(src, "strengths"):
@@ -289,6 +309,7 @@ class LHCXsuiteModel:
                 tw = tw.rows[startout:endout]  # can fail because of cycle
         else:
             tw = line.twiss(start=startout, end=endout, init=init)
+        return tw
 
     def copy(self):
         return self.__class__(
@@ -310,9 +331,17 @@ class LHCXsuiteModel:
                     f"{k:20} {self._var_values[k]:15.6g} {other._var_values[k]:15.6g}"
                 )
 
+    def match(self,*args,**kwargs):
+        return self.multiline.match(*args,**kwargs)
+    
+    def match_knob(self,*args,**kwargs):
+        return self.multiline.match_knob(*args,**kwargs)
 
-def mk_tune_knobs(collider):
+
+def make_tune_knobs(collider, ats=False):
+    #TODO ATS Option
     mqt_circuits = {}
+
     mqt_circuits["b1"] = [
         "kqtf.a12b1",
         "kqtf.a23b1",
@@ -358,13 +387,13 @@ def mk_tune_knobs(collider):
     optimizers = {"b1": {}, "b2": {}}
     dq_match = 1e-3
     for bname in ["b1", "b2"]:
-        tw = collider[f"lhc{bname}"].twiss()
-        opt_qx = collider[f"lhc{bname}"].match_knob(
+        tw = collider[f"{bname}"].twiss()
+        opt_qx = collider[f"{bname}"].match_knob(
             knob_name=f"dqx.{bname}",
             knob_value_start=0.0,
             knob_value_end=dq_match,
             run=False,
-            vary=xt.VaryList(mqt_circuits[bname], step=1e-8),
+            vary=xt.VaryList(mqt_circuits[bname], step=1e-9),
             targets=[
                 tw.target("qx", tw.qx + dq_match, tol=1e-7),
                 tw.target("qy", tw.qy, tol=1e-7),
@@ -375,7 +404,7 @@ def mk_tune_knobs(collider):
         opt_qx.generate_knob()
         optimizers[bname]["qx"] = opt_qx
 
-        opt_qy = collider[f"lhc{bname}"].match_knob(
+        opt_qy = collider[f"{bname}"].match_knob(
             knob_name=f"dqy.{bname}",
             knob_value_start=0.0,
             knob_value_end=dq_match,
@@ -394,7 +423,7 @@ def mk_tune_knobs(collider):
     return optimizers
 
 
-def make_coupling_knob(collider):
+def make_coupling_knobs(collider):
     mqs_circuits_4_quads = {}
     mqs_circuits_2_quads = {}
     mqs_circuits_4_quads["b1"] = [
@@ -467,7 +496,7 @@ def make_coupling_knob(collider):
 
     c_min_match = 1e-4
     for bname in ["b1", "b2"]:
-        line = collider[f"lhc{bname}"]
+        line = collider[f"{bname}"]
         act_cmin = ActionCmin(line)
 
         assert np.abs(act_cmin.run()["c_min_re"]) < 1e-6
@@ -509,6 +538,8 @@ def make_coupling_knob(collider):
         opt_im.generate_knob()
         optimizers[bname]["im"] = opt_im
 
+def test_coupling_knobs(collider):
+    line=collider.b1
     # Check orthogonality
     line.vars["cmrs.b1_op"] = 1e-3
     line.vars["cmis.b1_op"] = 1e-3
@@ -602,8 +633,9 @@ def make_chroma_knobs(collider):
     optimizers = {"b1": {}, "b2": {}}
     d_chrom_match = 0.5
     for bname in ["b1", "b2"]:
-        tw = collider[f"lhc{bname}"].twiss()
-        opt_qpx = collider[f"lhc{bname}"].match_knob(
+        tw = collider[f"{bname}"].twiss(compute_chromatic_properties = True)
+        opt_qpx = collider[f"{bname}"].match_knob(
+            compute_chromatic_properties = True,
             knob_name=f"dqpx.{bname}_op",
             knob_value_start=0.0,
             knob_value_end=d_chrom_match,
@@ -619,7 +651,8 @@ def make_chroma_knobs(collider):
         opt_qpx.generate_knob()
         optimizers[bname]["qpy"] = opt_qpx
 
-        opt_qpy = collider[f"lhc{bname}"].match_knob(
+        opt_qpy = collider[f"{bname}"].match_knob(
+            compute_chromatic_properties = True,
             knob_name=f"dqpy.{bname}_op",
             knob_value_start=0.0,
             knob_value_end=d_chrom_match,
@@ -635,7 +668,8 @@ def make_chroma_knobs(collider):
         opt_qpy.generate_knob()
         optimizers[bname]["qpy"] = opt_qpy
 
-    if False:
+
+def test_chroma_knobs(collider):
         # Test the knobs
 
         # Correct to zero
@@ -655,6 +689,8 @@ def make_chroma_knobs(collider):
         collider.vars["dqpy.b2_op"] += 5
 
         twtest = collider.twiss()
+
+        return twtest.dqx, twtest.dqy
 
 
 def make_orbit_knobs(collider):

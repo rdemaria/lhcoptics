@@ -1,7 +1,7 @@
 from cpymad.madx import Madx
 import json
 from pathlib import Path
-from copy import deepcopy
+import re
 
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
@@ -28,6 +28,26 @@ irs = [LHCIR1, LHCIR2]
 _opl = ["_op", "_sq", ""]
 
 
+def git_get_current_branch(directory):
+    import subprocess
+
+    return (
+        subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        )
+        .stdout.strip()
+        .strip()
+    )
+
+def git_set_branch(directory, branch):
+    import subprocess
+
+    subprocess.run(["git", "switch", branch], cwd=directory)
+
+
 class LHCOptics:
     """
     Optics containts global knobs, global parameters and sections
@@ -39,13 +59,16 @@ class LHCOptics:
         import subprocess
         import os
 
+        version=str(version)
+
         accmodels = Path("acc-models-lhc")
         if accmodels.exists():
             if not (accmodels / "lhc.seq").exists():
                 raise FileNotFoundError("acc-models-lhc/lhc.seq not found")
             else:
                 if (accmodels / ".git").exists():
-                    subprocess.run(["git", "switch", version], cwd=accmodels)
+                    if git_get_current_branch(accmodels) != version:
+                        git_set_branch(accmodels, version)
         elif (
             lcl := (Path.home() / "local" / "acc-models-lhc" / version)
         ).exists():
@@ -56,6 +79,7 @@ class LHCOptics:
                     "git",
                     "clone",
                     "https://gitlab.cern.ch/acc-models/lhc.git",
+                    f"-b {version}"
                     "acc-models-lhc",
                 ]
             )
@@ -63,15 +87,15 @@ class LHCOptics:
     _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
     _arcs = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
 
-    knobs = [f"dq{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
-    knobs += [f"dqp{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
-    knobs += [f"cm{x}s.b{b}{op}" for x in "ir" for b in "12" for op in _opl]
-    knobs += [
+    knob_names = [f"dq{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
+    knob_names += [f"dqp{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
+    knob_names += [f"cm{x}s.b{b}{op}" for x in "ir" for b in "12" for op in _opl]
+    knob_names += [
         f"{kk}.b{b}"
         for kk in ["on_mo", "phase_change", "dp_trim"]
         for b in "12"
     ]
-    knobs += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
+    knob_names += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
 
     def __init__(
         self,
@@ -145,7 +169,7 @@ class LHCOptics:
         verbose=False,
     ):
         madmodel = LHCMadModel(madx)
-        knobs = madmodel.make_and_set0_knobs(cls.knobs)
+        knobs = madmodel.make_and_set0_knobs(cls.knob_names)
         irs = [ir.from_madx(madx) for ir in cls._irs]
         arcs = [LHCArc.from_madx(madx, arc) for arc in cls._arcs]
         for k, knob in knobs.items():
@@ -288,10 +312,14 @@ class LHCOptics:
             src = src.knobs
         elif hasattr(src, "get_knob"):
             src = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
+        elif src == "default":
+            if verbose:
+                print("Update knobs from default list")
+            src ={k: self.model.get_knob_by_probing(k) for k in self.get_default_knob_names()}
         for k in self.knobs:
             if k in src:
                 if verbose:
-                    print(f"Update knob {k} from {src[k]}")
+                    self.knobs[k].print_update_diff(src[k])
                 self.knobs[k] = Knob.from_src(src[k])
         if full:
             for ss in self.irs + self.arcs:
@@ -301,6 +329,8 @@ class LHCOptics:
                 elif ss.name in src:
                     src_ss = src[ss.name]
                     ss.update_knobs(src=src_ss, verbose=verbose)
+                else:
+                    ss.update_knobs(src=src, verbose=verbose)
         return self
 
     def update(self, src=None, verbose=False, full=True):
@@ -515,18 +545,34 @@ class LHCOptics:
     def to_table(self, *rows):
         return LHCOpticsTable([self] + list(rows))
 
-    def get_all_strengths(self):
+    def find_strengths(self, regexp=None):
         strengths = {}
         for ss in self.irs + self.arcs:
             strengths.update(ss.strengths)
+        if regexp is not None:
+            strengths = {k: v for k, v in strengths.items() if re.match(regexp,k)}
         return strengths
 
-    def get_all_knobs(self):
+    def find_knobs(self, regexp=None):
         knobs = {}
         for ss in self.irs + self.arcs:
             knobs.update(ss.knobs)
         knobs.update(self.knobs)
+        if regexp is not None:
+            knobs = {k: v for k, v in knobs.items() if re.match(regexp,k)}
         return knobs
+
+    def find_knobs_null(self):
+        knobs=self.find_knobs()
+        return {k: v for k, v in knobs.items() if sum(map(abs,v.weights.values())) == 0}
+
+    @classmethod
+    def get_default_knob_names(cls):
+        out = cls.knob_names[:]
+        for ss in cls._irs:
+            out.extend(ss.knob_names)
+        return out
+
 
     def to_madx(self, output=None):
         out = []
@@ -542,11 +588,28 @@ class LHCOptics:
         for ss in self.irs + self.arcs:
             out.extend(ss.to_madx(output=list,knobs=False))
 
-        knobs = self.get_all_knobs()
+        knobs = self.find_knobs()
         if len(knobs) > 0:
-            strengths = self.get_all_strengths()
+            strengths = self.find_strengths()
             out.append(f"! Knobs")
             for expr in LHCMadModel.knobs_to_expr(self.knobs, strengths):
                 out.append(expr)
             out.append("")
         return deliver_list_str(out, output)
+
+
+    def make_tune_knobs(self):
+        from .model_xsuite import make_tune_knobs
+        make_tune_knobs(self.model.multiline)
+
+    def make_chroma_knobs(self):
+        from .model_xsuite import make_chroma_knobs
+        make_chroma_knobs(self.model.multiline)
+
+    def make_coupling_knobs(self):
+        from .model_xsuite import make_coupling_knobs
+        make_coupling_knobs(self.model.multiline)
+
+    def make_orbit_knobs(self):
+        from .model_xsuite import make_orbit_knobs
+        make_orbit_knobs(self.model.multiline)

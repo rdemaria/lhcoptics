@@ -60,10 +60,18 @@ class LHCArc(LHCSection):
         )
         self.i1 = i1
         self.i2 = i2
-        self.start_cell = {1: f"s.cell.{i1}{i2}.b1", 2: f"s.cell.{i1}{i2}.b2"}
-        self.end_cell = {1: f"e.cell.{i1}{i2}.b1", 2: f"e.cell.{i1}{i2}.b2"}
-        self.startb = {1: f"e.ds.r{i1}.b1", 2: f"e.ds.r{i1}.b2"}
-        self.endb = {1: f"s.ds.l{i2}.b1", 2: f"s.ds.l{i2}.b2"}
+        self.start_cellb1= f"s.cell.{i1}{i2}.b1"
+        self.start_cellb2= f"s.cell.{i1}{i2}.b2"
+        self.end_cellb1= f"e.cell.{i1}{i2}.b1"
+        self.end_cellb2= f"e.cell.{i1}{i2}.b2"
+        self.start_cellb12= (self.start_cellb1, self.start_cellb2)
+        self.end_cellb12= (self.end_cellb1, self.end_cellb2)
+        self.startb1= f"e.ds.r{i1}.b1"
+        self.startb2= f"e.ds.r{i1}.b2"
+        self.endb1= f"s.ds.l{i2}.b1"
+        self.endb2= f"s.ds.l{i2}.b2"
+        self.startb12= self.startb1, self.startb2
+        self.endb12= self.endb1, self.endb2
         self.phase_names = [
             f"mux{self.name}b1",
             f"muy{self.name}b1",
@@ -80,8 +88,8 @@ class LHCArc(LHCSection):
     def twiss_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
         tw = self.twiss(beam, strengths=False)
-        start = tw.get_twiss_init(self.startb[beam])
-        end = tw.get_twiss_init(self.endb[beam])
+        start = tw.get_twiss_init(self.startb12[beam-1])
+        end = tw.get_twiss_init(self.endb12[beam-1])
         start.mux = 0
         start.muy = 0
         end.mux = 0
@@ -96,8 +104,8 @@ class LHCArc(LHCSection):
                 self.twiss_cell(beam=2, strengths=strengths),
             ]
         sequence = self.model.sequence[beam]
-        start_cell = self.start_cell[beam]
-        end_cell = self.end_cell[beam]
+        start_cell = self.start_cellb12[beam-1]
+        end_cell = self.end_cellb12[beam-1]
         return sequence.twiss(
             start=start_cell,
             end=end_cell,
@@ -108,8 +116,8 @@ class LHCArc(LHCSection):
     def twiss_init_cell(self, beam, strengths=True):
         """Get twiss init at the beginning of the cell."""
         sequence = self.model.sequence[beam]
-        start_cell = self.start_cell[beam]
-        end_cell = self.end_cell[beam]
+        start_cell = self.start_cellb12[beam-1]
+        end_cell = self.end_cellb12[beam-1]
         twinit_cell = sequence.twiss(
             start=start_cell,
             end=end_cell,
@@ -128,8 +136,8 @@ class LHCArc(LHCSection):
             ]
         else:
             sequence = self.model.sequence[beam]
-            start = self.startb12[beam]
-            end = self.endb12[beam]
+            start = self.startb12[beam-1]
+            end = self.endb12[beam-1]
             init = sequence.twiss(strengths=False).get_twiss_init(start)
             return sequence.twiss(
                 start=start, end=end, init=init, strengths=strengths
@@ -144,8 +152,8 @@ class LHCArc(LHCSection):
             ]
         else:
             twinit_cell = self.twiss_init_cell(beam, strengths=strengths)
-            start_arc = self.startb[beam]
-            end_arc = self.endb[beam]
+            start_arc = self.startb12[beam-1]
+            end_arc = self.endb12[beam-1]
 
             sequence = self.model.sequence[beam]
             res = sequence.twiss(
@@ -166,14 +174,14 @@ class LHCArc(LHCSection):
             f"muy{self.name}b1": tw1.muy[-1],
             f"mux{self.name}b2": tw2.mux[-1],
             f"muy{self.name}b2": tw2.muy[-1],
-            f"muxcell{self.name[1:]}b1": tw1["mux", self.end_cell[1]]
-            - tw1["mux", self.start_cell[1]],
-            f"muxcell{self.name[1:]}b2": tw2["mux", self.end_cell[2]]
-            - tw2["mux", self.start_cell[2]],
-            f"muycell{self.name[1:]}b1": tw1["muy", self.end_cell[1]]
-            - tw1["muy", self.start_cell[1]],
-            f"muycell{self.name[1:]}b2": tw2["muy", self.end_cell[2]]
-            - tw2["muy", self.start_cell[2]],
+            f"muxcell{self.name[1:]}b1": tw1["mux", self.end_cellb1]
+            - tw1["mux", self.start_cellb1],
+            f"muxcell{self.name[1:]}b2": tw2["mux", self.end_cellb2]
+            - tw2["mux", self.start_cellb2],
+            f"muycell{self.name[1:]}b1": tw1["muy", self.end_cellb1]
+            - tw1["muy", self.start_cellb1],
+            f"muycell{self.name[1:]}b2": tw2["muy", self.end_cellb2]
+            - tw2["muy", self.start_cellb2],
         }
         return params
 

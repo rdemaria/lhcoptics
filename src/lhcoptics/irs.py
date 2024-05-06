@@ -25,7 +25,7 @@ class LHCIR(LHCSection):
     twiss_full(beam) -> Make twiss using full sequence
     """
 
-    knobs = []
+    knob_names = []
     _extra_param_names = []
     default_twiss_method = "init"
 
@@ -49,7 +49,7 @@ class LHCIR(LHCSection):
         acb = madmodel.filter(f"acbx.*[lr]{irn}$")
         acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)
-        knobs = madmodel.make_and_set0_knobs(cls.knobs)
+        knobs = madmodel.make_and_set0_knobs(cls.knob_names)
         strengths = {st: madx.globals[st] for st in strength_names}
         for knob in knobs:
             madx.globals[knob] = knobs[knob].value
@@ -99,8 +99,12 @@ class LHCIR(LHCSection):
         self.init_right = None
         self.irn = irn
         self.ipname = f"ip{irn}"
-        self.startb12 = {1: f"s.ds.l{irn}.b1", 2: f"s.ds.l{irn}.b2"}
-        self.endb12 = {1: f"e.ds.r{irn}.b1", 2: f"e.ds.r{irn}.b2"}
+        self.startb1 = f"s.ds.l{irn}.b1"
+        self.startb2 = f"s.ds.l{irn}.b2"
+        self.endb1 = f"e.ds.r{irn}.b1"
+        self.endb2 = f"e.ds.r{irn}.b2"
+        self.startb12 = (self.startb1, self.startb2)
+        self.endb12 = (self.endb1, self.endb2)
         self.param_names = self._get_param_default_names()
         self.param_names.extend(self._extra_param_names)
 
@@ -157,8 +161,8 @@ class LHCIR(LHCSection):
             ]
         if self.init_left is None:
             self.set_init()
-        start = self.startb12[beam]
-        end = self.endb12[beam]
+        start = self.startb12[beam-1]
+        end = self.endb12[beam-1]
         return self.model.sequence[beam].twiss(
             start=start,
             end=end,
@@ -183,7 +187,7 @@ class LHCIR(LHCSection):
             dy=self.params[f"dy{self.ipname}{beam}"],
         )
         return sequence.twiss(
-            start=self.startb12[beam], end=self.endb12[beam], init=init
+            start=self.startb12[beam-1], end=self.endb12[beam-1], init=init
         )
 
     def twiss_full(self, beam, strengths=True):
@@ -193,8 +197,8 @@ class LHCIR(LHCSection):
                 self.twiss_full(beam=2, strengths=strengths),
             ]
         sequence = self.model.sequence[beam]
-        start = self.startb12[beam]
-        end = self.endb12[beam]
+        start = self.startb12[beam-1]
+        end = self.endb12[beam-1]
         init = sequence.twiss(strengths=strengths).get_twiss_init(start)
         return sequence.twiss(
             start=start, end=end, init=init, strengths=strengths
@@ -250,18 +254,18 @@ class LHCIR(LHCSection):
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}"] = (
-                    tw[param, self.endb12[beam]]
-                    - tw[param, self.startb12[beam]]
+                    tw[param, self.endb12[beam-1]]
+                    - tw[param, self.startb12[beam-1]]
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_l"] = (
-                    tw[param, ipname] - tw[param, self.startb12[beam]]
+                    tw[param, ipname] - tw[param, self.startb12[beam-1]]
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_r"] = (
-                    tw[param, self.endb12[beam]] - tw[param, ipname]
+                    tw[param, self.endb12[beam-1]] - tw[param, ipname]
                 )
         return params
 
@@ -284,11 +288,11 @@ class LHCIR(LHCSection):
         if b1:
             lines.append("b1")
             inits_r.append(self.init_right[1])
-            ends.append(self.endb12[1])
+            ends.append(self.endb1)
         if b2:
             lines.append("b2")
             inits_r.append(self.init_right[2])
-            ends.append(self.endb12[2])
+            ends.append(self.endb2)
 
         lines = [f"b{beam}" for beam in [1, 2]]
 
@@ -379,7 +383,7 @@ class LHCIR(LHCSection):
         return varylst
 
     def disable_bumps(self):
-        for k, knob in self.knobs.items():
+        for k, knob in self.knob_names.items():
             if re.match(r"on_[xsao]", k):
                 knob.value = 0
                 self.parent.model[k] = 0
@@ -414,11 +418,6 @@ class LHCIR(LHCSection):
         if dkmax is None:
             dkmax = self.parent.params.get("match_dkmax", 0.01)
 
-        inits = [self.init_left[1], self.init_left[2]]
-        starts = [self.startb12[1], self.startb12[2]]
-        ends = [self.endb12[1], self.endb12[2]]
-        lines = ["b1", "b2"]
-
         targets = LHCIR.get_match_targets(self, b1=b1, b2=b2)
         varylst = LHCIR.get_match_vary(
             self,
@@ -435,10 +434,10 @@ class LHCIR(LHCSection):
             solve=False,
             default_tol={None: 5e-8},
             solver_options=dict(max_rel_penalty_increase=2.0),
-            lines=lines,
-            start=starts,
-            end=ends,
-            init=inits,
+            lines=["b1", "b2"],
+            start=self.startb12,
+            end=self.endb12,
+            init=[self.init_left[1], self.init_left[2]],
             targets=targets,
             vary=varylst,
             check_limits=False,

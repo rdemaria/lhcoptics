@@ -3,7 +3,7 @@ from .irs import LHCIR
 
 class LHCIR8(LHCIR):
     name = "ir8"
-    knobs = [
+    knob_names = [
         "on_x8h",
         "on_sep8h",
         "on_x8v",

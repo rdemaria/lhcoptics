@@ -1,9 +1,10 @@
 from .irs import LHCIR
+from .knob import IPKnob
 
 
 class LHCIR1(LHCIR):
     name = "ir1"
-    knobs = [
+    knob_names = [
         "on_x1_h",
         "on_sep1_h",
         "on_x1_v",

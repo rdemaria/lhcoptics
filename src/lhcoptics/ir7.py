@@ -146,8 +146,6 @@ class LHCIR7(LHCIR):
             dxb2 = self.action_sp2.run()["dx"]
 
         inits = [self.init_left[1], self.init_left[2]]
-        starts = [self.startb12[1], self.startb12[2]]
-        ends = [self.endb12[1], self.endb12[2]]
         lines = ["b1", "b2"]
 
         targets = LHCIR.get_match_targets(self)
@@ -198,8 +196,8 @@ class LHCIR7(LHCIR):
             default_tol={None: 5e-8},
             solver_options=dict(max_rel_penalty_increase=2.0),
             lines=lines,
-            start=starts,
-            end=ends,
+            start=self.startb12,
+            end=self.endb12,
             init=inits,
             targets=targets,
             vary=varylst,

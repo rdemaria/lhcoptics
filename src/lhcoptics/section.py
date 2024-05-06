@@ -227,9 +227,9 @@ class LHCSection:
             src = src.knobs
         for k in self.knobs:
             if k in src:
-                self.knobs[k] = Knob.from_src(src[k])
-            if verbose:
-                print(f"Updating {k!r:15} = {self.knobs[k]}")
+               if verbose:
+                     self.knobs[k].print_update_diff(src[k])   
+               self.knobs[k] = Knob.from_src(src[k])
         return self
 
     def update_params(self, src=None, add=False, verbose=False):
