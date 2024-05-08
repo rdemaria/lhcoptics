@@ -283,33 +283,63 @@ class LHCXsuiteModel:
         if hasattr(src, "knobs"):
             self.update_knobs(src.knobs)
 
-    def twiss(
-        self,
-        start=None,
-        end=None,
-        init=None,
-        beam=None,
-        full=False,
-        chrom=False,
-    ):
-        if beam is None:
-            return self.twiss(
-                start=start, end=end, init=init, beam=1, full=full, chrom=chrom
-            ), self.twiss(
-                start=start, end=end, init=init, beam=2, full=full, chrom=chrom
-            )
-        line = self.sequence[beam]
-        startout = line.element_names[0] if start is None else start
-        endout = line.element_names[-1] if end is None else end
-        startmac = line.element_names[0] if full is None else start
-        endmac = line.element_names[-1] if full is None else end
-        if init is None:
-            tw = line.twiss(start=startmac, end=endmac, init="periodic")
-            if full:
-                tw = tw.rows[startout:endout]  # can fail because of cycle
-        else:
-            tw = line.twiss(start=startout, end=endout, init=init)
+    def twiss_open(self,start,end,init,beam):
+        #line=self.sequence[beam]
+        #aux=line.element_names[0]
+        #line.cycle(init.element_name)
+        tw=self.sequence[beam].twiss(start=start,end=end,init=init)
+        #line.cycle(aux)
         return tw
+
+    def twiss_init(self,start,end,init_at,beam):
+        #line=self.sequence[beam]
+        #aux=line.element_names[0]
+        #self.sequence[beam].cycle(init_at)
+        init=self.sequence[beam].twiss(start=start,end=end,init="periodic").get_twiss_init(init_at)
+        #line.cycle(aux)
+        return init
+
+    def twiss(self,start=None,end=None,init=None,init_at=None,beam=None,full=True,chrom=False):
+        """
+        Examples
+        - twiss(): periodic solution, full machine, start/end of the line
+        - twiss(start="ip8", end="ip2"): as before by data at the start/end of the line
+        - twiss(start="ip8", end="ip2", full=True): full machine, start/end of the line
+        - twiss(start="ip8", end="ip2", init_at="ip1"): periodic solution, full machine, start/end of the line, s,mux,muy=0 at ip1
+        - twiss(start="ip8", end="ip2", init="init"): 
+
+
+        NB: Still fails when full=False and boundaries are reversed w.r.t the line orde
+        """
+        if beam is None:
+            return [
+                self.twiss(start,end,init,init_at=init_at,full=full,chrom=chrom,beam=1),
+                self.twiss(start,end,init,init_at=init_at,full=full,chrom=chrom,beam=2)]
+        if beam ==1:
+            line_start=self.sequence[beam].element_names[0]
+            line_end=self.sequence[beam].element_names[-1]
+        else:
+            line_start=self.sequence[beam].element_names[-1]
+            line_end=self.sequence[beam].element_names[0]
+        if start is None:
+            start=line_start
+        if end is None:
+            end=line_end
+        if full:
+            boundary_start=line_start
+            boundary_end=line_end
+        else:
+            boundary_start=start
+            boundary_end=end
+        if init is None:
+            if init_at is None:
+                init_at=start
+            init=self.twiss_init(boundary_start,boundary_end,init_at,beam)
+            init.s=0
+            init.mux=0
+            init.muy=0
+        return self.twiss_open(start,end,init,beam)
+
 
     def copy(self):
         return self.__class__(

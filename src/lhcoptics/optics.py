@@ -124,6 +124,11 @@ class LHCOptics:
         self.knobs = knobs
         self.model = model
         self.circuits = circuits
+        for knob in knobs.values():
+            knob.parent = self
+        for ss in irs + arcs:
+            for knob in ss.knobs.values():
+                knob.parent = self
 
     @property
     def irs(self):
@@ -235,6 +240,9 @@ class LHCOptics:
             return self.params[k]
         if k in self.knobs:
             return self.knobs[k]
+        for ss in self.irs + self.arcs:
+            if k in ss:
+                return ss[k]
         raise KeyError(f"{k} not found in {self}")
 
     def __contains__(self, k):
@@ -466,6 +474,12 @@ class LHCOptics:
         for sec in self.irs + self.arcs:
             sec.knobs_off()
 
+    def knobs_on(self):
+        for k,knob in self.knobs.items():
+            self.model[k] = knob.value
+        for sec in self.irs + self.arcs:
+            sec.knobs_on()
+
     def check(self):
         tw1, tw2 = self.twiss(chrom=True, strengths=False)
         header = True
@@ -613,3 +627,8 @@ class LHCOptics:
     def make_orbit_knobs(self):
         from .model_xsuite import make_orbit_knobs
         make_orbit_knobs(self.model.multiline)
+
+    def specialize_knobs(self):
+        for ss in self.irs:
+            ss.specialize_knobs()
+        return self

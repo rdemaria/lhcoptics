@@ -12,8 +12,8 @@ from .section import (
     sort_n,
 )
 from .model_madx import LHCMadModel
-
 from .opttable import LHCIRTable
+from .knob import IPKnob
 
 
 class LHCIR(LHCSection):
@@ -161,8 +161,8 @@ class LHCIR(LHCSection):
             ]
         if self.init_left is None:
             self.set_init()
-        start = self.startb12[beam-1]
-        end = self.endb12[beam-1]
+        start = self.startb12[beam - 1]
+        end = self.endb12[beam - 1]
         return self.model.sequence[beam].twiss(
             start=start,
             end=end,
@@ -187,7 +187,7 @@ class LHCIR(LHCSection):
             dy=self.params[f"dy{self.ipname}{beam}"],
         )
         return sequence.twiss(
-            start=self.startb12[beam-1], end=self.endb12[beam-1], init=init
+            start=self.startb12[beam - 1], end=self.endb12[beam - 1], init=init
         )
 
     def twiss_full(self, beam, strengths=True):
@@ -197,8 +197,8 @@ class LHCIR(LHCSection):
                 self.twiss_full(beam=2, strengths=strengths),
             ]
         sequence = self.model.sequence[beam]
-        start = self.startb12[beam-1]
-        end = self.endb12[beam-1]
+        start = self.startb12[beam - 1]
+        end = self.endb12[beam - 1]
         init = sequence.twiss(strengths=strengths).get_twiss_init(start)
         return sequence.twiss(
             start=start, end=end, init=init, strengths=strengths
@@ -212,14 +212,14 @@ class LHCIR(LHCSection):
         elif method == "params":
             return self.twiss_from_params(beam, strengths=strengths)
 
-    def plot(self, beam=None, method="init", figlabel=None):
+    def plot(self, beam=None, method="init", figlabel=None,yr="",yl=""):
         if beam is None:
             if figlabel is None:
                 figlabel1 = f"{self.name}b1"
                 figlabel2 = f"{self.name}b2"
             return [
-                self.plot(beam=1, method=method, figlabel=figlabel1),
-                self.plot(beam=2, method=method, figlabel=figlabel2),
+                self.plot(beam=1, method=method, figlabel=figlabel1,yr=yr,yl=yl),
+                self.plot(beam=2, method=method, figlabel=figlabel2,yr=yr,yl=yl),
             ]
         else:
             if method == "init":
@@ -230,7 +230,7 @@ class LHCIR(LHCSection):
                 mktwiss = self.twiss_from_params
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
-            return mktwiss(beam).plot(figlabel=figlabel)
+            return mktwiss(beam).plot(figlabel=figlabel,yr=yr,yl=yl)
 
     def _get_param_default_names(self):
         ipname = self.ipname
@@ -254,18 +254,18 @@ class LHCIR(LHCSection):
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}"] = (
-                    tw[param, self.endb12[beam-1]]
-                    - tw[param, self.startb12[beam-1]]
+                    tw[param, self.endb12[beam - 1]]
+                    - tw[param, self.startb12[beam - 1]]
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_l"] = (
-                    tw[param, ipname] - tw[param, self.startb12[beam-1]]
+                    tw[param, ipname] - tw[param, self.startb12[beam - 1]]
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_r"] = (
-                    tw[param, self.endb12[beam-1]] - tw[param, ipname]
+                    tw[param, self.endb12[beam - 1]] - tw[param, ipname]
                 )
         return params
 
@@ -486,3 +486,9 @@ class LHCIR(LHCSection):
             self.params[f"bety{self.ipname}b2"] = beta / ratio
         else:
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")
+
+    def specialize_knobs(self):
+        for k, knob in list(self.knobs.items()):
+            ## workaround because knob.specialize is also class method
+            ## of an already specialized knob
+            self.knobs[k] = knob.specialize(knob)

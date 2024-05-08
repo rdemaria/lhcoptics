@@ -312,6 +312,10 @@ class LHCSection:
         for k in self.knobs:
             self.parent.model[k] = 0
 
+    def knobs_on(self):
+        for k,knob in self.knobs.items():
+            self.parent.model[k] = knob.value
+
     def diff(self, other):
         self.diff_strengths(other)
         self.diff_knobs(other)

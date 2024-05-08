@@ -1,11 +1,17 @@
 from .utils import print_diff_dict_float
+import re
 
 import xtrack as xt
+
 
 class Knob:
     @classmethod
     def from_dict(cls, data):
-        return cls(data["name"], data["value"], data["weights"])
+        if "class" in data:
+            return globals()[data["class"]].from_dict(data)
+        out=cls(data["name"], data["value"], data["weights"])
+        out=IPKnob.specialize(out) # try to specialize from name
+        return out
 
     @classmethod
     def from_src(cls, src):
@@ -14,7 +20,7 @@ class Knob:
             and hasattr(src, "value")
             and hasattr(src, "weights")
         ):
-            return cls(src.name, src.value, src.weights)
+            return cls.from_dict(src.__dict__)
         else:
             return cls.from_dict(src)
 
@@ -58,37 +64,159 @@ class Knob:
     def get_weight_knob_names(self):
         return [f"{key}_from_{key}" for key in self.weights.keys()]
 
-class IPKnob(Knob):
-    _zero_init=[xt.TwissInit(), xt.TwissInit()]
+    def specialize(self, knob):
+        """Specialize the knob to a specific type."""
+        knob = IPKnob.specialize(self)
+        return knob
 
-    def __init__(self, name, value=0, weights=None, parent=None, const=None,ip=None, plane=None, specs=None, max_value=1):
+
+class IPKnob(Knob):
+    _zero_init = [xt.TwissInit(), xt.TwissInit()]
+    reorb = re.compile("on_([A-z]+)([0-9])_?([hv])?(b[12])?")
+
+    @classmethod
+    def specialize(cls, knob):
+        """
+        Specialize the knob to a specific type or return the original knob.
+        """
+        if isinstance(knob, cls):
+            return knob
+        mtc = cls.reorb.match(knob.name)
+        if mtc is None:
+            return knob
+        else:
+            kind, irn, hv, beam = mtc.groups()
+            if kind in ["xx", "ssep"]:
+                return knob
+            if hv is None:
+                if kind.startswith("x"):
+                    hv = "h"
+                elif kind.startswith("y"):
+                    hv = "v"
+                elif kind == "oh":
+                    hv = "h"
+                elif kind == "ov":
+                    hv = "v"
+                elif kind == "a" and irn in "12":
+                    hv = "h"
+                elif kind == "a" and irn in "58":
+                    hv = "v"
+                elif kind == "o" and irn in "12":
+                    hv = "v"
+                elif kind == "o" and irn in "58":
+                    hv = "h"
+                else:
+                    raise ValueError(f"Cannot determine plane for {knob.name!r}")
+            xy={"h":"x","v":"y"}[hv]
+            if kind in ["x", "sep", "oh", "ov", "a","o" ]:
+                beams=["b1", "b2"]
+                if kind == "x":
+                    dx=0; dpx=1e-6; ss=-1
+                elif kind == "sep":
+                    dx=1e-3; dpx=0; ss=-1
+                elif kind == "a":
+                    dx=0; dpx=1e-6; ss=1
+                elif kind.startswith("o"):
+                    dx=1e-3; dpx=0; ss=1
+                specs = {f"{xy}b1": dx, f"{xy}b2": ss*dx, f"p{xy}b1": dpx, "p{xy}b2": ss*dpx}
+                const = [
+                    k for k in knob.weights.keys() if re.match(f"acbx{hv}", k)
+                ]
+            elif kind == "xip" or kind == "yip":
+                specs = {kind[0] + beam: 1e-3, "p" + kind[0] + beam: 0.0}
+                const = []
+                beams = [beam]
+            else:
+                print(f"Warning: {cls} cannot specialize {knob.name!r}")
+                return knob
+            return cls(
+                knob.name,
+                value=knob.value,
+                weights=knob.weights,
+                parent=knob.parent,
+                const=const,
+                ip=irn,
+                plane=xy,
+                specs=specs,
+                beams=beams,
+            )
+
+    def __init__(
+        self,
+        name,
+        value=0,
+        weights=None,
+        parent=None,
+        const=None,
+        ip=None,
+        plane=None,
+        specs=None,
+        max_value=1,
+        beams=["b1", "b2"],
+    ):
         super().__init__(name, value, weights, parent)
         self.const = const
         self.ip = ip
         self.plane = plane
         self.ipname = f"ip{ip}"
-        self.tols= {"":1e-9, "p":1e-11}
-        self.step= 1e-9
-        self.specs=specs
-        self.max_value=max_value
+        self.tols = {"": 1e-9, "p": 1e-11}
+        self.step = 1e-9
+        self.specs = specs
+        self.beams = beams
+        self.max_value = max_value
 
     def match(self):
         self.parent.model.update_knob(self)
-        xt= self.parent.model._xt
-        targets = [ xt.Target(self.plane,  value=self.specs[tt+self.plane+bb], line=bb, at=self.ipname, tol=self.xytol) for tt in ('','p') for bb in ('b1','b2') ]
-        tagets+=[xt.Target(tt, value=0, line=bb,at=xt.END, tol=self.tols[tt]) for tt in ('','p') for bb in ('b1','b2') ]
-        vary= [xt.Vary(
-            self.get_weight_knob_names(),
-            step=self.step()) for wv,wv in self.get_weight_knob_names()
+        xt = self.parent.model._xt
+        ir = getattr(self.parent, f"ir{self.ip}")
+        targets = [
+            xt.Target(
+                self.plane,
+                value=self.specs[tt + self.plane + bb],
+                line=bb,
+                at=self.ipname,
+                tol=self.xytol,
+            )
+            for tt in ("", "p")
+            for bb in ("b1", "b2")
         ]
+        targets += [
+            xt.Target(tt, value=0, line=bb, at=xt.END, tol=self.tols[tt])
+            for tt in ("", "p")
+            for bb in ("b1", "b2")
+        ]
+        varyb1 = [
+            xt.Vary(wn, step=self.step)
+            for wn, wv in self.get_weight_knob_names() if "b1" in wn
+        ]
+        varyb2 = [
+            xt.Vary(wn, step=self.step)
+            for wn, wv in self.get_weight_knob_names() if "b2" in wn
+        ]
+        varycmn = [
+            xt.Vary(wn, step=self.step)
+            for wn, wv in self.get_weight_knob_names() if wn.startswith("acbx")
+        ]
+        if len(self.beams) == 2:
+            start = ir.startb12
+            end = ir.endb12
+            vary=[*varyb1, *varyb2, *varycmn]
+        elif self.beams[0] == "b1":
+            start = ir.startb1
+            end = ir.endb1
+            vary=varyb1
+        else:
+            start = ir.startb2
+            end = ir.endb2
+            vary=varyb2
 
-        mtc=self.parent.model.match_knob(
+        mtc = self.parent.model.match_knob(
             knob_name=self.name,
-            knob_value_start=0.0, # before knobs are applied
+            knob_value_start=0.0,  # before knobs are applied
             knob_value_end=self.max_value,  # after knobs are applied
             run=False,
-            start=self.startb12,
-            end=self.endb12,
+            start=start,
+            end=end,
             init=self._zero_init,  # Zero orbit
             vary=vary,
             targets=targets,
@@ -96,3 +224,17 @@ class IPKnob(Knob):
 
         mtc.disable(vary_name=self.const)
         return mtc
+
+    def plot(self,value=1):
+        aux=self.value
+        self.parent.model[self.name]=value
+        ir = getattr(self.parent, f"ir{self.ip}")
+        if len(self.beams) == 2:
+            ir.plot(yl="x y")
+        else:
+            ir.plot(beam=int(self.beams[0][1]),yl="x y")
+        self.parent.model[self.name]=aux
+
+
+    def __repr__(self):
+        return f"IPKnob({self.name!r}, {self.value})"
