@@ -9,8 +9,8 @@ class Knob:
     def from_dict(cls, data):
         if "class" in data:
             return globals()[data["class"]].from_dict(data)
-        out=cls(data["name"], data["value"], data["weights"])
-        out=IPKnob.specialize(out) # try to specialize from name
+        out = cls(data["name"], data["value"], data["weights"])
+        out = IPKnob.specialize(out)  # try to specialize from name
         return out
 
     @classmethod
@@ -62,7 +62,7 @@ class Knob:
                 )
 
     def get_weight_knob_names(self):
-        return [f"{key}_from_{key}" for key in self.weights.keys()]
+        return [f"{key}_from_{self.name}" for key in self.weights.keys()]
 
     def specialize(self, knob):
         """Specialize the knob to a specific type."""
@@ -106,19 +106,34 @@ class IPKnob(Knob):
                 elif kind == "o" and irn in "58":
                     hv = "h"
                 else:
-                    raise ValueError(f"Cannot determine plane for {knob.name!r}")
-            xy={"h":"x","v":"y"}[hv]
-            if kind in ["x", "sep", "oh", "ov", "a","o" ]:
-                beams=["b1", "b2"]
+                    raise ValueError(
+                        f"Cannot determine plane for {knob.name!r}"
+                    )
+            xy = {"h": "x", "v": "y"}[hv]
+            if kind in ["x", "sep", "oh", "ov", "a", "o"]:
+                beams = ["b1", "b2"]
                 if kind == "x":
-                    dx=0; dpx=1e-6; ss=-1
+                    dxy = 0
+                    dpxy = 1e-6
+                    ss = -1
                 elif kind == "sep":
-                    dx=1e-3; dpx=0; ss=-1
+                    dxy = 1e-3
+                    dpxy = 0
+                    ss = -1
                 elif kind == "a":
-                    dx=0; dpx=1e-6; ss=1
+                    dxy = 0
+                    dpxy = 1e-6
+                    ss = 1
                 elif kind.startswith("o"):
-                    dx=1e-3; dpx=0; ss=1
-                specs = {f"{xy}b1": dx, f"{xy}b2": ss*dx, f"p{xy}b1": dpx, "p{xy}b2": ss*dpx}
+                    dxy = 1e-3
+                    dpxy = 0
+                    ss = 1
+                specs = {
+                    f"{xy}b1": dxy,
+                    f"{xy}b2": ss * dxy,
+                    f"p{xy}b1": dpxy,
+                    f"p{xy}b2": ss * dpxy,
+                }
                 const = [
                     k for k in knob.weights.keys() if re.match(f"acbx{hv}", k)
                 ]
@@ -136,9 +151,10 @@ class IPKnob(Knob):
                 parent=knob.parent,
                 const=const,
                 ip=irn,
-                plane=xy,
+                xy=xy,
                 specs=specs,
                 beams=beams,
+                kind=kind,
             )
 
     def __init__(
@@ -149,72 +165,79 @@ class IPKnob(Knob):
         parent=None,
         const=None,
         ip=None,
-        plane=None,
+        xy=None,
         specs=None,
         max_value=1,
         beams=["b1", "b2"],
+        kind=None,
     ):
         super().__init__(name, value, weights, parent)
         self.const = const
         self.ip = ip
-        self.plane = plane
+        self.xy = xy
+        self.hv = "h" if xy == "x" else "v"
         self.ipname = f"ip{ip}"
         self.tols = {"": 1e-9, "p": 1e-11}
         self.step = 1e-9
         self.specs = specs
         self.beams = beams
         self.max_value = max_value
+        self.kind = kind
 
     def match(self):
-        self.parent.model.update_knob(self)
+        # for beam in self.beams:
+        #    getattr(self.parent.model,beam).build_tracker()
+        knob_start = self.parent.model[self.name]
         xt = self.parent.model._xt
         ir = getattr(self.parent, f"ir{self.ip}")
         targets = [
             xt.Target(
-                self.plane,
-                value=self.specs[tt + self.plane + bb],
+                tt + self.xy,
+                value=self.specs[tt + self.xy + bb],
                 line=bb,
                 at=self.ipname,
-                tol=self.xytol,
+                tol=self.tols[tt],
             )
             for tt in ("", "p")
-            for bb in ("b1", "b2")
+            for bb in self.beams
         ]
         targets += [
-            xt.Target(tt, value=0, line=bb, at=xt.END, tol=self.tols[tt])
+            xt.Target(
+                tt + self.xy, value=0, line=bb, at=xt.END, tol=self.tols[tt]
+            )
             for tt in ("", "p")
-            for bb in ("b1", "b2")
+            for bb in self.beams
         ]
         varyb1 = [
             xt.Vary(wn, step=self.step)
-            for wn, wv in self.get_weight_knob_names() if "b1" in wn
+            for wn in self.get_weight_knob_names()
+            if "b1" in wn
         ]
         varyb2 = [
             xt.Vary(wn, step=self.step)
-            for wn, wv in self.get_weight_knob_names() if "b2" in wn
+            for wn in self.get_weight_knob_names()
+            if "b2" in wn
         ]
         varycmn = [
             xt.Vary(wn, step=self.step)
-            for wn, wv in self.get_weight_knob_names() if wn.startswith("acbx")
+            for wn in self.get_weight_knob_names()
+            if wn.startswith(f"acbx{self.hv}")
         ]
         if len(self.beams) == 2:
             start = ir.startb12
             end = ir.endb12
-            vary=[*varyb1, *varyb2, *varycmn]
+            vary = varycmn + varyb1 + varyb2
         elif self.beams[0] == "b1":
             start = ir.startb1
             end = ir.endb1
-            vary=varyb1
-        else:
+            vary = varyb1
+        elif self.beams[0] == "b2":
             start = ir.startb2
             end = ir.endb2
-            vary=varyb2
+            vary = varyb2
 
-        mtc = self.parent.model.match_knob(
-            knob_name=self.name,
-            knob_value_start=0.0,  # before knobs are applied
-            knob_value_end=self.max_value,  # after knobs are applied
-            run=False,
+        mtc = self.parent.model.match(
+            solve=False,
             start=start,
             end=end,
             init=self._zero_init,  # Zero orbit
@@ -223,18 +246,52 @@ class IPKnob(Knob):
         )
 
         mtc.disable(vary_name=self.const)
+        mtc._err(
+            None, check_limits=False
+        )  # get present values
+        for val, tt in zip(
+            mtc._err.last_res_values, mtc.targets
+        ):  # add offsets
+            tt.value += val
+        self.parent.model.update_knob(self) # potentially mismatched
+        self.parent.model[self.name] += self.max_value
+        mtc.target_status()
+        try:
+            mtc.solve()
+            self.parent.model[self.name] = knob_start
+        except:
+            print(f"Failed to match {self.name}")
         return mtc
 
-    def plot(self,value=1):
-        aux=self.value
-        self.parent.model[self.name]=value
+    def get_mcbx_preset(self):
+        left = [k for k in self.weights if re.match(f"acbx{self.hv}\d.l", k)]
+        right = [k for k in self.weights if re.match(f"acbx{self.hv}\d.r", k)]
+        vleft = sum([self.weights[k] for k in left])
+        vright = sum([self.weights[k] for k in right])
+        return vleft, vright
+
+    def set_mcbx_preset(self, vleft, vright=None):
+        if vright is None:
+            if self.kind == "x":
+                vright = -vleft
+            else:
+                vright = vleft
+        left = [k for k in self.weights if re.match(f"acbx{self.hv}\d.l", k)]
+        right = [k for k in self.weights if re.match(f"acbx{self.hv}\d.r", k)]
+        for k in left:
+            self.weights[k] = vleft / len(left)
+        for k in right:
+            self.weights[k] = vright / len(right)
+
+    def plot(self, value=1):
+        aux = self.value
+        self.parent.model[self.name] = value
         ir = getattr(self.parent, f"ir{self.ip}")
         if len(self.beams) == 2:
             ir.plot(yl="x y")
         else:
-            ir.plot(beam=int(self.beams[0][1]),yl="x y")
-        self.parent.model[self.name]=aux
-
+            ir.plot(beam=int(self.beams[0][1]), yl="x y")
+        self.parent.model[self.name] = aux
 
     def __repr__(self):
         return f"IPKnob({self.name!r}, {self.value})"

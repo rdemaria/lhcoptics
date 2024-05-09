@@ -77,8 +77,6 @@ class LHCXsuiteModel:
                 lines[f"{ln}s"] = ls
 
         lhc = xt.Multiline(lines)
-        lines["b1"].build_tracker()
-        lines["b2"].build_tracker()
         out = cls(multiline=lhc, madxfile=madxfile)
         return out
 
@@ -109,6 +107,8 @@ class LHCXsuiteModel:
         self.mgr = multiline._xdeps_manager
         self.madxfile = madxfile
         self.sequence = {1: multiline.b1, 2: multiline.b2}
+        self.b1.build_tracker()
+        self.b2.build_tracker()
 
     def __repr__(self):
         if self.madxfile is not None:
