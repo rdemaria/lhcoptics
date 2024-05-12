@@ -246,18 +246,19 @@ class IPKnob(Knob):
         )
 
         mtc.disable(vary_name=self.const)
-        mtc._err(
-            None, check_limits=False
-        )  # get present values
-        for val, tt in zip(
-            mtc._err.last_res_values, mtc.targets
-        ):  # add offsets
+        # get present target values
+        mtc._err(None, check_limits=False)
+        # add offsets
+        for val, tt in zip(mtc._err.last_res_values, mtc.targets):
             tt.value += val
-        self.parent.model.update_knob(self) # potentially mismatched
+        # update definition, potentially mismatched
+        self.parent.model.update_knob(self)
+        # add offset in the knobs
         self.parent.model[self.name] += self.max_value
         mtc.target_status()
         try:
             mtc.solve()
+            mtc.vary_status()
             self.parent.model[self.name] = knob_start
         except:
             print(f"Failed to match {self.name}")
