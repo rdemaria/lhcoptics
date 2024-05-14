@@ -1,5 +1,4 @@
 from .irs import LHCIR
-from .knob import IPKnob
 
 
 class LHCIR1(LHCIR):

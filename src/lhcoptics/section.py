@@ -1,6 +1,5 @@
 import json
 import re
-from pathlib import Path
 
 from .knob import Knob
 from .model_madx import LHCMadxModel

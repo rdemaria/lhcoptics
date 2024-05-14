@@ -1,11 +1,8 @@
 import re
 
-import matplotlib.pyplot as plt
 import numpy as np
-import xdeps as xd
 import xtrack as xt
 
-from .knob import IPKnob
 from .model_madx import LHCMadxModel
 from .opttable import LHCIRTable
 from .section import LHCSection, lhcprev, lhcsucc, sort_n

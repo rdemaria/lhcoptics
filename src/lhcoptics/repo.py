@@ -2,7 +2,6 @@ from pathlib import Path
 
 from yaml import dump, load
 
-from .optics import LHCOptics
 
 try:
     from yaml import CDumper as Dumper
@@ -166,7 +165,7 @@ class LHCCycle:
             / self.name
             / "beam_processes.yaml"
         )
-        for bp in read_yaml(self.cycledir / f"beam_processes.yaml"):
+        for bp in read_yaml(self.cycledir / "beam_processes.yaml"):
             ((name, beamprocess),) = bp.items()
             dct[name] = LHCProcess(
                 name=name, beamprocess=beamprocess, parent=self

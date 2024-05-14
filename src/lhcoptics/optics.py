@@ -106,7 +106,6 @@ class LHCOptics:
 
     @staticmethod
     def set_repository(version="2024"):
-        import os
         import subprocess
 
         version = str(version)
@@ -618,7 +617,7 @@ class LHCOptics:
         out.append(f"! {self.name.upper()}\n")
 
         if len(self.params) > 0:
-            out.append(f"! Main Parameters")
+            out.append("! Main Parameters")
             for k, v in self.params.items():
                 out.append(f"{k:30} = {v:19.16f};")
             out.append("")
@@ -629,7 +628,7 @@ class LHCOptics:
         knobs = self.find_knobs()
         if len(knobs) > 0:
             strengths = self.find_strengths()
-            out.append(f"! Knobs")
+            out.append("! Knobs")
             for expr in LHCMadxModel.knobs_to_expr(self.knobs, strengths):
                 out.append(expr)
             out.append("")

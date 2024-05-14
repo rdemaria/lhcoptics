@@ -2,7 +2,6 @@ import re
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.interpolate
 import xdeps as xd
 
 from .rdmsignal import poly_fit, poly_val
@@ -110,7 +109,7 @@ class LHCSectionTable:
 
     def __repr__(self):
         if len(self) == 0:
-            return f"<Table: 0 rows>"
+            return "<Table: 0 rows>"
         cls = self.rows[0].__class__.__name__
         return f"<Table {cls}: {len(self)} rows>"
 
@@ -137,7 +136,7 @@ class LHCIRTable(LHCSectionTable):
                     k for k in ir.quads if re.match(f"kt?q[xtl]*{n}\\.", k)
                 ]
             elif n == 1:
-                quad_names = [k for k in ir.quads if re.match(f"kt?qx", k)]
+                quad_names = [k for k in ir.quads if re.match("kt?qx", k)]
             else:
                 quad_names = []
             return {k: [ir.quads[k] for ir in self.rows] for k in quad_names}

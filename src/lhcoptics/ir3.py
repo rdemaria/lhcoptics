@@ -1,5 +1,3 @@
-import numpy as np
-import xtrack as xt
 
 from .irs import LHCIR
 

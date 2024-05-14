@@ -1,4 +1,3 @@
-import numpy as np
 import xdeps as xd
 import xtrack as xt
 
