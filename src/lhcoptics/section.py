@@ -1,15 +1,11 @@
-import re
 import json
+import re
 from pathlib import Path
 
-
-from .model_madx import LHCMadModel
 from .knob import Knob
-from .utils import (
-    print_diff_dict_objs,
-    print_diff_dict_float,
-    deliver_list_str,
-)
+from .model_madx import LHCMadxModel
+from .utils import (deliver_list_str, print_diff_dict_float,
+                    print_diff_dict_objs)
 
 _lb = [(l, b) for l in "lr" for b in "12"]
 _ac = {
@@ -79,9 +75,6 @@ class LHCSection:
         self.filename = filename
         self._model = None
 
-    def __repr__(self):
-        return f"<LHCSection {self.name} {self.start}/{self.end}>"
-
     @property
     def model(self):
         return self.parent.model
@@ -113,7 +106,7 @@ class LHCSection:
 
     @classmethod
     def from_madxfile(cls, filename):
-        model = LHCMadModel.from_madxfile(filename)
+        model = LHCMadxModel.from_madxfile(filename)
         return cls.from_madx(model.madx, filename=filename)
 
     def update_from_madxfile(self, filename):
@@ -150,7 +143,7 @@ class LHCSection:
             out.append("")
         if knobs and len(self.knobs) > 0:
             out.append(f"! Knobs of {self.name.upper()}")
-            for expr in LHCMadModel.knobs_to_expr(self.knobs, self.strengths):
+            for expr in LHCMadxModel.knobs_to_expr(self.knobs, self.strengths):
                 out.append(expr)
             out.append("")
         return deliver_list_str(out, output)
@@ -172,7 +165,7 @@ class LHCSection:
         self.params.update(self.get_params())
         return self
 
-    def update_model(self, src=None, verbose=False):
+    def update_model(self, src=None, verbose=False,knobs_off=False):
         """Update the model with the local strengths, knobs
         If a src is provided, it will be used to update the local values, else self will be used.
         If src is a dict containing strengths, knobs or a LHCSection, they will be used to update the model.
@@ -195,7 +188,7 @@ class LHCSection:
             knobs = src["knobs"]
         else:
             knobs = {}
-        self.model.update_knobs(knobs, verbose=verbose)
+        self.model.update_knobs(knobs, verbose=verbose,knobs_off=knobs_off)
         return self
 
     def update_strengths(self, src=None, verbose=False):
@@ -230,6 +223,7 @@ class LHCSection:
                if verbose:
                      self.knobs[k].print_update_diff(src[k])   
                self.knobs[k] = Knob.from_src(src[k])
+               self.knobs[k].parent = self.parent
         return self
 
     def update_params(self, src=None, add=False, verbose=False):
@@ -287,19 +281,6 @@ class LHCSection:
                 figlabel = f"{self.name}b{beam}"
             return twiss.plot(figlabel=figlabel)
 
-    def __getitem__(self, key):
-        if key in self.strengths:
-            return self.strengths[key]
-        elif key in self.params:
-            return self.params[key]
-        elif key in self.knobs:
-            return self.knobs[key]
-        else:
-            raise KeyError(f"{key} not found in {self}")
-
-    def __contains__(self, key):
-        return key in self.strengths or key in self.params or key in self.knobs
-
     def get_current(self, kname, p0c=7e12):
         if self.parent.circuit is None:
             raise ValueError("Circuit not set")
@@ -329,3 +310,19 @@ class LHCSection:
 
     def diff_knobs(self, other):
         print_diff_dict_objs(self.knobs, other.knobs)
+
+    def __getitem__(self, key):
+        if key in self.strengths:
+            return self.strengths[key]
+        elif key in self.params:
+            return self.params[key]
+        elif key in self.knobs:
+            return self.knobs[key]
+        else:
+            raise KeyError(f"{key} not found in {self}")
+
+    def __contains__(self, key):
+        return key in self.strengths or key in self.params or key in self.knobs
+
+    def __repr__(self):
+        return f"<LHCSection {self.name} {self.start}/{self.end}>"

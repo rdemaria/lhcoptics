@@ -1,5 +1,6 @@
-from lhcoptics import LHCOptics
 import numpy as np
+
+from lhcoptics import LHCOptics
 
 inj = LHCOptics.from_json("inj_newphase.json")
 inj.params["match_inj"] = False
@@ -45,9 +46,9 @@ optt.plot_quads()
 # refine
 
 ir7t = optt.ir7  # only first time
-ir7t = ir7t2
 
 ir7t2 = inj.ir7.to_table().clear()
+ir7t = ir7t2
 for n in np.linspace(0, 10, 11):
     cur.update(optt.interp(n))
     cur.ir7.update_strengths(ir7t.interp(n, order=4))

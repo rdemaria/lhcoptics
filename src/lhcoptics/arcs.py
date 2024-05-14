@@ -1,9 +1,10 @@
-from .section import LHCSection
-from .model_xsuite import LHCMadModel
-import xtrack as xt
 import re
 
+import xtrack as xt
+
+from .model_xsuite import LHCMadxModel
 from .opttable import LHCArcTable
+from .section import LHCSection
 
 
 class ActionArcPhaseAdvance(xt.Action):
@@ -24,23 +25,6 @@ class ActionArcPhaseAdvance(xt.Action):
 class LHCArc(LHCSection):
 
     default_twiss_method = "periodic"
-
-    @classmethod
-    def from_madx(cls, madx, name="a12"):
-        madmodel = LHCMadModel(madx)
-        i1, i2 = int(name[1]), int(name[2])
-        strength_names = []
-        strength_names += madmodel.filter(f"kq[fd]\.*{name}$")
-        strength_names += madmodel.filter(f"kqt[fd]\.*{name}b[12]$")
-        strength_names += madmodel.filter(f"kqs\.*{name}b[12]$")
-        strength_names += madmodel.filter(f"ksq\.*r{i1}b[12]$")
-        strength_names += madmodel.filter(f"ksq\.*l{i2}b[12]$")
-        strength_names += madmodel.filter(f"ks[fd][12]\.*{name}b[12]$")
-        strength_names += madmodel.filter(f"ko[fd]\.*{name}b[12]$")
-        knobs = {}
-        params = {}
-        strengths = {st: madx.globals[st] for st in strength_names}
-        return cls(name, strengths, params, knobs)
 
     def __init__(
         self,
@@ -79,11 +63,22 @@ class LHCArc(LHCSection):
             f"muy{self.name}b2",
         ]
 
-    def __repr__(self):
-        if self.parent is None:
-            return f"<LHCArc {self.name}>"
-        else:
-            return f"<LHCArc {self.name} in {self.parent.name!r}>"
+    @classmethod
+    def from_madx(cls, madx, name="a12"):
+        madmodel = LHCMadxModel(madx)
+        i1, i2 = int(name[1]), int(name[2])
+        strength_names = []
+        strength_names += madmodel.filter(f"kq[fd]\.*{name}$")
+        strength_names += madmodel.filter(f"kqt[fd]\.*{name}b[12]$")
+        strength_names += madmodel.filter(f"kqs\.*{name}b[12]$")
+        strength_names += madmodel.filter(f"ksq\.*r{i1}b[12]$")
+        strength_names += madmodel.filter(f"ksq\.*l{i2}b[12]$")
+        strength_names += madmodel.filter(f"ks[fd][12]\.*{name}b[12]$")
+        strength_names += madmodel.filter(f"ko[fd]\.*{name}b[12]$")
+        knobs = {}
+        params = {}
+        strengths = {st: madx.globals[st] for st in strength_names}
+        return cls(name, strengths, params, knobs)
 
     def twiss_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
@@ -289,3 +284,9 @@ class LHCArc(LHCSection):
 
     def to_table(self, *rows):
         return LHCArcTable([self] + list(rows))
+
+    def __repr__(self):
+        if self.parent is None:
+            return f"<LHCArc {self.name}>"
+        else:
+            return f"<LHCArc {self.name} in {self.parent.name!r}>"

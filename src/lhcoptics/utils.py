@@ -30,13 +30,17 @@ def deliver_list_str(out, output=None):
         return out
     elif hasattr(output, "input"):
         for ll in out:
-            if ll[0] != "!":
+            if len(ll)>0 and ll[0] != "!":
                 output.input(ll)
     elif hasattr(output, "writelines"):
-        output.writelines(out)
+        for ll in out:
+            output.write(ll)
+            output.write("\n")
     elif isinstance(output, str) or isinstance(output, Path):
         with open(output, "w") as f:
-            f.writelines(out)
+            for ll in out:
+                f.write(ll)
+                f.write("\n")
     elif output is None:
         print("\n".join(out))
     else:

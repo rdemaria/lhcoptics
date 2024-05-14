@@ -1,8 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import re
-import xdeps as xd
+
+import matplotlib.pyplot as plt
+import numpy as np
 import scipy.interpolate
+import xdeps as xd
 
 from .rdmsignal import poly_fit, poly_val
 
@@ -26,15 +27,6 @@ class LHCSectionTable:
         self.strengths = Col("strengths", rows)
         self.params = Col("params", rows)
         self.knobs = Col("knobs", rows)
-
-    def __len__(self):
-        return len(self.rows)
-
-    def __repr__(self):
-        if len(self) == 0:
-            return f"<Table: 0 rows>"
-        cls = self.rows[0].__class__.__name__
-        return f"<Table {cls}: {len(self)} rows>"
 
     def clear(self):
         self.rows.clear()
@@ -65,9 +57,6 @@ class LHCSectionTable:
     def count(self, row):
         return self.rows.count(row)
 
-    def __iter__(self):
-        return iter(self.rows)
-
     @property
     def tab(self):
         tab = {}
@@ -82,14 +71,6 @@ class LHCSectionTable:
             for w in ir0.knobs[k].weights:
                 tab[f"{k}_{w}"] = [ir.knobs[k].weights[w] for ir in self.rows]
         return xd.Table(tab, index="id")
-
-    def __getitem__(self, k):
-        if isinstance(k, int):
-            return self.rows[k]
-        elif k == "id":
-            return np.arange(len(self))
-        else:
-            return np.array([ir[k] for ir in self.rows])
 
     def interp_val(self, x, kname, order=1, xname="id", soft=False):
         xx = self[xname]
@@ -112,6 +93,26 @@ class LHCSectionTable:
             return poly_val(poly, x)
         else:
             return np.interp(x, xx, yy)
+
+    def __getitem__(self, k):
+        if isinstance(k, int):
+            return self.rows[k]
+        elif k == "id":
+            return np.arange(len(self))
+        else:
+            return np.array([ir[k] for ir in self.rows])
+
+    def __iter__(self):
+        return iter(self.rows)
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __repr__(self):
+        if len(self) == 0:
+            return f"<Table: 0 rows>"
+        cls = self.rows[0].__class__.__name__
+        return f"<Table {cls}: {len(self)} rows>"
 
 
 class LHCIRTable(LHCSectionTable):

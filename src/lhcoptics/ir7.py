@@ -1,7 +1,6 @@
-import xtrack as xt
-import xdeps as xd
-
 import numpy as np
+import xdeps as xd
+import xtrack as xt
 
 from .irs import LHCIR
 
@@ -61,17 +60,6 @@ class LHCIR7(LHCIR):
         "tcsg.a5r7.b2",
     ]
 
-    def get_params_from_twiss(self, tw1, tw2):
-        params = LHCIR.get_params_from_twiss(self, tw1, tw2)
-        for col_name in self.collimators:
-            if "b1" in col_name:
-                params[f"betx_{col_name}"] = tw1["betx", col_name]
-                params[f"bety_{col_name}"] = tw1["bety", col_name]
-            else:
-                params[f"betx_{col_name}"] = tw2["betx", col_name]
-                params[f"bety_{col_name}"] = tw2["bety", col_name]
-        return params
-
     knobsRematched12c6b = {
         "kqt4.l7": 0.0012257364160585084,
         "kqt4.r7": 0.0012659632628095638,
@@ -110,6 +98,17 @@ class LHCIR7(LHCIR):
         "kq4.lr7": 0.0011653779946877393,
         "kq5.lr7": -0.001202569087048791,
     }
+
+    def get_params_from_twiss(self, tw1, tw2):
+        params = LHCIR.get_params_from_twiss(self, tw1, tw2)
+        for col_name in self.collimators:
+            if "b1" in col_name:
+                params[f"betx_{col_name}"] = tw1["betx", col_name]
+                params[f"bety_{col_name}"] = tw1["bety", col_name]
+            else:
+                params[f"betx_{col_name}"] = tw2["betx", col_name]
+                params[f"bety_{col_name}"] = tw2["bety", col_name]
+        return params
 
     def match(
         self,

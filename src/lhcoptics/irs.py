@@ -1,19 +1,14 @@
 import re
 
-import xtrack as xt
-import xdeps as xd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import xdeps as xd
+import xtrack as xt
 
-from .section import (
-    LHCSection,
-    lhcprev,
-    lhcsucc,
-    sort_n,
-)
-from .model_madx import LHCMadModel
-from .opttable import LHCIRTable
 from .knob import IPKnob
+from .model_madx import LHCMadxModel
+from .opttable import LHCIRTable
+from .section import LHCSection, lhcprev, lhcsucc, sort_n
 
 
 class LHCIR(LHCSection):
@@ -29,9 +24,55 @@ class LHCIR(LHCSection):
     _extra_param_names = []
     default_twiss_method = "init"
 
+    def _get_param_default_names(self):
+        ipname = self.ipname
+        params = []
+        for param in "betx bety alfx alfy dx dy".split():
+            for beam in "12":
+                params.append(f"{param}{ipname}{beam}")
+        for param in "mux muy".split():
+            for beam in "12":
+                params.append(f"{param}{ipname}b{beam}")
+                params.append(f"{param}{ipname}b{beam}_l")
+                params.append(f"{param}{ipname}b{beam}_r")
+        return params
+
+    def __init__(
+        self,
+        name=None,
+        strengths=None,
+        params=None,
+        knobs=None,
+        start=None,
+        end=None,
+        filename=None,
+    ):
+        if name is None:
+            name = self.__class__.name
+        irn = int(name[-1])
+        start = f"s.ds.l{irn}"
+        end = f"e.ds.r{irn}"
+        super().__init__(
+            name, start, end, strengths, params, knobs, filename=filename
+        )
+        self.arc_left_name = f"a{lhcprev(irn)}{irn}"
+        self.arc_right_name = f"a{irn}{lhcsucc(irn)}"
+        self.init_left = None
+        self.init_right = None
+        self.irn = irn
+        self.ipname = f"ip{irn}"
+        self.startb1 = f"s.ds.l{irn}.b1"
+        self.startb2 = f"s.ds.l{irn}.b2"
+        self.endb1 = f"e.ds.r{irn}.b1"
+        self.endb2 = f"e.ds.r{irn}.b2"
+        self.startb12 = (self.startb1, self.startb2)
+        self.endb12 = (self.endb1, self.endb2)
+        self.param_names = self._get_param_default_names()
+        self.param_names.extend(self._extra_param_names)
+
     @classmethod
     def from_madx(cls, madx, name=None):
-        madmodel = LHCMadModel(madx)
+        madmodel = LHCMadxModel(madx)
         if name is None:
             name = cls.name
         irn = int(name[-1])
@@ -74,47 +115,6 @@ class LHCIR(LHCSection):
         madx = Madx(stdout=stdout)
         madx.call(filename)
         return cls.from_madx(madx, name)
-
-    def __init__(
-        self,
-        name=None,
-        strengths=None,
-        params=None,
-        knobs=None,
-        start=None,
-        end=None,
-        filename=None,
-    ):
-        if name is None:
-            name = self.__class__.name
-        irn = int(name[-1])
-        start = f"s.ds.l{irn}"
-        end = f"e.ds.r{irn}"
-        super().__init__(
-            name, start, end, strengths, params, knobs, filename=filename
-        )
-        self.arc_left_name = f"a{lhcprev(irn)}{irn}"
-        self.arc_right_name = f"a{irn}{lhcsucc(irn)}"
-        self.init_left = None
-        self.init_right = None
-        self.irn = irn
-        self.ipname = f"ip{irn}"
-        self.startb1 = f"s.ds.l{irn}.b1"
-        self.startb2 = f"s.ds.l{irn}.b2"
-        self.endb1 = f"e.ds.r{irn}.b1"
-        self.endb2 = f"e.ds.r{irn}.b2"
-        self.startb12 = (self.startb1, self.startb2)
-        self.endb12 = (self.endb1, self.endb2)
-        self.param_names = self._get_param_default_names()
-        self.param_names.extend(self._extra_param_names)
-
-    def __repr__(self):
-        if self.parent is not None:
-            return f"<LHCIR{self.irn} in {self.parent.name!r}>"
-        elif self.filename is not None:
-            return f"<LHCIR{self.irn} from {self.filename!r}>"
-        else:
-            return f"<LHCIR{self.irn}>"
 
     def to_table(self, *rows):
         return LHCIRTable([self] + list(rows))
@@ -231,19 +231,6 @@ class LHCIR(LHCSection):
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
             return mktwiss(beam).plot(figlabel=figlabel,yr=yr,yl=yl)
-
-    def _get_param_default_names(self):
-        ipname = self.ipname
-        params = []
-        for param in "betx bety alfx alfy dx dy".split():
-            for beam in "12":
-                params.append(f"{param}{ipname}{beam}")
-        for param in "mux muy".split():
-            for beam in "12":
-                params.append(f"{param}{ipname}b{beam}")
-                params.append(f"{param}{ipname}b{beam}_l")
-                params.append(f"{param}{ipname}b{beam}_r")
-        return params
 
     def get_params_from_twiss(self, tw1, tw2):
         ipname = self.ipname
@@ -492,3 +479,11 @@ class LHCIR(LHCSection):
             ## workaround because knob.specialize is also class method
             ## of an already specialized knob
             self.knobs[k] = knob.specialize(knob)
+
+    def __repr__(self):
+        if self.parent is not None:
+            return f"<LHCIR{self.irn} in {self.parent.name!r}>"
+        elif self.filename is not None:
+            return f"<LHCIR{self.irn} from {self.filename!r}>"
+        else:
+            return f"<LHCIR{self.irn}>"

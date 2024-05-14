@@ -43,14 +43,15 @@ Methods:
 - `to_dict()`: Save section to a dict
 - `to_madx(filename,dst)`: Save section to dst which could be `str`, filename, a madx instance, an open file.
 
-- `update_model()`: transfer section data to `parent.model`
-- `update_strength(src)`: update strengths from `src.strengths`, or `src` or `parent.model`  if src is None
-- `update_knobs(src)`: update knobs from `src.knobs`, or `src` or `parent.model`  if src is None
-- `update_params(src)`: update params from `src.params`, or `src` or `parent.model`  if src is None
-- `update(src)`: copy strengths, params, knobs from `src`, or `parent.model`  if src is None
+- `update_model()`: transfer strengths and knobs data to `parent.model`
+- `update_strength(src)`: update existing strengths from `src.strengths`, or `src` or `parent.model`  if src is None
+- `update_knobs(src)`: update existing knobs from `src.knobs`, or `src` or `parent.model`  if src is None
+- `update_params(src)`: update existing params from `src.params`, or `src` or `parent.model`  if src is None
+- `update(src)`: combine update_strengths, knobs and params.
 
-- `get_params()`:  measure parameters from the model
-- `get_params_from_twiss()`: measure parameters from a twiss table
+- `get_params()`:  measure hardcoded parameters from model
+- `get_params_from_twiss()`: measure hardcoded parameters from a twiss table
+- `set_params()`: add or replace  hardcoded parameters from model
 
 - `twiss(beam,method)`: get the twiss table table: beam  in (1,2), method see specific sections
 - `plot(beam,method)`: plot the twiss table: beam in (1,2), method see specific sections

@@ -1,19 +1,18 @@
 import re
-from .knob import Knob
-
-from .utils import print_diff_dict_float
-
 
 import pyoptics
 
+from .knob import Knob
+from .utils import print_diff_dict_float
+
 
 class RMatrix:
-    @classmethod
-    def from_twiss(cls, tw):
-        pass
 
     def __init__(self, matrix):
         self.matrix = matrix
+    @classmethod
+    def from_twiss(cls, tw):
+        pass
 
 
 class TwissInit:
@@ -200,8 +199,8 @@ class MADSequence:
         return tw
 
 
-class LHCMadModel:
-    extra_madx = """
+class LHCMadxModel:
+    extra_defs = """
 kd1.lr1       :=  ad1.lr1/l.mbxw;
 kd2.l1        :=  ad2.l5/l.mbrc ;
 kd2.r1        :=  ad2.r5/l.mbrc ;
@@ -255,13 +254,21 @@ abxws.l8      := -0.000045681598453109894*on_lhcb   ;
 abxwh.l8      := +0.000180681598453109894*on_lhcb   ;
 ablw.r8       := -0.000180681598453109894*on_lhcb   ;
 abxws.r8      := +0.000045681598453109894*on_lhcb   ;
+    """
 
-
+    extra_madx = extra_defs + """
 beam, particle=proton, energy=6.8e12, sequence=lhcb1;
 beam, particle=proton, energy=6.8e12, sequence=lhcb2, bv=-1;
 use, sequence=lhcb1;
 use, sequence=lhcb2;
     """
+
+    def __init__(self, madx):
+        self.madx = madx
+        self.b1 = MADSequence(self.madx, "lhcb1")
+        self.b2 = MADSequence(self.madx, "lhcb2")
+
+    
 
     @staticmethod
     def knobs_to_expr(knobs, strengths=None):
@@ -290,17 +297,6 @@ use, sequence=lhcb2;
         madx.call(str(madxfile))
         madx.input(cls.extra_madx)
         return cls(madx)
-
-    def __init__(self, madx):
-        self.madx = madx
-        self.b1 = MADSequence(self.madx, "lhcb1")
-        self.b2 = MADSequence(self.madx, "lhcb2")
-
-    def __getitem__(self, key):
-        return self.madx.globals[key]
-
-    def __setitem__(self, key, value):
-        self.madx.globals[key] = value
 
     def filter(self, pattern):
         return [k for k in self.madx.globals if re.match(pattern, k)]
@@ -406,3 +402,8 @@ use, sequence=lhcb2;
         }
         print_diff_dict_float(selfvar, othervar)
 
+    def __getitem__(self, key):
+        return self.madx.globals[key]
+
+    def __setitem__(self, key, value):
+        self.madx.globals[key] = value

@@ -1,8 +1,12 @@
-from cpymad.madx import Madx
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
+import numpy as np
+from cpymad.madx import Madx
+
+from .arcs import LHCArc
+from .circuits import LHCCircuits
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
 from .ir3 import LHCIR3
@@ -11,17 +15,11 @@ from .ir5 import LHCIR5
 from .ir6 import LHCIR6
 from .ir7 import LHCIR7
 from .ir8 import LHCIR8
-from .arcs import LHCArc
-
-from .section import Knob
-from .model_xsuite import LHCXsuiteModel, LHCMadModel
-from .circuits import LHCCircuits
-from .utils import (
-    print_diff_dict_objs,
-    print_diff_dict_float,
-    deliver_list_str,
-)
+from .model_xsuite import LHCMadxModel, LHCXsuiteModel
 from .opttable import LHCOpticsTable
+from .section import Knob
+from .utils import (deliver_list_str, print_diff_dict_float,
+                    print_diff_dict_objs)
 
 irs = [LHCIR1, LHCIR2]
 
@@ -42,6 +40,7 @@ def git_get_current_branch(directory):
         .strip()
     )
 
+
 def git_set_branch(directory, branch):
     import subprocess
 
@@ -54,42 +53,16 @@ class LHCOptics:
     Section contains strengths, local knobs, local parameters
     """
 
-    @staticmethod
-    def set_repository(version="2024"):
-        import subprocess
-        import os
-
-        version=str(version)
-
-        accmodels = Path("acc-models-lhc")
-        if accmodels.exists():
-            if not (accmodels / "lhc.seq").exists():
-                raise FileNotFoundError("acc-models-lhc/lhc.seq not found")
-            else:
-                if (accmodels / ".git").exists():
-                    if git_get_current_branch(accmodels) != version:
-                        git_set_branch(accmodels, version)
-        elif (
-            lcl := (Path.home() / "local" / "acc-models-lhc" / version)
-        ).exists():
-            accmodels.symlink_to(lcl)
-        else:
-            subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "https://gitlab.cern.ch/acc-models/lhc.git",
-                    f"-b {version}"
-                    "acc-models-lhc",
-                ]
-            )
-
     _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
     _arcs = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
 
     knob_names = [f"dq{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
-    knob_names += [f"dqp{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
-    knob_names += [f"cm{x}s.b{b}{op}" for x in "ir" for b in "12" for op in _opl]
+    knob_names += [
+        f"dqp{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl
+    ]
+    knob_names += [
+        f"cm{x}s.b{b}{op}" for x in "ir" for b in "12" for op in _opl
+    ]
     knob_names += [
         f"{kk}.b{b}"
         for kk in ["on_mo", "phase_change", "dp_trim"]
@@ -124,19 +97,49 @@ class LHCOptics:
         self.knobs = knobs
         self.model = model
         self.circuits = circuits
+        print(f"Optics {self.name} created")
         for knob in knobs.values():
             knob.parent = self
         for ss in irs + arcs:
             for knob in ss.knobs.values():
                 knob.parent = self
 
-    @property
-    def irs(self):
-        return [getattr(self, ir.name) for ir in self._irs]
+    @staticmethod
+    def set_repository(version="2024"):
+        import os
+        import subprocess
+
+        version = str(version)
+
+        accmodels = Path("acc-models-lhc")
+        if accmodels.exists():
+            if not (accmodels / "lhc.seq").exists():
+                raise FileNotFoundError("acc-models-lhc/lhc.seq not found")
+            else:
+                if (accmodels / ".git").exists():
+                    if git_get_current_branch(accmodels) != version:
+                        git_set_branch(accmodels, version)
+        elif (
+            lcl := (Path.home() / "local" / "acc-models-lhc" / version)
+        ).exists():
+            accmodels.symlink_to(lcl)
+        else:
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "https://gitlab.cern.ch/acc-models/lhc.git",
+                    f"-b {version}" "acc-models-lhc",
+                ]
+            )
 
     @property
     def arcs(self):
         return [getattr(self, arc) for arc in self._arcs]
+
+    @property
+    def irs(self):
+        return [getattr(self, ir.name) for ir in self._irs]
 
     @classmethod
     def from_madxfile(
@@ -173,7 +176,7 @@ class LHCOptics:
         circuits=None,
         verbose=False,
     ):
-        madmodel = LHCMadModel(madx)
+        madmodel = LHCMadxModel(madx)
         knobs = madmodel.make_and_set0_knobs(cls.knob_names)
         irs = [ir.from_madx(madx) for ir in cls._irs]
         arcs = [LHCArc.from_madx(madx, arc) for arc in cls._arcs]
@@ -191,7 +194,7 @@ class LHCOptics:
         return self
 
     @classmethod
-    def from_dict(cls, data, xsuite_model=None, circuits=None, verbose=False):
+    def from_dict(cls, data, xsuite_model=None, circuits=None, verbose=False, name=None):
         irs = [
             globals()[f"LHCIR{n+1}"].from_dict(d)
             for n, d in enumerate(data["irs"])
@@ -202,7 +205,7 @@ class LHCOptics:
         if isinstance(circuits, str) or isinstance(circuits, Path):
             circuits = LHCCircuits.from_json(circuits)
         out = cls(
-            name=data["name"],
+            name=data.get("name",name),
             irs=irs,
             arcs=arcs,
             params=data["params"],
@@ -224,29 +227,16 @@ class LHCOptics:
     ):
         with open(filename) as f:
             data = json.load(f)
+            if name is None:
+                name = Path(filename).stem
             out = cls.from_dict(
                 data,
                 xsuite_model=xsuite_model,
                 circuits=circuits,
                 verbose=verbose,
+                name=name,
             )
             return out
-
-    def __repr__(self) -> str:
-        return f"<LHCOptics {self.name!r}>"
-
-    def __getitem__(self, k):
-        if k in self.params:
-            return self.params[k]
-        if k in self.knobs:
-            return self.knobs[k]
-        for ss in self.irs + self.arcs:
-            if k in ss:
-                return ss[k]
-        raise KeyError(f"{k} not found in {self}")
-
-    def __contains__(self, k):
-        return k in self.params or k in self.knobs
 
     def get(self, k, default=None, full=True):
         if k in self:
@@ -281,7 +271,9 @@ class LHCOptics:
         with open(filename, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
-    def update_model(self, src=None, full=True, verbose=False):
+    def update_model(
+        self, src=None, full=True, verbose=False, knobs_off=False
+    ):
         """
         Update model from an optics or a dict.
         If full incluiding all sections strengths and knobs.
@@ -293,19 +285,24 @@ class LHCOptics:
         if full:
             for ss in self.irs + self.arcs:
                 if hasattr(src, ss.name):
-                    if verbose:
-                        print(f"Update {ss.name} from {src}.{ss.name}")
                     src_ss = getattr(src, ss.name)
-                    ss.update_model(src=src_ss, verbose=verbose)
+                    lbl = f"{src}.{ss.name}"
                 elif ss.name in src:
-                    if verbose:
-                        print(f"Update {ss.name} from {src}[{ss.name}]")
                     src_ss = src[ss.name]
-                    ss.update_model(src=src_ss, verbose=verbose)
+                    lbl = f"{src}[{ss.name!r}]"
+                if verbose:
+                    print(
+                        f"Update strengths and knobs in {ss.name!r} from {lbl}"
+                    )
+                ss.update_model(
+                    src=src_ss, verbose=verbose, knobs_off=knobs_off
+                )
         # knobs must be updated after the strengths
         if verbose:
             print(f"Update knobs from {src}")
-        self.model.update_knobs(src.knobs, verbose=verbose)
+        self.model.update_knobs(
+            src.knobs, verbose=verbose, knobs_off=knobs_off
+        )
         if "p0c" in self.params:
             self.model.p0c = self.params["p0c"]
         return self
@@ -323,12 +320,16 @@ class LHCOptics:
         elif src == "default":
             if verbose:
                 print("Update knobs from default list")
-            src ={k: self.model.get_knob_by_probing(k) for k in self.get_default_knob_names()}
+            src = {
+                k: self.model.get_knob_by_probing(k)
+                for k in self.get_default_knob_names()
+            }
         for k in self.knobs:
             if k in src:
                 if verbose:
                     self.knobs[k].print_update_diff(src[k])
                 self.knobs[k] = Knob.from_src(src[k])
+                self.knobs[k].parent = self
         if full:
             for ss in self.irs + self.arcs:
                 if hasattr(src, ss.name):
@@ -401,7 +402,7 @@ class LHCOptics:
 
     def set_madx_model(self, model):
         if Path(model).exists():
-            model = LHCMadModel.from_madxfile(model)
+            model = LHCMadxModel.from_madxfile(model)
         self.model = model
         self.update_model()
         return self
@@ -456,6 +457,26 @@ class LHCOptics:
             compute_chromatic_properties=chrom, strengths=strengths
         )
 
+    def cmin(self, beam=None):
+        if beam is None:
+            return [
+                self.cmin(beam=1),
+                self.cmin(beam=2),
+            ]
+        tw = self.twiss(beam=beam)
+        k1sl = tw["k1sl"]
+        pi2 = 2 * np.pi
+        j2pi = 1j * pi2
+        cmin = (
+            np.sum(
+                k1sl
+                * np.sqrt(tw.betx * tw.bety)
+                * np.exp(j2pi * (tw.mux - tw.muy))
+            )
+            / pi2
+        )
+        return cmin.real, cmin.imag
+
     def plot(self, beam=None):
         if beam is None:
             for beam in [1, 2]:
@@ -475,7 +496,7 @@ class LHCOptics:
             sec.knobs_off()
 
     def knobs_on(self):
-        for k,knob in self.knobs.items():
+        for k, knob in self.knobs.items():
             self.model[k] = knob.value
         for sec in self.irs + self.arcs:
             sec.knobs_on()
@@ -549,7 +570,6 @@ class LHCOptics:
     def diff_params(self, other):
         print_diff_dict_float(self.params, other.params)
 
-
     def get_phase_arcs(self):
         phases = {}
         for arc in self.arcs:
@@ -564,7 +584,9 @@ class LHCOptics:
         for ss in self.irs + self.arcs:
             strengths.update(ss.strengths)
         if regexp is not None:
-            strengths = {k: v for k, v in strengths.items() if re.match(regexp,k)}
+            strengths = {
+                k: v for k, v in strengths.items() if re.match(regexp, k)
+            }
         return strengths
 
     def find_knobs(self, regexp=None):
@@ -573,12 +595,16 @@ class LHCOptics:
             knobs.update(ss.knobs)
         knobs.update(self.knobs)
         if regexp is not None:
-            knobs = {k: v for k, v in knobs.items() if re.match(regexp,k)}
-        return knobs
+            knobs = {k: v for k, v in knobs.items() if re.match(regexp, k)}
+        return knobs.values()
 
     def find_knobs_null(self):
-        knobs=self.find_knobs()
-        return {k: v for k, v in knobs.items() if sum(map(abs,v.weights.values())) == 0}
+        knobs = self.find_knobs()
+        return {
+            knob
+            for knob in knobs.items()
+            if sum(map(abs, knob.weights.values())) == 0
+        }
 
     @classmethod
     def get_default_knob_names(cls):
@@ -586,7 +612,6 @@ class LHCOptics:
         for ss in cls._irs:
             out.extend(ss.knob_names)
         return out
-
 
     def to_madx(self, output=None):
         out = []
@@ -598,37 +623,39 @@ class LHCOptics:
                 out.append(f"{k:30} = {v:19.16f};")
             out.append("")
 
-
         for ss in self.irs + self.arcs:
-            out.extend(ss.to_madx(output=list,knobs=False))
+            out.extend(ss.to_madx(output=list, knobs=False))
 
         knobs = self.find_knobs()
         if len(knobs) > 0:
             strengths = self.find_strengths()
             out.append(f"! Knobs")
-            for expr in LHCMadModel.knobs_to_expr(self.knobs, strengths):
+            for expr in LHCMadxModel.knobs_to_expr(self.knobs, strengths):
                 out.append(expr)
             out.append("")
+
+        out.append("! Constant definitions\n")
+        out.append(LHCMadxModel.extra_defs)
         return deliver_list_str(out, output)
 
 
-    def make_tune_knobs(self):
-        from .model_xsuite import make_tune_knobs
-        make_tune_knobs(self.model.multiline)
+    def match_all_knobs(self):
+        for knob in self.find_knobs():
+            if hasattr(knob, "match"):
+                knob.match()
 
-    def make_chroma_knobs(self):
-        from .model_xsuite import make_chroma_knobs
-        make_chroma_knobs(self.model.multiline)
+    def __getitem__(self, k):
+        if k in self.params:
+            return self.params[k]
+        if k in self.knobs:
+            return self.knobs[k]
+        for ss in self.irs + self.arcs:
+            if k in ss:
+                return ss[k]
+        raise KeyError(f"{k} not found in {self}")
 
-    def make_coupling_knobs(self):
-        from .model_xsuite import make_coupling_knobs
-        make_coupling_knobs(self.model.multiline)
+    def __contains__(self, k):
+        return k in self.params or k in self.knobs
 
-    def make_orbit_knobs(self):
-        from .model_xsuite import make_orbit_knobs
-        make_orbit_knobs(self.model.multiline)
-
-    def specialize_knobs(self):
-        for ss in self.irs:
-            ss.specialize_knobs()
-        return self
+    def __repr__(self) -> str:
+        return f"<LHCOptics {self.name!r}>"

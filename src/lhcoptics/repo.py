@@ -1,10 +1,12 @@
 from pathlib import Path
+
+from yaml import dump, load
+
 from .optics import LHCOptics
 
-from yaml import load, dump
-
 try:
-    from yaml import CLoader as Loader, CDumper as Dumper
+    from yaml import CDumper as Dumper
+    from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader, Dumper
 

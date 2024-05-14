@@ -12,6 +12,9 @@ class Piecewise:
 
 
 class Polynomial:
+
+    def __init__(self, coeffs):
+        self.coeffs = coeffs
     @classmethod
     def from_fit(
         cls, t, v, n, t0=None, v0=None, t1=None, v1=None, t2=None, v2=None
@@ -20,21 +23,18 @@ class Polynomial:
         coeffs = np.polyfit(t, v, n)
         return cls(coeffs)
 
-    def __init__(self, coeffs):
-        self.coeffs = coeffs
-
     def __call__(self, x):
         return sum(c * x**i for i, c in enumerate(self.coeffs))
 
 
 class Spline:
+
+    def __init__(self, spline):
+        self.spline = spline
     @classmethod
     def from_fit(cls, t, v):
         spline = interp1d(t, v, kind="cubic")
         return cls(spline)
-
-    def __init__(self, spline):
-        self.spline = spline
 
     def __call__(self, t):
         self.spline(t)

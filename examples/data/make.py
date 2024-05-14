@@ -1,4 +1,4 @@
-from lhcoptics import LHCOptics, LHCCircuits
+from lhcoptics import LHCCircuits, LHCOptics
 
 LHCOptics.set_repository("2024")
 

@@ -1,7 +1,7 @@
-from lhcoptics import LHCOptics, LHCMadModel
+from lhcoptics import LHCMadxModel, LHCOptics
 
 # test round trip
-model = LHCMadModel.from_madxfile("flat_model.madx")
+model = LHCMadxModel.from_madxfile("flat_model.madx")
 tw1 = model.b1.twiss()
 tw1.x
 tw1.header["q2"]
