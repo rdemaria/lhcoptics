@@ -18,8 +18,11 @@ from .ir8 import LHCIR8
 from .model_xsuite import LHCMadxModel, LHCXsuiteModel
 from .opttable import LHCOpticsTable
 from .section import Knob
-from .utils import (deliver_list_str, print_diff_dict_float,
-                    print_diff_dict_objs)
+from .utils import (
+    deliver_list_str,
+    print_diff_dict_float,
+    print_diff_dict_objs,
+)
 
 irs = [LHCIR1, LHCIR2]
 
@@ -193,7 +196,15 @@ class LHCOptics:
         return self
 
     @classmethod
-    def from_dict(cls, data, xsuite_model=None, circuits=None, verbose=False, name=None):
+    def from_dict(
+        cls,
+        data,
+        xsuite_model=None,
+        madx_model=None,
+        circuits=None,
+        verbose=False,
+        name=None,
+    ):
         irs = [
             globals()[f"LHCIR{n+1}"].from_dict(d)
             for n, d in enumerate(data["irs"])
@@ -204,7 +215,7 @@ class LHCOptics:
         if isinstance(circuits, str) or isinstance(circuits, Path):
             circuits = LHCCircuits.from_json(circuits)
         out = cls(
-            name=data.get("name",name),
+            name=data.get("name", name),
             irs=irs,
             arcs=arcs,
             params=data["params"],
@@ -213,6 +224,8 @@ class LHCOptics:
         )
         if xsuite_model is not None:
             out.update_model(verbose=verbose)
+        elif madx_model is not None:
+            out.set_madx_model(madx_model)
         return out
 
     @classmethod
@@ -221,6 +234,7 @@ class LHCOptics:
         filename,
         name=None,
         xsuite_model=None,
+        madx_model=None,
         circuits=None,
         verbose=False,
     ):
@@ -231,6 +245,7 @@ class LHCOptics:
             out = cls.from_dict(
                 data,
                 xsuite_model=xsuite_model,
+                madx_model=madx_model,
                 circuits=circuits,
                 verbose=verbose,
                 name=name,
@@ -637,7 +652,6 @@ class LHCOptics:
         out.append(LHCMadxModel.extra_defs)
         return deliver_list_str(out, output)
 
-
     def match_all_knobs(self):
         for knob in self.find_knobs():
             if hasattr(knob, "match"):
@@ -658,3 +672,11 @@ class LHCOptics:
 
     def __repr__(self) -> str:
         return f"<LHCOptics {self.name!r}>"
+
+    def check_quad_strengths(
+        self, verbose=False, p0c=None, ratio_threshold=1.5
+    ):
+        for ir in self.irs:
+            ir.check_quad_strengths(
+                verbose=verbose, p0c=p0c, ratio_threshold=ratio_threshold
+            )

@@ -127,7 +127,7 @@ class LHCXsuiteModel:
 
     @property
     def p0c(self):
-        return self.multiline.b1.p0c
+        return self.multiline.b1.particle_ref.p0c[0]
 
     @p0c.setter
     def p0c(self, value):

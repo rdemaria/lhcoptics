@@ -209,14 +209,18 @@ class LHCIR(LHCSection):
         elif method == "params":
             return self.twiss_from_params(beam, strengths=strengths)
 
-    def plot(self, beam=None, method="init", figlabel=None,yr="",yl=""):
+    def plot(self, beam=None, method="init", figlabel=None, yr="", yl=""):
         if beam is None:
             if figlabel is None:
                 figlabel1 = f"{self.name}b1"
                 figlabel2 = f"{self.name}b2"
             return [
-                self.plot(beam=1, method=method, figlabel=figlabel1,yr=yr,yl=yl),
-                self.plot(beam=2, method=method, figlabel=figlabel2,yr=yr,yl=yl),
+                self.plot(
+                    beam=1, method=method, figlabel=figlabel1, yr=yr, yl=yl
+                ),
+                self.plot(
+                    beam=2, method=method, figlabel=figlabel2, yr=yr, yl=yl
+                ),
             ]
         else:
             if method == "init":
@@ -227,7 +231,7 @@ class LHCIR(LHCSection):
                 mktwiss = self.twiss_from_params
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
-            return mktwiss(beam).plot(figlabel=figlabel,yr=yr,yl=yl)
+            return mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
 
     def get_params_from_twiss(self, tw1, tw2):
         ipname = self.ipname
@@ -337,7 +341,12 @@ class LHCIR(LHCSection):
         return targets
 
     def get_match_vary(
-        self, b1=True, b2=True, common=True, dkmin=0.0, dkmax=0.0
+        self,
+        b1=True,
+        b2=True,
+        common=True,
+        dkmin=0.0,
+        dkmax=0.0,
     ):
         varylst = []
         for kk in self.quads:
@@ -382,6 +391,9 @@ class LHCIR(LHCSection):
         hold_init=False,
         sym_triplets=True,
         lrphase=False,
+        extra_targets=None,
+        vary_ratio=None,
+        ratio_threshold=1.5,
     ):
         if self.parent.model is None:
             raise ValueError("Model not set for {self)")
@@ -403,6 +415,27 @@ class LHCIR(LHCSection):
             dkmax = self.parent.params.get("match_dkmax", 0.01)
 
         targets = LHCIR.get_match_targets(self, b1=b1, b2=b2)
+        if extra_targets is not None:
+            for name, attr in extra_targets.items():
+                if name.endswith("b1"):
+                    line = "b1"
+                    value = self.twiss(beam=1)[attr, name]
+                elif name.endswith("b2"):
+                    line = "b2"
+                    value = self.twiss(beam=2)[attr, name]
+                else:
+                    raise ValueError(f"Unknown beam for {name}")
+
+                targets.append(
+                    xt.Target(
+                        tar=attr,
+                        value=value,
+                        at=name,
+                        line=line,
+                        tag=f"{name}_{attr}",
+                    )
+                )
+
         varylst = LHCIR.get_match_vary(
             self,
             b1=b1,
@@ -413,6 +446,23 @@ class LHCIR(LHCSection):
         )
         if self.name == "ir1":
             varylst = [v for v in varylst if not v.name.startswith("kq4")]
+
+        if vary_ratio is not None:
+            model = self.parent.model
+            for k in vary_ratio:
+                if "b1" in k:
+                    kother = k.replace("b1", "b2")
+                rat_name = f"{k}_ratio"
+                model[rat_name] = -model[k] / model[kother]
+                model.vars[k] = -model.vars[rat_name] * model.vars[kother]
+                varylst.append(
+                    xt.Vary(
+                        rat_name,
+                        limits=[1 / ratio_threshold, ratio_threshold],
+                        step=1e-9,
+                        tag="ratio",
+                    )
+                )
 
         match = lhc.match(
             solve=False,
@@ -427,6 +477,12 @@ class LHCIR(LHCSection):
             check_limits=False,
             strengths=False,
         )
+
+        if vary_ratio is not None:
+            for k in vary_ratio:
+                print(f"disabling {k}")
+                match.disable(vary_name=k)
+
         if lrphase is False:
             match.disable(target="mu.*_l")
 
@@ -437,7 +493,7 @@ class LHCIR(LHCSection):
 
         if self.parent.params["match_inj"]:
             if self.name == "ir2" or self.name == "ir8":
-                match.disable(vary_name="kqt?x")
+                match.disable(vary_name="kqt?x.*")
                 self.parent.model[f"kqx.l{self.irn}"] = 0.950981581300e-02
                 self.parent.model[f"kqx.r{self.irn}"] = -0.950981581300e-02
                 self.parent.model[f"ktqx1.l{self.irn}"] = 0.0
@@ -460,6 +516,8 @@ class LHCIR(LHCSection):
             match.disable(vary_name="kq4.l6b1")
             match.disable(vary_name="kq4.r6b2")
         self.optimizer = match
+        match.target_status()
+        match.vary_status()
         return match
 
     def set_betastar(self, beta=None, ratio=1.0):
@@ -484,3 +542,21 @@ class LHCIR(LHCSection):
             return f"<LHCIR{self.irn} from {self.filename!r}>"
         else:
             return f"<LHCIR{self.irn}>"
+
+    def check_quad_strengths(
+        self, verbose=False, p0c=None, ratio_threshold=1.5
+    ):
+        if p0c is None:
+            p0c = self.parent.params["p0c"]
+        rmax = 1
+        for k, v in self.strengths.items():
+            if "b1" in k and abs(v) > 0 and "kqt" not in k:
+                k2 = k.replace("b1", "b2")
+                rat = abs(v / self.strengths[k2])
+                rat1 = rat if rat > 1 else 1 / rat
+                if verbose or rat1 > ratio_threshold:
+                    print(f"Ratio {k}/{k2} = {rat:.5f}")
+                if rat1 > rmax:
+                    rmax = rat1
+        if verbose:
+            print(f"Max ratio {self}: {rmax:.5f}")

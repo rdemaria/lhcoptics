@@ -1,6 +1,8 @@
 import re
 
 import pyoptics
+import xdeps as xd
+
 
 from .knob import Knob
 from .utils import print_diff_dict_float
@@ -140,7 +142,7 @@ class MADSequence:
                 alfy=alfy,
                 sequence=self.sequence,
             )
-        return pyoptics.optics(tw)
+        return xd.Table(tw)
 
     def twiss_periodic(self, use=False):
         if use:
@@ -289,14 +291,26 @@ use, sequence=lhcb2;
         return out
 
     @classmethod
-    def from_madxfile(cls, madxfile):
+    def from_madxfile(cls, madxfile,extra=True):
         from cpymad.madx import Madx
 
         madx = Madx()
         madx.options(echo=False, warn=False, info=False)
         madx.call(str(madxfile))
-        madx.input(cls.extra_madx)
+        if extra:
+            madx.input(cls.extra_madx)
         return cls(madx)
+
+    def twiss(self, sequence=None, **kwargs):
+        if sequence is None:
+            return (self.b1.twiss(**kwargs), self.b2.twiss(**kwargs))
+        else:
+            return getattr(self, f"b{sequence}").twiss(**kwargs)
+
+
+    def call(self, filename):
+        self.madx.call(filename)
+        return self
 
     def filter(self, pattern):
         return [k for k in self.madx.globals if re.match(pattern, k)]
