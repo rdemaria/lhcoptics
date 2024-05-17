@@ -463,6 +463,14 @@ class LHCIR(LHCSection):
                         tag="ratio",
                     )
                 )
+            #for k in vary_ratio:
+            #    varylst = [v for v in varylst if not v.name == k]
+
+        if vary_ratio is not None:
+            for k in vary_ratio:
+                for vv in varylst:
+                    if vv.name == k:
+                        vv.active = False
 
         match = lhc.match(
             solve=False,
@@ -478,10 +486,6 @@ class LHCIR(LHCSection):
             strengths=False,
         )
 
-        if vary_ratio is not None:
-            for k in vary_ratio:
-                print(f"disabling {k}")
-                match.disable(vary_name=k)
 
         if lrphase is False:
             match.disable(target="mu.*_l")
@@ -560,3 +564,9 @@ class LHCIR(LHCSection):
                     rmax = rat1
         if verbose:
             print(f"Max ratio {self}: {rmax:.5f}")
+
+    def match_knobs(self, **kwargs):
+        for knob in self.knobs.values():
+            if hasattr(knob, "match"):
+                knob.match(**kwargs)
+        return self
