@@ -501,6 +501,8 @@ class ChromaKnob(Knob):
             vary=vary,
             targets=targets,
             strengths=False,
+            compute_chromatic_properties=True,
+            n_steps_max=50
         )
         mtc.target_status()
         mtc.vary_status()

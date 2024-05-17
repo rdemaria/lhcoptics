@@ -138,6 +138,24 @@ class LHCIR(LHCSection):
     def kqxr(self):
         return [k for k in self.quads if "r" in k and "x" in k]
 
+    def __getitem__(self, key):
+        if re.match(r"kqx[123]\.[lr]", key):
+            return self.get_kqx(int(key[3]), key[-2])
+        return super().__getitem__(key)
+
+    def get_kqx(self, n, lr):
+        side=lr+f"{self.irn}"
+        kq = self.strengths[f"kqx.{side}"]
+        if n==3:
+            return kq
+        elif n==1 or n==2:
+            ktq= self.strengths[f"ktqx{n}.{side}"]
+            return kq+ktq
+        else:
+            raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
+
+
+
     def set_init(self):
         arcleft = self.arc_left
         self.init_left = {
@@ -547,23 +565,27 @@ class LHCIR(LHCSection):
         else:
             return f"<LHCIR{self.irn}>"
 
-    def check_quad_strengths(
-        self, verbose=False, p0c=None, ratio_threshold=1.5
-    ):
-        if p0c is None:
-            p0c = self.parent.params["p0c"]
+    def get_quad_max_ratio(self,verbose=False,ratio_threshold=1.5):
         rmax = 1
         for k, v in self.strengths.items():
             if "b1" in k and abs(v) > 0 and "kqt" not in k:
                 k2 = k.replace("b1", "b2")
                 rat = abs(v / self.strengths[k2])
                 rat1 = rat if rat > 1 else 1 / rat
-                if verbose or rat1 > ratio_threshold:
+                if verbose and rat1 > ratio_threshold:
                     print(f"Ratio {k}/{k2} = {rat:.5f}")
                 if rat1 > rmax:
                     rmax = rat1
         if verbose:
             print(f"Max ratio {self}: {rmax:.5f}")
+        return rmax
+
+    def check_quad_strengths(
+        self, verbose=False, p0c=None, ratio_threshold=1.5
+    ):
+        if p0c is None:
+            p0c = self.parent.params["p0c"]
+        self.get_quad_max_ratio(verbose=verbose, ratio_threshold=ratio_threshold)
 
     def match_knobs(self, **kwargs):
         for knob in self.knobs.values():
