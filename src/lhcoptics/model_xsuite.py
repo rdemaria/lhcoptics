@@ -25,22 +25,6 @@ def pprint(expr):
     return "\n + ".join([str(t) for t in termlist(expr)])
 
 
-def bbox_from_data(data):
-    shape=data['aperture'][0]
-    if shape=="rectellipse":
-        ax=min(data['aperture'][1],data['aperture'][3])
-        ay=min(data['aperture'][2],data['aperture'][4])
-    elif shape=="ellipse":
-        ax=data['aperture'][1]
-        ay=data['aperture'][2]
-    elif shape=="circle":
-        ax=data['aperture'][1]
-        ay=ax
-    else:
-        ax=None
-        ay=None
-    return ax,ay
-
 class LHCXsuiteModel:
     _xt = xt
 
@@ -437,72 +421,111 @@ class LHCXsuiteModel:
         co_error=2e-3,
         ndisp_err=0.1,
         delta_err=2e-4,
-        nsigma=12
+        nsigma=12,
     ):
         if beam is None:
             return [
-                self.plot_beamsize(beam=1, emit_n=emit_n, p0c=p0c, bbeat=bbeat, co_error=co_error, ndisp_err=ndisp_err, delta_err=delta_err, nsigma=nsigma),
-                self.plot_beamsize(beam=2, emit_n=emit_n, p0c=p0c, bbeat=bbeat, co_error=co_error, ndisp_err=ndisp_err, delta_err=delta_err, nsigma=nsigma)
+                self.plot_beamsize(
+                    beam=1,
+                    emit_n=emit_n,
+                    p0c=p0c,
+                    bbeat=bbeat,
+                    co_error=co_error,
+                    ndisp_err=ndisp_err,
+                    delta_err=delta_err,
+                    nsigma=nsigma,
+                ),
+                self.plot_beamsize(
+                    beam=2,
+                    emit_n=emit_n,
+                    p0c=p0c,
+                    bbeat=bbeat,
+                    co_error=co_error,
+                    ndisp_err=ndisp_err,
+                    delta_err=delta_err,
+                    nsigma=nsigma,
+                ),
             ]
-        line=self.sequence[beam]
-        tw= line.twiss(strengths=False)
+        line = self.sequence[beam]
+        tw = line.twiss(strengths=False)
         if p0c is None:
-            p0c=self.p0c
-        ex=emit_n/p0c*0.9382720813e9
-        ey=ex
-        dx_err=2.0*np.sqrt(tw.betx/170)*ndisp_err
-        dy_err=2.0*np.sqrt(tw.bety/170)*ndisp_err
-        dx=tw.dx+delta_err
-        dy=tw.dy+delta_err
+            p0c = self.p0c
+        ex = emit_n / p0c * 0.9382720813e9
+        ey = ex
+        dx_err = 2.0 * np.sqrt(tw.betx / 170) * ndisp_err
+        dy_err = 2.0 * np.sqrt(tw.bety / 170) * ndisp_err
+        dx = tw.dx + delta_err
+        dy = tw.dy + delta_err
         print(f"dx_err={dx_err.max()} dy_err={dy_err.max()}")
         print(f"dx={dx_err.max()} dy={dy.max()}")
         print(f"ex={ex} ey={ey}")
-        sx=nsigma*bbeat*np.sqrt(tw.betx*ex)+abs(dx)*delta_err+co_error
-        sy=nsigma*bbeat*np.sqrt(tw.bety*ey)+abs(dy)*delta_err+co_error
-        xp=tw.x+sx
-        xm=tw.x-sx
-        yp=tw.y+sy
-        ym=tw.y-sy
-        fig,(ax1,ax2)=plt.subplots(2,1,num=f"aperture{beam}",clear=True)
-        ax1.plot(tw.s, tw.x, label="x",color="b")
-        ax2.plot(tw.s, tw.y, label="y",color="b")
+        sx = (
+            nsigma * bbeat * np.sqrt(tw.betx * ex)
+            + abs(dx) * delta_err
+            + co_error
+        )
+        sy = (
+            nsigma * bbeat * np.sqrt(tw.bety * ey)
+            + abs(dy) * delta_err
+            + co_error
+        )
+        xp = tw.x + sx
+        xm = tw.x - sx
+        yp = tw.y + sy
+        ym = tw.y - sy
+        fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
+        ax1.plot(tw.s, tw.x, label="x", color="b")
+        ax2.plot(tw.s, tw.y, label="y", color="b")
         ax1.set_ylabel("x [m]")
         ax2.set_ylabel("y [m]")
-        ax1.fill_between(tw.s, xp, xm, alpha=0.5, color="b", label=f"{nsigma} sigma")
-        ax2.fill_between(tw.s, yp, ym, alpha=0.5, color="b", label=f"{nsigma} sigma")
+        ax1.fill_between(
+            tw.s, xp, xm, alpha=0.5, color="b", label=f"{nsigma} sigma"
+        )
+        ax2.fill_between(
+            tw.s, yp, ym, alpha=0.5, color="b", label=f"{nsigma} sigma"
+        )
         return self
 
-    def plot_aperture(self,beam=None):
+    def plot_aperture(self, beam=None):
         if beam is None:
-            return [self.plot_aperture(beam=1),self.plot_aperture(beam=2)]
-        su=self.get_survey_flat(beam)
-        line=self.sequence[beam]
-        fig,(ax1,ax2)=plt.subplots(2,1,num=f"aperture{beam}",clear=True)
+            return [self.plot_aperture(beam=1), self.plot_aperture(beam=2)]
+        su = self.get_survey_flat(beam)
+        line = self.sequence[beam]
+        fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
 
-    def get_elem_bbox(self,beam,name):
-        line=self.sequence[beam]
-        data=line.metadata["layout_data"][name]
-        return bbox_from_data(data)
-
-    def get_survey_flat(self,beam=1):
-        line=self.sequence[beam].copy()
+    def get_survey_flat(self, beam=1):
+        line = self.sequence[beam].copy()
         line.build_tracker()
-        for name,elem in line.element_dict.items():
+        for name, elem in line.element_dict.items():
             if name.startswith("mb."):
-                elem.h=0
-        su=line.survey()
-        if beam==2:
-            su=su.reverse()
+                elem.h = 0
+        su = line.survey()
+        if beam == 2:
+            su = su.reverse()
         return su
 
     def plot_survey_flat(self):
-        su1=self.get_survey_flat(beam=1)
-        su2=self.get_survey_flat(beam=2)
+        su1 = self.get_survey_flat(beam=1)
+        su2 = self.get_survey_flat(beam=2)
         plt.figure("survey_flat")
-        plt.plot(su1.s,su1.X)
-        plt.plot(su2.s,su2.X)
+        plt.plot(su1.s, su1.X)
+        plt.plot(su2.s, su2.X)
         return self
 
+    def slice(self, slices=8):
+        for beam in [1, 2]:
+            line = self.sequence[beam]
+            line.slice_thick_elements(
+                slicing_strategies=[
+                    xt.Strategy(slicing=None),
+                    xt.Strategy(
+                        slicing=xt.Uniform(slices, mode="thick"), name="mb.*"
+                    ),
+                    xt.Strategy(
+                        slicing=xt.Uniform(slices, mode="thick"), name="mq.*"
+                    ),
+                ]
+            )
 
 
 def test_coupling_knobs(collider):

@@ -1,4 +1,5 @@
 from pathlib import Path
+from collections import namedtuple
 
 
 def print_diff_dict_float(dct1, dct2):
@@ -45,3 +46,9 @@ def deliver_list_str(out, output=None):
         print("\n".join(out))
     else:
         raise ValueError(f"Unknown output type {output}")
+
+
+def iter_rows(table):
+    Row=namedtuple("Row",table._col_names)
+    for i in range(len(table)):
+        yield Row(*[table._data[cn][i] for cn in table._col_names])
