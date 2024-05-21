@@ -18,8 +18,11 @@ from .ir8 import LHCIR8
 from .model_xsuite import LHCMadxModel, LHCXsuiteModel
 from .opttable import LHCOpticsTable
 from .section import Knob
-from .utils import (deliver_list_str, print_diff_dict_float,
-                    print_diff_dict_objs)
+from .utils import (
+    deliver_list_str,
+    print_diff_dict_float,
+    print_diff_dict_objs,
+)
 
 irs = [LHCIR1, LHCIR2]
 
@@ -193,7 +196,15 @@ class LHCOptics:
         return self
 
     @classmethod
-    def from_dict(cls, data, xsuite_model=None, circuits=None, verbose=False, name=None):
+    def from_dict(
+        cls,
+        data,
+        xsuite_model=None,
+        madx_model=None,
+        circuits=None,
+        verbose=False,
+        name=None,
+    ):
         irs = [
             globals()[f"LHCIR{n+1}"].from_dict(d)
             for n, d in enumerate(data["irs"])
@@ -204,7 +215,7 @@ class LHCOptics:
         if isinstance(circuits, str) or isinstance(circuits, Path):
             circuits = LHCCircuits.from_json(circuits)
         out = cls(
-            name=data.get("name",name),
+            name=data.get("name", name),
             irs=irs,
             arcs=arcs,
             params=data["params"],
@@ -213,6 +224,8 @@ class LHCOptics:
         )
         if xsuite_model is not None:
             out.update_model(verbose=verbose)
+        elif madx_model is not None:
+            out.set_madx_model(madx_model)
         return out
 
     @classmethod
@@ -221,6 +234,7 @@ class LHCOptics:
         filename,
         name=None,
         xsuite_model=None,
+        madx_model=None,
         circuits=None,
         verbose=False,
     ):
@@ -231,6 +245,7 @@ class LHCOptics:
             out = cls.from_dict(
                 data,
                 xsuite_model=xsuite_model,
+                madx_model=madx_model,
                 circuits=circuits,
                 verbose=verbose,
                 name=name,
@@ -544,6 +559,38 @@ class LHCOptics:
             )
             self.check()
 
+    def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="all", solve=True):
+        """
+        NB: breaks knobs and restore them
+        """
+        if beam is None:
+            for beam in [1, 2]:
+                self.match_chroma(beam, dqx, dqy, arcs, solve=solve)
+        else:
+            model = self.model
+            xt = model._xt
+            beam = f"b{beam}"
+            line = getattr(model, beam)
+            for fd in "fd":
+                for ks in self.find_strengths(f"ks{fd}.*{beam}"):
+                    tmp = f"ks{fd}_{beam}"
+                    model[tmp] = model[ks]
+                    print(f"Set {tmp} from {ks} to {model[tmp]}")
+                    model.vars[ks] = model.vars[tmp]  # expr
+            mtc = line.match(
+                solve=solve,
+                vary=[xt.VaryList([f"ksf_{beam}", f"ksd_{beam}"], step=1e-9)],
+                targets=[xt.TargetSet(dqx=dqx, dqy=dqy, tol=1e-6)],
+                strengths=False,
+                compute_chromatic_properties=True,
+                n_steps_max=50,
+            )
+            mtc.target_status()
+            mtc.vary_status()
+            for knob in self.find_knobs(f"dqp.*{beam}"):
+                model.update_knob(knob)
+            return mtc
+
     def match_phase_arcs(self, newphases):
         for arc in self.arcs:
             phases = [k for k in newphases if arc.name in k]
@@ -629,7 +676,7 @@ class LHCOptics:
         if len(knobs) > 0:
             strengths = self.find_strengths()
             out.append("! Knobs")
-            for expr in LHCMadxModel.knobs_to_expr(self.knobs, strengths):
+            for expr in LHCMadxModel.knobs_to_expr(knobs, strengths):
                 out.append(expr)
             out.append("")
 
@@ -637,8 +684,7 @@ class LHCOptics:
         out.append(LHCMadxModel.extra_defs)
         return deliver_list_str(out, output)
 
-
-    def match_all_knobs(self):
+    def match_knobs(self):
         for knob in self.find_knobs():
             if hasattr(knob, "match"):
                 knob.match()
@@ -658,3 +704,22 @@ class LHCOptics:
 
     def __repr__(self) -> str:
         return f"<LHCOptics {self.name!r}>"
+
+    def get_quad_max_ratio(self, verbose=False, ratio_threshold=1.5):
+        ratios = np.array(
+            [
+                ir.get_quad_max_ratio(
+                    verbose=verbose, ratio_threshold=ratio_threshold
+                )
+                for ir in self.irs
+            ]
+        )
+        return ratios.max()
+
+    def check_quad_strengths(
+        self, verbose=False, p0c=None, ratio_threshold=1.5
+    ):
+        for ir in self.irs:
+            ir.check_quad_strengths(
+                verbose=verbose, p0c=p0c, ratio_threshold=ratio_threshold
+            )

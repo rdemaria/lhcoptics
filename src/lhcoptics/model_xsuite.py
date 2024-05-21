@@ -5,6 +5,8 @@ import xtrack as xt
 from .knob import Knob
 from .model_madx import LHCMadxModel
 
+import matplotlib.pyplot as plt
+
 
 class SinglePassDispersion(xd.Action):
     def __init__(self, line, ele_start, ele_stop, backtrack=False, delta=1e-3):
@@ -154,7 +156,10 @@ class LHCXsuiteModel:
 
     @property
     def p0c(self):
-        return self.multiline.b1.p0c
+        return self.multiline.b1.particle_ref.p0c[0]
+
+    def info(self, k):
+        return self.multiline.vars[k]._info()
 
     @p0c.setter
     def p0c(self, value):
@@ -434,121 +439,120 @@ class LHCXsuiteModel:
         else:
             return f"<LHCXsuiteModel {id(self)}>"
 
-
-def make_coupling_knobs(collider):
-    mqs_circuits_4_quads = {}
-    mqs_circuits_2_quads = {}
-    mqs_circuits_4_quads["b1"] = [
-        "kqs.a23b1",
-        "kqs.a45b1",
-        "kqs.a67b1",
-        "kqs.a81b1",
-    ]
-    mqs_circuits_2_quads["b1"] = [
-        "kqs.l2b1",
-        "kqs.l4b1",
-        "kqs.l6b1",
-        "kqs.l8b1",
-        "kqs.r1b1",
-        "kqs.r3b1",
-        "kqs.r5b1",
-        "kqs.r7b1",
-    ]
-
-    mqs_circuits_4_quads["b2"] = [
-        "kqs.a12b2",
-        "kqs.a34b2",
-        "kqs.a56b2",
-        "kqs.a78b2",
-    ]
-
-    mqs_circuits_2_quads["b2"] = [
-        "kqs.l1b2",
-        "kqs.l3b2",
-        "kqs.l5b2",
-        "kqs.l7b2",
-        "kqs.r2b2",
-        "kqs.r4b2",
-        "kqs.r6b2",
-        "kqs.r8b2",
-    ]
-
-    # see Eq. 47 in https://cds.cern.ch/record/522049/files/lhc-project-report-501.pdf
-    class ActionCmin(xt.Action):
-        def __init__(self, line):
-            self.line = line
-
-        def run(self):
-            tw = self.line.twiss(strengths=True)
-            k1sl = tw["k1sl"]
-            c_min = (
-                1
-                / (2 * np.pi)
-                * np.sum(
-                    k1sl
-                    * np.sqrt(tw.betx * tw.bety)
-                    * np.exp(1j * 2 * np.pi * (tw.mux - tw.muy))
-                )
-            )
-            return {"c_min_re": c_min.real, "c_min_im": c_min.imag}
-
-    act_cmin_b1 = ActionCmin(collider["b1"])
-    act_cmin_b2 = ActionCmin(collider["b2"])
-
-    for nn in (
-        mqs_circuits_4_quads["b1"]
-        + mqs_circuits_2_quads["b1"]
-        + mqs_circuits_4_quads["b2"]
-        + mqs_circuits_2_quads["b2"]
+    def plot_beamsize(
+        self,
+        beam=None,
+        emit_n=2.5e-6,
+        p0c=None,
+        bbeat=1.1,
+        co_error=2e-3,
+        ndisp_err=0.1,
+        delta_err=2e-4,
+        nsigma=12,
     ):
-        collider.vars["old_" + nn] = collider.vars[nn]._expr
-        collider.vars[nn] = collider.vars[nn]._value
-
-    optimizers = {"b1": {}, "b2": {}}
-
-    c_min_match = 1e-4
-    for bname in ["b1", "b2"]:
-        line = collider[f"{bname}"]
-        act_cmin = ActionCmin(line)
-
-        assert np.abs(act_cmin.run()["c_min_re"]) < 1e-6
-        assert np.abs(act_cmin.run()["c_min_im"]) < 1e-6
-
-        opt_re = line.match_knob(
-            run=False,
-            knob_name=f"cmrs.{bname}_op",
-            knob_value_start=0,
-            knob_value_end=c_min_match,
-            vary=[
-                xt.VaryList(mqs_circuits_2_quads[bname], step=5e-5),
-                xt.VaryList(mqs_circuits_4_quads[bname], step=5e-5, weight=2),
-            ],
-            targets=[
-                act_cmin.target("c_min_re", value=c_min_match, tol=1e-8),
-                act_cmin.target("c_min_im", value=0, tol=1e-8),
-            ],
+        if beam is None:
+            return [
+                self.plot_beamsize(
+                    beam=1,
+                    emit_n=emit_n,
+                    p0c=p0c,
+                    bbeat=bbeat,
+                    co_error=co_error,
+                    ndisp_err=ndisp_err,
+                    delta_err=delta_err,
+                    nsigma=nsigma,
+                ),
+                self.plot_beamsize(
+                    beam=2,
+                    emit_n=emit_n,
+                    p0c=p0c,
+                    bbeat=bbeat,
+                    co_error=co_error,
+                    ndisp_err=ndisp_err,
+                    delta_err=delta_err,
+                    nsigma=nsigma,
+                ),
+            ]
+        line = self.sequence[beam]
+        tw = line.twiss(strengths=False)
+        if p0c is None:
+            p0c = self.p0c
+        ex = emit_n / p0c * 0.9382720813e9
+        ey = ex
+        dx_err = 2.0 * np.sqrt(tw.betx / 170) * ndisp_err
+        dy_err = 2.0 * np.sqrt(tw.bety / 170) * ndisp_err
+        dx = tw.dx + delta_err
+        dy = tw.dy + delta_err
+        print(f"dx_err={dx_err.max()} dy_err={dy_err.max()}")
+        print(f"dx={dx_err.max()} dy={dy.max()}")
+        print(f"ex={ex} ey={ey}")
+        sx = (
+            nsigma * bbeat * np.sqrt(tw.betx * ex)
+            + abs(dx) * delta_err
+            + co_error
         )
-        opt_re.solve()
-        opt_re.generate_knob()
-        optimizers[bname]["re"] = opt_re
-
-        opt_im = line.match_knob(
-            run=False,
-            knob_name=f"cmis.{bname}_op",
-            knob_value_start=0,
-            knob_value_end=c_min_match,
-            vary=[
-                xt.VaryList(mqs_circuits_2_quads[bname], step=5e-5),
-                xt.VaryList(mqs_circuits_4_quads[bname], step=5e-5, weight=2),
-            ],
-            targets=[
-                act_cmin.target("c_min_re", value=0, tol=1e-8),
-                act_cmin.target("c_min_im", value=c_min_match, tol=1e-8),
-            ],
+        sy = (
+            nsigma * bbeat * np.sqrt(tw.bety * ey)
+            + abs(dy) * delta_err
+            + co_error
         )
-        opt_im.solve()
-        opt_im.generate_knob()
-        optimizers[bname]["im"] = opt_im
+        xp = tw.x + sx
+        xm = tw.x - sx
+        yp = tw.y + sy
+        ym = tw.y - sy
+        fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
+        ax1.plot(tw.s, tw.x, label="x", color="b")
+        ax2.plot(tw.s, tw.y, label="y", color="b")
+        ax1.set_ylabel("x [m]")
+        ax2.set_ylabel("y [m]")
+        ax1.fill_between(
+            tw.s, xp, xm, alpha=0.5, color="b", label=f"{nsigma} sigma"
+        )
+        ax2.fill_between(
+            tw.s, yp, ym, alpha=0.5, color="b", label=f"{nsigma} sigma"
+        )
+        return self
+
+    def plot_aperture(self, beam=None):
+        if beam is None:
+            return [self.plot_aperture(beam=1), self.plot_aperture(beam=2)]
+        su = self.get_survey_flat(beam)
+        line = self.sequence[beam]
+        fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
+
+    def get_survey_flat(self, beam=1):
+        line = self.sequence[beam].copy()
+        line.build_tracker()
+        for name, elem in line.element_dict.items():
+            if name.startswith("mb."):
+                elem.h = 0
+        su = line.survey()
+        if beam == 2:
+            su = su.reverse()
+        return su
+
+    def plot_survey_flat(self):
+        su1 = self.get_survey_flat(beam=1)
+        su2 = self.get_survey_flat(beam=2)
+        plt.figure("survey_flat")
+        plt.plot(su1.s, su1.X)
+        plt.plot(su2.s, su2.X)
+        return self
+
+    def slice(self, slices=8):
+        for beam in [1, 2]:
+            line = self.sequence[beam]
+            line.slice_thick_elements(
+                slicing_strategies=[
+                    xt.Strategy(slicing=None),
+                    xt.Strategy(
+                        slicing=xt.Uniform(slices, mode="thick"), name="mb.*"
+                    ),
+                    xt.Strategy(
+                        slicing=xt.Uniform(slices, mode="thick"), name="mq.*"
+                    ),
+                ]
+            )
 
 
 def test_coupling_knobs(collider):
@@ -565,121 +569,6 @@ def test_coupling_knobs(collider):
     assert np.isclose(
         collider.b2.twiss().c_minus / np.sqrt(2), 1e-3, rtol=0, atol=1.5e-5
     )
-
-
-def make_chroma_knobs(collider):
-    ms_circuits = {}
-    ms_circuits["b1"] = [
-        "ksf1.a12b1",
-        "ksf1.a23b1",
-        "ksf1.a34b1",
-        "ksf1.a45b1",
-        "ksf1.a56b1",
-        "ksf1.a67b1",
-        "ksf1.a78b1",
-        "ksf1.a81b1",
-        "ksf2.a12b1",
-        "ksf2.a23b1",
-        "ksf2.a34b1",
-        "ksf2.a45b1",
-        "ksf2.a56b1",
-        "ksf2.a67b1",
-        "ksf2.a78b1",
-        "ksf2.a81b1",
-        "ksd1.a12b1",
-        "ksd1.a23b1",
-        "ksd1.a34b1",
-        "ksd1.a45b1",
-        "ksd1.a56b1",
-        "ksd1.a67b1",
-        "ksd1.a78b1",
-        "ksd1.a81b1",
-        "ksd2.a12b1",
-        "ksd2.a23b1",
-        "ksd2.a34b1",
-        "ksd2.a45b1",
-        "ksd2.a56b1",
-        "ksd2.a67b1",
-        "ksd2.a78b1",
-        "ksd2.a81b1",
-    ]
-
-    ms_circuits["b2"] = [
-        "ksf1.a12b2",
-        "ksf1.a23b2",
-        "ksf1.a34b2",
-        "ksf1.a45b2",
-        "ksf1.a56b2",
-        "ksf1.a67b2",
-        "ksf1.a78b2",
-        "ksf1.a81b2",
-        "ksf2.a12b2",
-        "ksf2.a23b2",
-        "ksf2.a34b2",
-        "ksf2.a45b2",
-        "ksf2.a56b2",
-        "ksf2.a67b2",
-        "ksf2.a78b2",
-        "ksf2.a81b2",
-        "ksd1.a12b2",
-        "ksd1.a23b2",
-        "ksd1.a34b2",
-        "ksd1.a45b2",
-        "ksd1.a56b2",
-        "ksd1.a67b2",
-        "ksd1.a78b2",
-        "ksd1.a81b2",
-        "ksd2.a12b2",
-        "ksd2.a23b2",
-        "ksd2.a34b2",
-        "ksd2.a45b2",
-        "ksd2.a56b2",
-        "ksd2.a67b2",
-        "ksd2.a78b2",
-        "ksd2.a81b2",
-    ]
-
-    for nn in ms_circuits["b1"] + ms_circuits["b2"]:
-        collider.vars["old_" + nn] = collider.vars[nn]._expr
-        collider.vars[nn] = collider.vars[nn]._value
-
-    optimizers = {"b1": {}, "b2": {}}
-    d_chrom_match = 0.5
-    for bname in ["b1", "b2"]:
-        tw = collider[f"{bname}"].twiss(compute_chromatic_properties=True)
-        opt_qpx = collider[f"{bname}"].match_knob(
-            compute_chromatic_properties=True,
-            knob_name=f"dqpx.{bname}_op",
-            knob_value_start=0.0,
-            knob_value_end=d_chrom_match,
-            run=False,
-            vary=xt.VaryList(ms_circuits[bname], step=1e-5),
-            targets=[
-                xt.Target("dqx", tw.dqx + d_chrom_match, tol=1e-4),
-                xt.Target("dqy", tw.dqy, tol=1e-4),
-            ],
-        )
-
-        opt_qpx.solve()
-        opt_qpx.generate_knob()
-        optimizers[bname]["qpy"] = opt_qpx
-
-        opt_qpy = collider[f"{bname}"].match_knob(
-            compute_chromatic_properties=True,
-            knob_name=f"dqpy.{bname}_op",
-            knob_value_start=0.0,
-            knob_value_end=d_chrom_match,
-            run=False,
-            vary=xt.VaryList(ms_circuits[bname], step=1e-5),
-            targets=[
-                xt.Target("dqx", tw.dqx, tol=1e-4),
-                xt.Target("dqy", tw.dqy + d_chrom_match, tol=1e-4),
-            ],
-        )
-
-        opt_qpy.solve()
-        opt_qpy.generate_knob()
-        optimizers[bname]["qpy"] = opt_qpy
 
 
 def test_chroma_knobs(collider):

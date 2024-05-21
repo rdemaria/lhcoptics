@@ -31,7 +31,7 @@ eor.params["p0c"] = 6.8e12
 # IR7 (from bjorn)
 eor.ir7.update_model(src=eor.ir7.knobsRematched12c6b)
 opt = eor.ir7.match()
-opt.disable(target=["ip_", "mu"])
+opt.disable(target=["ip_.*", "mu.*"])
 opt.solve()
 
 # IR3 (from bjorn)
