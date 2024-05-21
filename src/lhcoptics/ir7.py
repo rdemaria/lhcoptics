@@ -2,31 +2,8 @@ import xdeps as xd
 import xtrack as xt
 
 from .irs import LHCIR
+from .model_xsuite import SinglePassDispersion
 
-
-class SinglePassDispersion(xd.Action):
-    def __init__(self, line, ele_start, ele_stop, backtrack=False, delta=1e-3):
-        self.line = line
-        self.ele_start = ele_start
-        self.ele_stop = ele_stop
-        self.delta = delta
-        self.backtrack = backtrack
-        self._pp = line.build_particles(delta=delta)
-
-    def run(self):
-        for nn in ["x", "px", "y", "py", "zeta", "delta", "at_element"]:
-            setattr(self._pp, nn, 0)
-        self._pp.delta = self.delta
-        self.line.track(
-            self._pp,
-            ele_start=self.ele_start,
-            ele_stop=self.ele_stop,
-            backtrack=self.backtrack,
-        )
-        return {
-            "d" + nn: getattr(self._pp, nn)[0] / self.delta
-            for nn in ["x", "px", "y", "py"]
-        }
 
 
 class LHCIR7(LHCIR):
@@ -107,6 +84,15 @@ class LHCIR7(LHCIR):
             else:
                 params[f"betx_{col_name}"] = tw2["betx", col_name]
                 params[f"bety_{col_name}"] = tw2["bety", col_name]
+        if self.parent.model is not None:
+            self.action_sp1 = SinglePassDispersion(
+                    self.parent.model.b1, ele_start="tcp.d6l7.b1", ele_stop="tcspm.6r7.b1"
+                )
+            self.action_sp2 = SinglePassDispersion(
+                    self.parent.model.b2, ele_start="tcp.d6r7.b2", ele_stop="tcspm.6l7.b2"
+                )
+            params["dx_tcp_tcsb1"] = self.action_sp1.run()["dx"]
+            params["dx_tcp_tcsb2"] = self.action_sp2.run()["dx"]
         return params
 
     def match(
