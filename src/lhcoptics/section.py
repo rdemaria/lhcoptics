@@ -3,8 +3,11 @@ import re
 
 from .knob import Knob
 from .model_madx import LHCMadxModel
-from .utils import (deliver_list_str, print_diff_dict_float,
-                    print_diff_dict_objs)
+from .utils import (
+    deliver_list_str,
+    print_diff_dict_float,
+    print_diff_dict_objs,
+)
 
 _lb = [(l, b) for l in "lr" for b in "12"]
 _ac = {
@@ -133,16 +136,18 @@ class LHCSection:
         if len(self.strengths) > 0:
             out.append(f"! Strengths of {self.name.upper()}")
             for k, v in self.strengths.items():
-                out.append(f"{k:30} = {v:19.16f};")
+                out.append(f"{k:30} = {v:23.16g};")
             out.append("")
         if len(self.params) > 0:
             out.append(f"! Parameters of {self.name.upper()}")
             for k, v in self.params.items():
-                out.append(f"{k:30} = {v:19.16f};")
+                out.append(f"{k:30} = {v:23.16g};")
             out.append("")
         if knobs and len(self.knobs) > 0:
             out.append(f"! Knobs of {self.name.upper()}")
-            for expr in LHCMadxModel.knobs_to_expr(self.knobs.values(), self.strengths):
+            for expr in LHCMadxModel.knobs_to_expr(
+                self.knobs.values(), self.strengths
+            ):
                 out.append(expr)
             out.append("")
         return deliver_list_str(out, output)
@@ -166,7 +171,7 @@ class LHCSection:
         self.params.update(self.get_params())
         return self
 
-    def update_model(self, src=None, verbose=False,knobs_off=False):
+    def update_model(self, src=None, verbose=False, knobs_off=False):
         """Update the model with the local strengths, knobs
         If a src is provided, it will be used to update the local values, else self will be used.
         If src is a dict containing strengths, knobs or a LHCSection, they will be used to update the model.
@@ -189,7 +194,7 @@ class LHCSection:
             knobs = src["knobs"]
         else:
             knobs = {}
-        self.model.update_knobs(knobs, verbose=verbose,knobs_off=knobs_off)
+        self.model.update_knobs(knobs, verbose=verbose, knobs_off=knobs_off)
         return self
 
     def update_strengths(self, src=None, verbose=False):
@@ -221,10 +226,10 @@ class LHCSection:
             src = src.knobs
         for k in self.knobs:
             if k in src:
-               if verbose:
-                     self.knobs[k].print_update_diff(src[k])   
-               self.knobs[k] = Knob.from_src(src[k])
-               self.knobs[k].parent = self.parent
+                if verbose:
+                    self.knobs[k].print_update_diff(src[k])
+                self.knobs[k] = Knob.from_src(src[k])
+                self.knobs[k].parent = self.parent
         return self
 
     def update_params(self, src=None, add=False, verbose=False):
@@ -295,7 +300,7 @@ class LHCSection:
             self.parent.model[k] = 0
 
     def knobs_on(self):
-        for k,knob in self.knobs.items():
+        for k, knob in self.knobs.items():
             self.parent.model[k] = knob.value
 
     def diff(self, other):

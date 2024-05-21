@@ -5,7 +5,6 @@ from .irs import LHCIR
 from .model_xsuite import SinglePassDispersion
 
 
-
 class LHCIR7(LHCIR):
     name = "ir7"
 
@@ -86,11 +85,15 @@ class LHCIR7(LHCIR):
                 params[f"bety_{col_name}"] = tw2["bety", col_name]
         if self.parent.model is not None:
             self.action_sp1 = SinglePassDispersion(
-                    self.parent.model.b1, ele_start="tcp.d6l7.b1", ele_stop="tcspm.6r7.b1"
-                )
+                self.parent.model.b1,
+                ele_start="tcp.d6l7.b1",
+                ele_stop="tcspm.6r7.b1",
+            )
             self.action_sp2 = SinglePassDispersion(
-                    self.parent.model.b2, ele_start="tcp.d6r7.b2", ele_stop="tcspm.6l7.b2"
-                )
+                self.parent.model.b2,
+                ele_start="tcp.d6r7.b2",
+                ele_stop="tcspm.6l7.b2",
+            )
             params["dx_tcp_tcsb1"] = self.action_sp1.run()["dx"]
             params["dx_tcp_tcsb2"] = self.action_sp2.run()["dx"]
         return params

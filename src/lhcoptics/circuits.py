@@ -62,6 +62,7 @@ class LHCCircuit:
         self.vpmax = vpmax
         self.vpmin = vpmin
         self.polarity = polarity
+
     @staticmethod
     def get_logicalhardware_from_lsa(pcname, first=True):
         """
@@ -150,6 +151,7 @@ class LHCCalibration:
         self.current = current
         self.field = field
         self.fieldtype = fieldtype
+
     @classmethod
     def from_lsa_calib(cls, calib):
         name = calib.getName()
@@ -244,6 +246,7 @@ class LHCCircuits:
             ".".join(cir.pcname.split(".")[2:]): cir
             for cir in self.pcname.values()
         }
+
     @staticmethod
     def get_pc_names_from_lsa():
         lsa = get_lsa()

@@ -51,7 +51,14 @@ class LHCIR(LHCSection):
         start = f"s.ds.l{irn}"
         end = f"e.ds.r{irn}"
         super().__init__(
-            name, start, end, strengths, params, knobs, filename=filename, parent=parent
+            name,
+            start,
+            end,
+            strengths,
+            params,
+            knobs,
+            filename=filename,
+            parent=parent,
         )
         self.arc_left_name = f"a{lhcprev(irn)}{irn}"
         self.arc_right_name = f"a{irn}{lhcsucc(irn)}"
@@ -145,17 +152,15 @@ class LHCIR(LHCSection):
         return super().__getitem__(key)
 
     def get_kqx(self, n, lr):
-        side=lr+f"{self.irn}"
+        side = lr + f"{self.irn}"
         kq = self.strengths[f"kqx.{side}"]
-        if n==3:
+        if n == 3:
             return kq
-        elif n==1 or n==2:
-            ktq= self.strengths[f"ktqx{n}.{side}"]
-            return kq+ktq
+        elif n == 1 or n == 2:
+            ktq = self.strengths[f"ktqx{n}.{side}"]
+            return kq + ktq
         else:
             raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
-
-
 
     def set_init(self):
         arcleft = self.arc_left
@@ -483,7 +488,7 @@ class LHCIR(LHCSection):
                         tag="ratio",
                     )
                 )
-            #for k in vary_ratio:
+            # for k in vary_ratio:
             #    varylst = [v for v in varylst if not v.name == k]
 
         if vary_ratio is not None:
@@ -505,7 +510,6 @@ class LHCIR(LHCSection):
             check_limits=False,
             strengths=False,
         )
-
 
         if lrphase is False:
             match.disable(target="mu.*_l")
@@ -567,7 +571,7 @@ class LHCIR(LHCSection):
         else:
             return f"<LHCIR{self.irn}>"
 
-    def get_quad_max_ratio(self,verbose=False,ratio_threshold=1.5):
+    def get_quad_max_ratio(self, verbose=False, ratio_threshold=1.5):
         rmax = 1
         for k, v in self.strengths.items():
             if "b1" in k and abs(v) > 0 and "kqt" not in k:
@@ -587,7 +591,9 @@ class LHCIR(LHCSection):
     ):
         if p0c is None:
             p0c = self.parent.params["p0c"]
-        self.get_quad_max_ratio(verbose=verbose, ratio_threshold=ratio_threshold)
+        self.get_quad_max_ratio(
+            verbose=verbose, ratio_threshold=ratio_threshold
+        )
 
     def match_knobs(self, **kwargs):
         for knob in self.knobs.values():

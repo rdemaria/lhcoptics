@@ -15,6 +15,7 @@ class Polynomial:
 
     def __init__(self, coeffs):
         self.coeffs = coeffs
+
     @classmethod
     def from_fit(
         cls, t, v, n, t0=None, v0=None, t1=None, v1=None, t2=None, v2=None
@@ -31,6 +32,7 @@ class Spline:
 
     def __init__(self, spline):
         self.spline = spline
+
     @classmethod
     def from_fit(cls, t, v):
         spline = interp1d(t, v, kind="cubic")

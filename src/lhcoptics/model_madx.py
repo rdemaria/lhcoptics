@@ -294,7 +294,7 @@ use, sequence=lhcb2;
                 weights[st].insert(0, f"{basevalue:+.15g}")
         out = []
         for knob in knobs:
-            out.append(f"{knob.name} := {knob.value:.15g};")
+            out.append(f"{knob.name} = {knob.value:.15g};")
         for st in weights:
             rhs = "\n  ".join(weights[st])
             out.append(f"{st} :=\n  {rhs};")

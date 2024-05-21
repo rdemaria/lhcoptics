@@ -13,6 +13,7 @@ class Knob:
         self.value = value
         self.weights = weights
         self.parent = parent
+
     @classmethod
     def from_dict(cls, data):
         if "class" in data:
@@ -378,7 +379,7 @@ class TuneKnob(Knob):
                 match_value=0.01,
             )
 
-    def match(self,solve=True):
+    def match(self, solve=True):
         model = self.parent.model
         xt = model._xt
         knob_start = model[self.name]
@@ -503,7 +504,7 @@ class ChromaKnob(Knob):
             targets=targets,
             strengths=False,
             compute_chromatic_properties=True,
-            n_steps_max=50
+            n_steps_max=50,
         )
         mtc.target_status()
         mtc.vary_status()
@@ -606,7 +607,7 @@ class CouplingKnob(Knob):
         # find baseline
         knob_start = model[self.name]
         model[self.name] = 0
-        q0 = {'r':act_cmin.run()["r"], 'i':act_cmin.run()["i"]}
+        q0 = {"r": act_cmin.run()["r"], "i": act_cmin.run()["i"]}
         targets = [
             act_cmin.target(ri, value=q0[ri] + dq[ri], tol=1e-8) for ri in "ri"
         ]

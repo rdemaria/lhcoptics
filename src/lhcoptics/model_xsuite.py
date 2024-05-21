@@ -33,8 +33,6 @@ class SinglePassDispersion(xd.Action):
         }
 
 
-
-
 def termlist(ex, lst=[]):
     if isinstance(ex, xdeps.refs.AddExpr):
         return lst + termlist(ex._lhs) + termlist(ex._rhs)

@@ -1,4 +1,3 @@
-
 from .irs import LHCIR
 from .model_xsuite import SinglePassDispersion
 
@@ -28,7 +27,7 @@ class LHCIR3(LHCIR):
         "tcla.6l3.b2",
         "tcla.7l3.b2",
     ]
-    
+
     collimators = colls_ir3b1 + colls_ir3b2
 
     knobsRematched13b_mu = {
@@ -69,7 +68,7 @@ class LHCIR3(LHCIR):
         "kqt12.r3b2": -9.48176531256308e-05,
         "kqt13.r3b2": -0.005098976136482916,
     }
-    
+
     def get_params_from_twiss(self, tw1, tw2):
         params = LHCIR.get_params_from_twiss(self, tw1, tw2)
         for col_name in self.collimators:
@@ -81,11 +80,15 @@ class LHCIR3(LHCIR):
                 params[f"bety_{col_name}"] = tw2["bety", col_name]
         if self.parent.model is not None:
             self.action_sp1 = SinglePassDispersion(
-                    self.parent.model.b1, ele_start="tcp.d6l7.b1", ele_stop="tcspm.6r7.b1"
-                )
+                self.parent.model.b1,
+                ele_start="tcp.d6l7.b1",
+                ele_stop="tcspm.6r7.b1",
+            )
             self.action_sp2 = SinglePassDispersion(
-                    self.parent.model.b2, ele_start="tcp.d6r7.b2", ele_stop="tcspm.6l7.b2"
-                )
+                self.parent.model.b2,
+                ele_start="tcp.d6r7.b2",
+                ele_stop="tcspm.6l7.b2",
+            )
             params["dx_tcp_tcsb1"] = self.action_sp1.run()["dx"]
             params["dx_tcp_tcsb2"] = self.action_sp2.run()["dx"]
         return params

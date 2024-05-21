@@ -286,7 +286,12 @@ class LHCOptics:
             json.dump(self.to_dict(), f, indent=2)
 
     def update_model(
-        self, src=None, full=True, verbose=False, knobs_off=False
+        self,
+        src=None,
+        full=True,
+        verbose=False,
+        knobs_off=False,
+        set_init=True,
     ):
         """
         Update model from an optics or a dict.
@@ -319,6 +324,8 @@ class LHCOptics:
         )
         if "p0c" in self.params:
             self.model.p0c = self.params["p0c"]
+        if set_init:
+            self.set_init()
         return self
 
     def update_knobs(self, src=None, full=True, verbose=False):
@@ -723,3 +730,7 @@ class LHCOptics:
             ir.check_quad_strengths(
                 verbose=verbose, p0c=p0c, ratio_threshold=ratio_threshold
             )
+
+    def set_init(self):
+        for ir in self.irs:
+            ir.set_init()
