@@ -12,6 +12,7 @@ class RMatrix:
 
     def __init__(self, matrix):
         self.matrix = matrix
+
     @classmethod
     def from_twiss(cls, tw):
         pass
@@ -258,42 +259,49 @@ ablw.r8       := -0.000180681598453109894*on_lhcb   ;
 abxws.r8      := +0.000045681598453109894*on_lhcb   ;
     """
 
-    extra_madx = extra_defs + """
+    extra_madx = (
+        extra_defs
+        + """
 beam, particle=proton, energy=6.8e12, sequence=lhcb1;
 beam, particle=proton, energy=6.8e12, sequence=lhcb2, bv=-1;
 use, sequence=lhcb1;
 use, sequence=lhcb2;
     """
+    )
 
     def __init__(self, madx):
         self.madx = madx
         self.b1 = MADSequence(self.madx, "lhcb1")
         self.b2 = MADSequence(self.madx, "lhcb2")
 
-    
-
     @staticmethod
     def knobs_to_expr(knobs, strengths=None):
+        """
+        Print knobs as madx expressions.
+
+        knobs: list of knobs
+        strengths: dictionary of strengths to be used as base values
+        """
         if strengths is None:
             strengths = {}
         weights = {}
-        for knob in knobs.values():
+        for knob in knobs:
             for st, val in knob.weights.items():
                 weights.setdefault(st, []).append(f"{val:+.15g} * {knob.name}")
         for st in weights:
             basevalue = strengths.get(st)
             if basevalue is not None:
                 weights[st].insert(0, f"{basevalue:+.15g}")
-        out=[]
-        for knob in knobs.values():
+        out = []
+        for knob in knobs:
             out.append(f"{knob.name} := {knob.value:.15g};")
         for st in weights:
-            rhs='\n  '.join(weights[st])
+            rhs = "\n  ".join(weights[st])
             out.append(f"{st} :=\n  {rhs};")
         return out
 
     @classmethod
-    def from_madxfile(cls, madxfile,extra=True):
+    def from_madxfile(cls, madxfile, extra=True):
         from cpymad.madx import Madx
 
         madx = Madx()
@@ -308,7 +316,6 @@ use, sequence=lhcb2;
             return (self.b1.twiss(**kwargs), self.b2.twiss(**kwargs))
         else:
             return getattr(self, f"b{sequence}").twiss(**kwargs)
-
 
     def call(self, filename):
         self.madx.call(filename)
