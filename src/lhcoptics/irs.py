@@ -43,6 +43,7 @@ class LHCIR(LHCSection):
         start=None,
         end=None,
         filename=None,
+        parent=None,
     ):
         if name is None:
             name = self.__class__.name
@@ -50,7 +51,7 @@ class LHCIR(LHCSection):
         start = f"s.ds.l{irn}"
         end = f"e.ds.r{irn}"
         super().__init__(
-            name, start, end, strengths, params, knobs, filename=filename
+            name, start, end, strengths, params, knobs, filename=filename, parent=parent
         )
         self.arc_left_name = f"a{lhcprev(irn)}{irn}"
         self.arc_right_name = f"a{irn}{lhcsucc(irn)}"
@@ -408,6 +409,7 @@ class LHCIR(LHCSection):
         common=True,
         hold_init=False,
         sym_triplets=True,
+        no_triplets=False,
         lrphase=False,
         extra_targets=None,
         vary_ratio=None,
@@ -515,7 +517,7 @@ class LHCIR(LHCSection):
 
         if self.parent.params["match_inj"]:
             if self.name == "ir2" or self.name == "ir8":
-                match.disable(vary_name="kqt?x.*")
+                match.disable(vary_name="kt?qx.*")
                 self.parent.model[f"kqx.l{self.irn}"] = 0.950981581300e-02
                 self.parent.model[f"kqx.r{self.irn}"] = -0.950981581300e-02
                 self.parent.model[f"ktqx1.l{self.irn}"] = 0.0
@@ -523,13 +525,13 @@ class LHCIR(LHCSection):
                 self.parent.model[f"ktqx2.l{self.irn}"] = 0.0
                 self.parent.model[f"ktqx2.r{self.irn}"] = 0.0
             if self.name == "ir2":
-                match.disable(vary_name="kq[45]\.2[lr]b1")
+                match.disable(vary_name=r"kq[45]\.[lr]2b1")
                 self.parent.model["kq4.l2b1"] = -0.549274522900e-02
                 self.parent.model["kq4.r2b1"] = 0.471284923000e-02
                 self.parent.model["kq5.l2b1"] = 0.482678438300e-02
                 self.parent.model["kq5.r2b1"] = -0.461752389200e-02
             if self.name == "ir8":
-                match.disable(vary_name="kq[45]\.8[lr]b2")
+                match.disable(vary_name=r"kq[45]\.[lr]8b2")
                 self.parent.model["kq4.l8b2"] = 0.449559181916e-02
                 self.parent.model["kq4.r8b2"] = -0.447368899600e-02
                 self.parent.model["kq5.l8b2"] = -0.538821723331e-02

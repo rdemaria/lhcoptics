@@ -21,7 +21,7 @@ class Col:
 
 
 class LHCSectionTable:
-    def __init__(self, rows,parent=None):
+    def __init__(self, rows, parent=None):
         self.rows = list(rows)
         self.strengths = Col("strengths", rows)
         self.params = Col("params", rows)
@@ -126,7 +126,10 @@ class LHCIRTable(LHCSectionTable):
             k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths
         }
         params = {k: self.interp_val(n, k, order, xaxis) for k in ir0.params}
-        return ir0.__class__(strengths=strengths, params=params)
+        ##TODO add knobs
+        return ir0.__class__(
+            strengths=strengths, params=params, parent=self.parent
+        )
 
     def get_quads(self, n=None):
         if n is None:
@@ -171,12 +174,12 @@ class LHCIRTable(LHCSectionTable):
             fig, ax = plt.subplots(num=figname)
         xx = self[xaxis]
         if n == 1:
-            kqx1l = self.get_gradient(f"kqx1.l{self.rows[0].irn}",p0c=p0c)
-            kqx1r = self.get_gradient(f"kqx1.r{self.rows[0].irn}",p0c=p0c)
-            kqx2l = self.get_gradient(f"kqx2.l{self.rows[1].irn}",p0c=p0c)
-            kqx2r = self.get_gradient(f"kqx2.r{self.rows[1].irn}",p0c=p0c)
-            kqx3l = self.get_gradient(f"kqx3.l{self.rows[0].irn}",p0c=p0c)
-            kqx3r = self.get_gradient(f"kqx3.r{self.rows[0].irn}",p0c=p0c)
+            kqx1l = self.get_gradient(f"kqx1.l{self.rows[0].irn}", p0c=p0c)
+            kqx1r = self.get_gradient(f"kqx1.r{self.rows[0].irn}", p0c=p0c)
+            kqx2l = self.get_gradient(f"kqx2.l{self.rows[1].irn}", p0c=p0c)
+            kqx2r = self.get_gradient(f"kqx2.r{self.rows[1].irn}", p0c=p0c)
+            kqx3l = self.get_gradient(f"kqx3.l{self.rows[0].irn}", p0c=p0c)
+            kqx3r = self.get_gradient(f"kqx3.r{self.rows[0].irn}", p0c=p0c)
             ax.plot(xx, abs(kqx1l), label=f"kqx1.l{self.rows[0].irn}")
             ax.plot(xx, abs(kqx1r), label=f"kqx1.r{self.rows[0].irn}")
             ax.plot(xx, abs(kqx2l), label=f"kqx2.l{self.rows[1].irn}")
@@ -185,7 +188,7 @@ class LHCIRTable(LHCSectionTable):
             ax.plot(xx, abs(kqx3r), label=f"kqx3.r{self.rows[0].irn}")
         else:
             for q in self.get_quads(n):
-                grad=self.get_gradient(q,p0c=p0c)
+                grad = self.get_gradient(q, p0c=p0c)
                 if "t" not in q and np.all(grad < 0):
                     ax.plot(xx, -grad, label=f"-{q}")
                 else:
@@ -228,9 +231,14 @@ class LHCIRTable(LHCSectionTable):
         ax.legend()
 
     def plot_quads(
-        self, xaxis="id", fig=None, title=None, figname=None, p0c=None,
-        current=False
-    ): 
+        self,
+        xaxis="id",
+        fig=None,
+        title=None,
+        figname=None,
+        p0c=None,
+        current=False,
+    ):
         nq = []
         for n in range(1, 14):
             if len(self.get_quads(n)) > 0:
@@ -284,7 +292,10 @@ class LHCArcTable(LHCSectionTable):
             )
             for k in arc0.params
         }
-        return arc0.__class__(arc0.name, strengths=strengths, params=params)
+        ##TODO add knobs
+        return arc0.__class__(
+            arc0.name, strengths=strengths, params=params, parent=self.parent
+        )
 
 
 class LHCOpticsTable(LHCSectionTable):
@@ -293,10 +304,11 @@ class LHCOpticsTable(LHCSectionTable):
         self.params = Col("params", rows)
         self.knobs = Col("knobs", rows)
         self.irs = [
-            LHCIRTable(irlst,self) for irlst in zip(*[row.irs for row in self.rows])
+            LHCIRTable(irlst, self)
+            for irlst in zip(*[row.irs for row in self.rows])
         ]
         self.arcs = [
-            LHCArcTable(arclst,self)
+            LHCArcTable(arclst, self)
             for arclst in zip(*[row.arcs for row in self.rows])
         ]
         for ir in self.irs:
@@ -337,6 +349,6 @@ class LHCOpticsTable(LHCSectionTable):
         self.rows.remove(row)
         return self
 
-    def plot_quads(self,current=False,p0c=None):
+    def plot_quads(self, current=False, p0c=None):
         for ir in self.irs:
-            ir.plot_quads(current=current,p0c=p0c)
+            ir.plot_quads(current=current, p0c=p0c)

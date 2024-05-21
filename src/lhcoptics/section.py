@@ -155,6 +155,8 @@ class LHCSection:
             strengths=self.strengths.copy(),
             params=self.params.copy(),
             knobs={k: knob.copy() for k, knob in self.knobs.items()},
+            parent=self.parent,
+            filename=self.filename,
         )
 
     def set_params(self):
