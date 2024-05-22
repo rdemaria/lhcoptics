@@ -142,7 +142,7 @@ class LHCSection:
             out.append("")
         if knobs and len(self.knobs) > 0:
             out.append(f"! Knobs of {self.name.upper()}")
-            for expr in LHCMadxModel.knobs_to_expr(self.knobs, self.strengths):
+            for expr in LHCMadxModel.knobs_to_expr(self.knobs.values(), self.strengths):
                 out.append(expr)
             out.append("")
         return deliver_list_str(out, output)
@@ -155,6 +155,8 @@ class LHCSection:
             strengths=self.strengths.copy(),
             params=self.params.copy(),
             knobs={k: knob.copy() for k, knob in self.knobs.items()},
+            parent=self.parent,
+            filename=self.filename,
         )
 
     def set_params(self):

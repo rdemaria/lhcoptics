@@ -1,11 +1,38 @@
 import numpy as np
-import xdeps
+import xdeps as xd
 import xtrack as xt
 
 from .knob import Knob
 from .model_madx import LHCMadxModel
 
 import matplotlib.pyplot as plt
+
+
+class SinglePassDispersion(xd.Action):
+    def __init__(self, line, ele_start, ele_stop, backtrack=False, delta=1e-3):
+        self.line = line
+        self.ele_start = ele_start
+        self.ele_stop = ele_stop
+        self.delta = delta
+        self.backtrack = backtrack
+        self._pp = line.build_particles(delta=delta)
+
+    def run(self):
+        for nn in ["x", "px", "y", "py", "zeta", "delta", "at_element"]:
+            setattr(self._pp, nn, 0)
+        self._pp.delta = self.delta
+        self.line.track(
+            self._pp,
+            ele_start=self.ele_start,
+            ele_stop=self.ele_stop,
+            backtrack=self.backtrack,
+        )
+        return {
+            "d" + nn: getattr(self._pp, nn)[0] / self.delta
+            for nn in ["x", "px", "y", "py"]
+        }
+
+
 
 
 def termlist(ex, lst=[]):

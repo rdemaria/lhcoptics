@@ -378,7 +378,7 @@ class TuneKnob(Knob):
                 match_value=0.01,
             )
 
-    def match(self):
+    def match(self,solve=True):
         model = self.parent.model
         xt = model._xt
         knob_start = model[self.name]
@@ -414,7 +414,8 @@ class TuneKnob(Knob):
         )
         mtc.target_status()
         mtc.vary_status()
-        mtc.solve()
+        if solve:
+            mtc.solve()
         model[self.name] = knob_start
         model.get_knob(self).diff(self)
         return mtc

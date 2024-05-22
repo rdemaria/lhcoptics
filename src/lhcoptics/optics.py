@@ -676,7 +676,7 @@ class LHCOptics:
         if len(knobs) > 0:
             strengths = self.find_strengths()
             out.append("! Knobs")
-            for expr in LHCMadxModel.knobs_to_expr(self.knobs, strengths):
+            for expr in LHCMadxModel.knobs_to_expr(knobs, strengths):
                 out.append(expr)
             out.append("")
 

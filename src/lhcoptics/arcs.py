@@ -34,12 +34,13 @@ class LHCArc(LHCSection):
         start=None,
         end=None,
         filename=None,
+        parent=None,
     ):
         i1, i2 = int(name[1]), int(name[2])
         start = f"s.ds.r{i1}"
         end = f"e.ds.l{i2}"
         super().__init__(
-            name, start, end, strengths, params, knobs, filename=filename
+            name, start, end, strengths, params, knobs, filename=filename, parent=parent
         )
         self.i1 = i1
         self.i2 = i2
