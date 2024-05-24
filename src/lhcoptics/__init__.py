@@ -23,3 +23,27 @@ from .optics import LHCOptics
 from .opttable import LHCOpticsTable
 from .rdmsignal import poly_fit, poly_val
 from .repo import LHC
+from .aperture import LHCAperture
+
+
+__all__ = [
+    LHCArc,
+    LHCCircuits,
+    LHCIR1,
+    LHCIR2,
+    LHCIR3,
+    LHCIR4,
+    LHCIR5,
+    LHCIR6,
+    LHCIR7,
+    LHCIR8,
+    Knob,
+    LHCMadxModel,
+    LHCXsuiteModel,
+    LHCOptics,
+    LHCOpticsTable,
+    poly_fit,
+    poly_val,
+    LHC,
+    get_lsa,
+]

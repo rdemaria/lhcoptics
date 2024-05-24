@@ -518,7 +518,9 @@ class LHCXsuiteModel:
         line = self.sequence[beam]
         fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
 
-    def get_survey_flat(self, beam=1):
+    def get_survey_flat(self, beam=None):
+        if beam is None:
+            return [self.get_survey_flat(beam=1), self.get_survey_flat(beam=2)]
         line = self.sequence[beam].copy()
         line.build_tracker()
         for name, elem in line.element_dict.items():

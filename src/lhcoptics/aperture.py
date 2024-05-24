@@ -2,36 +2,124 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class RectEllipse:
-    def __init__(self, rh, rv, ah, av):
-        self.rh = rh
-        self.rv = rv
+class Rectellipse:
+    """
+    Intersect a rectangle with an ellipse.
+
+    ah, av: half-widths of the rectangle
+    rh, rv: half-widths of the ellipse
+    """
+
+    @classmethod
+    def from_layout_spec(cls, spec, tols):
+        return cls(*spec, tols)
+
+    def __init__(self, ah, av, rh, rv, tols=None):
         self.ah = ah
         self.av = av
+        self.rh = rh
+        self.rv = rv
+        self.tols = tols
 
-    def get_bbox(self):
+    def bbox(self):
         return min(self.rh, self.ah), min(self.rv, self.av)
+
+    def __repr__(self):
+        return f"Rectellipse({self.ah}, {self.av}, {self.rh}, {self.rv})"
 
 
 class Ellipse:
-    def __init__(self, rh, rv):
+    @classmethod
+    def from_layout_spec(cls, spec, tols):
+        return cls(spec[0], spec[1], tols)
+
+    def __init__(self, rh, rv, tols=None):
         self.rh = rh
         self.rv = rv
+        self.tols = tols
 
-    def get_bbox(self):
+    def bbox(self):
         return self.rh, self.rv
+
+    def __repr__(self):
+        return f"Ellipse({self.rh}, {self.rv})"
 
 
 class Rectangle:
-    def __init__(self, ah, av):
+    @classmethod
+    def from_layout_spec(cls, spec, tols):
+        return cls(spec[0], spec[1], tols)
+
+    def __init__(self, ah, av, tols=None):
         self.ah = ah
         self.av = av
+        self.tols = tols
 
-    def get_bbox(self):
+    def bbox(self):
+        return self.ah, self.av
+
+    def __repr__(self):
+        return f"Rectangle({self.ah}, {self.av})"
+
+
+class Circle:
+    @classmethod
+    def from_layout_spec(cls, spec, tols):
+        return cls(spec[0], tols)
+
+    def __init__(self, r, tols=None):
+        self.r = r
+        self.tols = tols
+
+    def bbox(self):
+        return self.r, self.r
+
+    def __repr__(self):
+        return f"Circle({self.r})"
+
+
+class Octagon:
+    """
+    Octagon with sides parallel to the axes and 45 degrees.
+
+    ah, av: horizontal, vertical half-widths
+    ar: half-width at 45 degrees
+    """
+
+    @classmethod
+    def from_layout_spec(cls, spec, tols):
+        return cls(spec[0], spec[1], spec[3], tols)
+
+    def __init__(self, ah, av, ar, tols=None):
+        self.ah = ah
+        self.av = av
+        self.ar = ar
+        self.tols = tols
+
+    def bbox(self):
+        return self.ah, self.av
+
+    def __repr__(self):
+        return f"Octagon({self.ah}, {self.av}, {self.ar})"
+
+
+class Racetrack:
+    @classmethod
+    def from_layout_spec(cls, spec, tols):
+        return cls(spec[0], spec[1], spec[2], tols)
+
+    def __init__(self, ah, av, rh, rv, tols=None):
+        self.ah = ah
+        self.av = av
+        self.rh = rh
+        self.rv = rv
+        self.tols = tols
+
+    def bbox(self):
         return self.ah, self.av
 
 
-class LHCApertureModel:
+class LHCAperture:
     """
     twiss: s,x,y,betx,bety,dx,dy,pt
     survey: su_x, su_y
@@ -53,29 +141,49 @@ class LHCApertureModel:
         profiles = {}
         apertures = []
         for ld, su in zip(layout_data, survey):
-            for ii in len(su):
+            for ii in range(len(su)):
                 name = su.name[ii]
-                if name.split('..')[0].split('_')[0] in ld:
+                if name.split("..")[0].split("_")[0] in ld:
                     data = ld[name]
-                    aperture = data["aperture"]
+                    shape, spec, tols = data["aperture"]
+                    aperture = (
+                        shape,
+                        tuple(spec),
+                        tuple(tols),
+                    )
+                    print(aperture)
                     if aperture in profile_def:
                         profile_id = profile_def[aperture]
                         profile = profiles[profile_id]
                     else:
-                        profile_def[aperture] = len(profiles)
-                        profile = globals()[aperture[0].capitalize()](
-                            *aperture[1:]
-                        )
+                        profile_id = len(profiles)
+                        profile_def[aperture] = profile_id
+                        profile_cls = globals()[shape.capitalize()]
+                        profile = profile_cls.from_layout_spec(spec, tols)
                         profiles[len(profiles)] = profile
-                    ah, av = profile.get_bbox()
-                    offsets = data["offsets"]
-                    dx, dy = offsets[:2]
-                    if len(offsets):
-                        x = su.X[ii] - dx
-                        y = su.Y[ii] - dy
-                    apertures.append((name, x, y, ah, av, profile_id))
+                    ah, av = profile.bbox()
+                    offset = data.get("offset", (0, 0))
+                    if len(offset) == 0:
+                        dx, dy, dpsi = 0, 0, 0
+                    elif len(offset) == 2:
+                        dx, dy = offset[:2]
+                        dpsi = 0
+                    elif len(offset) == 3:
+                        dx, dy, dpsi = offset
+                    x = su.X[ii] - dx
+                    y = su.Y[ii] - dy
                 else:
-                    apertures.append((name, 0, 0, 0, 0, -1))
+                    x, y, dx, dy, dpsi, ah, av, profile_id = (
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        -1,
+                    )
+                apertures.append((name, x, y, dpsi, ah, av, profile_id))
         return cls(apertures, profiles, model, survey)
 
     def __init__(self, apertures, profiles, model=None, survey=None):
