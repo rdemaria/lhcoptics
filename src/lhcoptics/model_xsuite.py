@@ -553,6 +553,10 @@ class LHCXsuiteModel:
                     ),
                 ]
             )
+    
+    def make_aperture(self):
+        from .aperture import LHCAperture
+        return LHCAperture.from_xsuite_model(self)
 
 
 def test_coupling_knobs(collider):

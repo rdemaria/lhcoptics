@@ -16,6 +16,7 @@ from .ir6 import LHCIR6
 from .ir7 import LHCIR7
 from .ir8 import LHCIR8
 from .model_xsuite import LHCMadxModel, LHCXsuiteModel
+from .aperture import LHCAperture
 from .opttable import LHCOpticsTable
 from .section import Knob
 from .utils import (
@@ -82,6 +83,7 @@ class LHCOptics:
         knobs=None,
         model=None,
         circuits=None,
+        aperture=None,
     ):
         if name is None:
             name = "lhcoptics"
@@ -100,6 +102,7 @@ class LHCOptics:
         self.knobs = knobs
         self.model = model
         self.circuits = circuits
+        self.aperture = aperture
         print(f"Optics {self.name} created")
         for knob in knobs.values():
             knob.parent = self
@@ -202,6 +205,7 @@ class LHCOptics:
         xsuite_model=None,
         madx_model=None,
         circuits=None,
+        aperture=None,
         verbose=False,
         name=None,
     ):
@@ -226,6 +230,11 @@ class LHCOptics:
             out.update_model(verbose=verbose)
         elif madx_model is not None:
             out.set_madx_model(madx_model)
+        if aperture is not None:
+            if isinstance(aperture, str) or isinstance(aperture, Path):
+                out.aperture = LHCAperture.from_json(aperture)
+            else:
+                out.aperture = LHCAperture.from_json(aperture)
         return out
 
     @classmethod
@@ -236,6 +245,7 @@ class LHCOptics:
         xsuite_model=None,
         madx_model=None,
         circuits=None,
+        aperture=None,
         verbose=False,
     ):
         with open(filename) as f:
@@ -248,6 +258,7 @@ class LHCOptics:
                 madx_model=madx_model,
                 circuits=circuits,
                 verbose=verbose,
+                aperture=aperture,
                 name=name,
             )
             return out

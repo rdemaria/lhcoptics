@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 
 
 class Rectellipse:
@@ -9,6 +10,10 @@ class Rectellipse:
     ah, av: half-widths of the rectangle
     rh, rv: half-widths of the ellipse
     """
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"], data["rh"], data["rv"])
 
     @classmethod
     def from_layout_spec(cls, spec):
@@ -26,8 +31,21 @@ class Rectellipse:
     def __repr__(self):
         return f"Rectellipse({self.ah}, {self.av}, {self.rh}, {self.rv})"
 
+    def to_dict(self):
+        return {
+            "shape": "rectellipse",
+            "ah": self.ah,
+            "av": self.av,
+            "rh": self.rh,
+            "rv": self.rv,
+        }
+
 
 class Ellipse:
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["rh"], data["rv"])
+
     @classmethod
     def from_layout_spec(cls, spec):
         return cls(spec[0], spec[1])
@@ -42,8 +60,19 @@ class Ellipse:
     def __repr__(self):
         return f"Ellipse({self.rh}, {self.rv})"
 
+    def to_dict(self):
+        return {
+            "shape": "ellipse",
+            "rh": self.rh,
+            "rv": self.rv,
+        }
+
 
 class Rectangle:
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"])
+
     @classmethod
     def from_layout_spec(cls, spec):
         return cls(spec[0], spec[1])
@@ -58,8 +87,19 @@ class Rectangle:
     def __repr__(self):
         return f"Rectangle({self.ah}, {self.av})"
 
+    def to_dict(self):
+        return {
+            "shape": "rectangle",
+            "ah": self.ah,
+            "av": self.av,
+        }
+
 
 class Circle:
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["r"])
+
     @classmethod
     def from_layout_spec(cls, spec):
         return cls(spec[0])
@@ -73,6 +113,12 @@ class Circle:
     def __repr__(self):
         return f"Circle({self.r})"
 
+    def to_dict(self):
+        return {
+            "shape": "circle",
+            "r": self.r,
+        }
+
 
 class Octagon:
     """
@@ -81,6 +127,10 @@ class Octagon:
     ah, av: horizontal, vertical half-widths
     ar: half-width at 45 degrees
     """
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"], data["ar"])
 
     @classmethod
     def from_layout_spec(cls, spec):
@@ -97,8 +147,20 @@ class Octagon:
     def __repr__(self):
         return f"Octagon({self.ah}, {self.av}, {self.ar})"
 
+    def to_dict(self):
+        return {
+            "shape": "octagon",
+            "ah": self.ah,
+            "av": self.av,
+            "ar": self.ar,
+        }
+
 
 class Racetrack:
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"], data["rh"], data["rv"])
+
     @classmethod
     def from_layout_spec(cls, spec):
         return cls(spec[0], spec[1], spec[2], spec[3])
@@ -111,6 +173,18 @@ class Racetrack:
 
     def bbox(self):
         return self.ah, self.av
+
+    def __repr__(self):
+        return f"Racetrack({self.ah}, {self.av}, {self.rh}, {self.rv})"
+
+    def to_dict(self):
+        return {
+            "shape": "racetrack",
+            "ah": self.ah,
+            "av": self.av,
+            "rh": self.rh,
+            "rv": self.rv,
+        }
 
 
 class LHCAperture:
@@ -140,12 +214,9 @@ class LHCAperture:
                 if name.split("..")[0].split("_")[0] in ld:
                     data = ld[name]
                     shape, spec, tols = data["aperture"]
-                    aperture = (
-                        shape,
-                        tuple(spec),
-                        tuple(tols),
-                    )
-                    print(aperture)
+                    tols = tuple(tols)
+                    spec = tuple(spec)
+                    aperture = (shape, spec)
                     if aperture in profile_def:
                         profile_id = profile_def[aperture]
                         profile = profiles[profile_id]
@@ -164,21 +235,25 @@ class LHCAperture:
                         dpsi = 0
                     elif len(offset) == 3:
                         dx, dy, dpsi = offset
-                    x = su.X[ii] - dx
-                    y = su.Y[ii] - dy
-                else:
-                    x, y, dx, dy, dpsi, ah, av, profile_id = (
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        -1,
+                    dx = su.X[ii] - dx
+                    dy = su.Y[ii] - dy
+                    apertures.append(
+                        (name, (dx, dy, dpsi), (ah, av), profile_id, tols)
                     )
-                apertures.append((name, x, y, dpsi, ah, av, profile_id, tols))
-        return cls(apertures, profiles, model, survey)
+
+        return cls(
+            np.array(apertures, dtype=cls.dtype), profiles, model, survey
+        )
+
+    dtype = np.dtype(
+        [
+            ("name", "U64"),
+            ("offset", "3f8"),
+            ("bbox", "2f8"),
+            ("profile", "i4"),
+            ("tols", "3f8"),
+        ]
+    )
 
     def __init__(self, apertures, profiles, model=None, survey=None):
         self.apertures = apertures
@@ -186,3 +261,43 @@ class LHCAperture:
         self.survey = survey
         self.model = model
 
+    @property
+    def name(self):
+        return self.apertures["name"]
+
+    @property
+    def offset(self):
+        return self.apertures["offset"]
+
+    @property
+    def bbox(self):
+        return self.apertures["bbox"]
+
+    @property
+    def profile(self):
+        return self.apertures["profile"]
+
+    def to_dict(self):
+        apertures = [
+            (name, offset.tolist(), bbox.tolist(), int(profile), tols.tolist())
+            for name, offset, bbox, profile, tols in self.apertures
+        ]
+        return {
+            "apertures": apertures,
+            "profiles": [p.to_dict() for p in self.profiles.values()],
+        }
+
+    def to_json(self, fn):
+        return json.dump(self.to_dict(), open(fn, "w"), indent=2)
+
+    @classmethod
+    def from_json(cls, fn):
+        data = json.load(open(fn))
+        apertures = np.array(
+            list(map(tuple, data["apertures"])), dtype=cls.dtype
+        )
+        profiles = {
+            ii: globals()[d["shape"].capitalize()].from_dict(d)
+            for ii, d in enumerate(data["profiles"])
+        }
+        return cls(apertures, profiles)
