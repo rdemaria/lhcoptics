@@ -222,11 +222,12 @@ class LHCCalibration:
         plt.legend()
 
     def __repr__(self) -> str:
-        ilim = f"{self.imin:.0f}:{self.imax:.0f}"
-        flim = f"{self.fmin:.3g}:{self.fmax:.3g}"
-        return (
-            f"<LHCCalibration {self.name}, I {ilim}, {self.fieldtype} {flim}>"
-        )
+        if len(self.current) > 0:
+            ilim = f"{self.imin:.0f}:{self.imax:.0f}"
+            flim = f"{self.fmin:.3g}:{self.fmax:.3g}"
+            return f"<LHCCalibration {self.name}, I {ilim}, {self.fieldtype} {flim}>"
+        else:
+            return f"<LHCCalibration {self.name}, empty>"
 
 
 class LHCCircuits:

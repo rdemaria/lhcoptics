@@ -519,6 +519,11 @@ class LHCIR(LHCSection):
                 self.parent.model.vars[kl] = -self.parent.model.vars[kr]
                 match.disable(vary_name=kl)
 
+        if no_triplets:
+            for kl, kr in zip(self.kqxl, self.kqxr):
+                match.disable(vary_name=kl)
+                match.disable(vary_name=kr)
+
         if self.parent.params["match_inj"]:
             if self.name == "ir2" or self.name == "ir8":
                 match.disable(vary_name="kt?qx.*")

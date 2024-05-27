@@ -11,15 +11,14 @@ class Rectellipse:
     """
 
     @classmethod
-    def from_layout_spec(cls, spec, tols):
-        return cls(*spec, tols)
+    def from_layout_spec(cls, spec):
+        return cls(*spec)
 
-    def __init__(self, ah, av, rh, rv, tols=None):
+    def __init__(self, ah, av, rh, rv):
         self.ah = ah
         self.av = av
         self.rh = rh
         self.rv = rv
-        self.tols = tols
 
     def bbox(self):
         return min(self.rh, self.ah), min(self.rv, self.av)
@@ -30,13 +29,12 @@ class Rectellipse:
 
 class Ellipse:
     @classmethod
-    def from_layout_spec(cls, spec, tols):
-        return cls(spec[0], spec[1], tols)
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1])
 
-    def __init__(self, rh, rv, tols=None):
+    def __init__(self, rh, rv):
         self.rh = rh
         self.rv = rv
-        self.tols = tols
 
     def bbox(self):
         return self.rh, self.rv
@@ -47,13 +45,12 @@ class Ellipse:
 
 class Rectangle:
     @classmethod
-    def from_layout_spec(cls, spec, tols):
-        return cls(spec[0], spec[1], tols)
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1])
 
-    def __init__(self, ah, av, tols=None):
+    def __init__(self, ah, av):
         self.ah = ah
         self.av = av
-        self.tols = tols
 
     def bbox(self):
         return self.ah, self.av
@@ -64,12 +61,11 @@ class Rectangle:
 
 class Circle:
     @classmethod
-    def from_layout_spec(cls, spec, tols):
-        return cls(spec[0], tols)
+    def from_layout_spec(cls, spec):
+        return cls(spec[0])
 
-    def __init__(self, r, tols=None):
+    def __init__(self, r):
         self.r = r
-        self.tols = tols
 
     def bbox(self):
         return self.r, self.r
@@ -87,14 +83,13 @@ class Octagon:
     """
 
     @classmethod
-    def from_layout_spec(cls, spec, tols):
-        return cls(spec[0], spec[1], spec[3], tols)
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1], spec[3])
 
-    def __init__(self, ah, av, ar, tols=None):
+    def __init__(self, ah, av, ar):
         self.ah = ah
         self.av = av
         self.ar = ar
-        self.tols = tols
 
     def bbox(self):
         return self.ah, self.av
@@ -105,15 +100,14 @@ class Octagon:
 
 class Racetrack:
     @classmethod
-    def from_layout_spec(cls, spec, tols):
-        return cls(spec[0], spec[1], spec[2], tols)
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1], spec[2], spec[3])
 
-    def __init__(self, ah, av, rh, rv, tols=None):
+    def __init__(self, ah, av, rh, rv):
         self.ah = ah
         self.av = av
         self.rh = rh
         self.rv = rv
-        self.tols = tols
 
     def bbox(self):
         return self.ah, self.av
@@ -159,7 +153,7 @@ class LHCAperture:
                         profile_id = len(profiles)
                         profile_def[aperture] = profile_id
                         profile_cls = globals()[shape.capitalize()]
-                        profile = profile_cls.from_layout_spec(spec, tols)
+                        profile = profile_cls.from_layout_spec(spec)
                         profiles[len(profiles)] = profile
                     ah, av = profile.bbox()
                     offset = data.get("offset", (0, 0))
@@ -183,7 +177,7 @@ class LHCAperture:
                         0,
                         -1,
                     )
-                apertures.append((name, x, y, dpsi, ah, av, profile_id))
+                apertures.append((name, x, y, dpsi, ah, av, profile_id, tols))
         return cls(apertures, profiles, model, survey)
 
     def __init__(self, apertures, profiles, model=None, survey=None):
@@ -191,3 +185,4 @@ class LHCAperture:
         self.profiles = profiles
         self.survey = survey
         self.model = model
+

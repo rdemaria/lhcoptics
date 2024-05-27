@@ -604,8 +604,7 @@ class LHCOptics:
             if len(phases) > 0:
                 for k in phases:
                     print(f"Set {k!r} from {arc.params[k]} to {newphases[k]}")
-                dct = {k: newphases[k] for k in phases}
-                arc.params.update({k: newphases[k] for k in phases})
+                    arc.params[k]= newphases[k]
                 arc.match_phase()
 
     def diff(self, other, full=True):
