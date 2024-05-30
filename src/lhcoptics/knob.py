@@ -629,4 +629,4 @@ class CouplingKnob(Knob):
         return mtc
 
     def __repr__(self):
-        return f"ChromaKnob({self.name!r}, {self.value})"
+        return f"CouplingKnob({self.name!r}, {self.value})"

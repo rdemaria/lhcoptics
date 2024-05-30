@@ -230,6 +230,9 @@ class LHCOptics:
             out.update_model(verbose=verbose)
         elif madx_model is not None:
             out.set_madx_model(madx_model)
+        if circuits is not None:
+            if isinstance(circuits, str) or isinstance(circuits, Path):
+                out.set_circuits_from_json(circuits)
         if aperture is not None:
             if isinstance(aperture, str) or isinstance(aperture, Path):
                 out.aperture = LHCAperture.from_json(aperture)
@@ -615,7 +618,7 @@ class LHCOptics:
             if len(phases) > 0:
                 for k in phases:
                     print(f"Set {k!r} from {arc.params[k]} to {newphases[k]}")
-                    arc.params[k]= newphases[k]
+                    arc.params[k] = newphases[k]
                 arc.match_phase()
 
     def diff(self, other, full=True):
