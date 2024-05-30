@@ -187,6 +187,73 @@ class Racetrack:
         }
 
 
+class AperList:
+    dtype = np.dtype(
+        [
+            ("name", "U64"),
+            ("ap_s", "f8"),
+            ("offset", "3f8"),
+            ("bbox", "2f8"),
+            ("profile", "i4"),
+            ("tols", "3f8"),
+        ]
+    )
+
+    def __init__(self, apertures):
+        self.apertures = np.array(apertures, np.dtype(self.dtype))
+        self.lookup = {a["name"]: ii for ii, a in enumerate(self.apertures)}
+
+    @property
+    def name(self):
+        return self.apertures["name"]
+
+    @property
+    def ap_s(self):
+        return self.apertures["ap_s"]
+
+    @property
+    def offset(self):
+        return self.apertures["offset"]
+    
+    @property
+    def ap_x(self):
+        return self.apertures["offset"][:, 0]
+    
+    @property
+    def ap_y(self):
+        return self.apertures["offset"][:, 1]
+
+    @property
+    def bbox(self):
+        return self.apertures["bbox"]
+
+    @property
+    def profile(self):
+        return self.apertures["profile"]
+
+    @property
+    def mask(self):
+        return self.apertures["profile"] != -1
+
+
+    def to_list(self):
+        return [
+            (name, s, offset.tolist(), bbox.tolist(), int(profile), tols.tolist())
+            for name, s, offset, bbox, profile, tols in self.apertures
+        ]
+
+    def plot(self, ax=None):
+        """
+        Plot the apertures for a given beam.
+        """
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        plt.plot(self.ap_s[self.mask], self.ap_x[self.mask], label="ap_x")
+        return ax
+
+
+
 class LHCAperture:
     """
     twiss: s,x,y,betx,bety,dx,dy,pt
@@ -207,8 +274,9 @@ class LHCAperture:
         survey = model.get_survey_flat()
         profile_def = {}
         profiles = {}
-        apertures = []
+        aplists = []
         for ld, su in zip(layout_data, survey):
+            aplist = []
             for ii in range(len(su)):
                 name = su.name[ii]
                 if name.split("..")[0].split("_")[0] in ld:
@@ -237,23 +305,16 @@ class LHCAperture:
                         dx, dy, dpsi = offset
                     dx = su.X[ii] - dx
                     dy = su.Y[ii] - dy
-                    apertures.append(
-                        (name, (dx, dy, dpsi), (ah, av), profile_id, tols)
+                else:
+                    dx, dy, dpsi = 0, 0, 0
+                    ah, av = 0, 0
+                    profile_id = -1
+                    tols = (0, 0, 0)
+                aplist.append(
+                        (name, su.s[ii], (dx, dy, dpsi), (ah, av), profile_id, tols)
                     )
-
-        return cls(
-            np.array(apertures, dtype=cls.dtype), profiles, model, survey
-        )
-
-    dtype = np.dtype(
-        [
-            ("name", "U64"),
-            ("offset", "3f8"),
-            ("bbox", "2f8"),
-            ("profile", "i4"),
-            ("tols", "3f8"),
-        ]
-    )
+            aplists.append(AperList(aplist))
+        return cls(aplists, profiles, model, survey)
 
     def __init__(self, apertures, profiles, model=None, survey=None):
         self.apertures = apertures
@@ -261,29 +322,9 @@ class LHCAperture:
         self.survey = survey
         self.model = model
 
-    @property
-    def name(self):
-        return self.apertures["name"]
-
-    @property
-    def offset(self):
-        return self.apertures["offset"]
-
-    @property
-    def bbox(self):
-        return self.apertures["bbox"]
-
-    @property
-    def profile(self):
-        return self.apertures["profile"]
-
     def to_dict(self):
-        apertures = [
-            (name, offset.tolist(), bbox.tolist(), int(profile), tols.tolist())
-            for name, offset, bbox, profile, tols in self.apertures
-        ]
         return {
-            "apertures": apertures,
+            "apertures": [a.tolist() for a in self.apertures],
             "profiles": [p.to_dict() for p in self.profiles.values()],
         }
 
@@ -293,9 +334,7 @@ class LHCAperture:
     @classmethod
     def from_json(cls, fn):
         data = json.load(open(fn))
-        apertures = np.array(
-            list(map(tuple, data["apertures"])), dtype=cls.dtype
-        )
+        apertures = [AperList(list(map(tuple,aplist))) for aplist in data["apertures"]]
         profiles = {
             ii: globals()[d["shape"].capitalize()].from_dict(d)
             for ii, d in enumerate(data["profiles"])

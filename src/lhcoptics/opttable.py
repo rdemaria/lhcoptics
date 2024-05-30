@@ -5,6 +5,7 @@ import numpy as np
 import xdeps as xd
 
 from .rdmsignal import poly_fit, poly_val
+from .lsa_util import get_lsa
 
 
 class Col:
@@ -299,6 +300,20 @@ class LHCArcTable(LHCSectionTable):
 
 
 class LHCOpticsTable(LHCSectionTable):
+    def tab_from_lsa(self,beamprocess, parameters=None):
+        if parameters is None:
+            parameters = ["LHCBEAM/MOMENTUM"]
+        lsa = get_lsa()
+        opttable=lsa.getOpticTable(beamprocess)
+        out={"name":np.array([oo.name for oo in opttable]),
+             "time":np.array([oo.time for oo in opttable])}
+        for pp in parameters:
+            trim=lsa.getLastTrim(pp,beamprocess)
+            ptime=trim.data[0]
+            pval=trim.data[1]
+            out[pp]=np.interp(out["time"],ptime,pval)
+        return xd.Table(out)
+
     def __init__(self, rows):
         self.rows = rows
         self.params = Col("params", rows)

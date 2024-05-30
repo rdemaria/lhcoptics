@@ -72,6 +72,7 @@ class LHCXsuiteModel:
         self.sequence = {1: multiline.b1, 2: multiline.b2}
         self.b1.build_tracker()
         self.b2.build_tracker()
+        self._aperture = None
 
     @classmethod
     def from_madxfile(cls, madxfile, sliced=False):
@@ -553,10 +554,28 @@ class LHCXsuiteModel:
                     ),
                 ]
             )
-    
+
     def make_aperture(self):
         from .aperture import LHCAperture
+
         return LHCAperture.from_xsuite_model(self)
+
+    def aperture(self, beam, emit=2.5e-6, p0c=None, bbeat=1.1,delta_err=2e-4, ndisp_err=0.1, co_error=2e-3, nsigma=12):
+        if self._aperture is None:
+            self._aperture = self.make_aperture()
+        tw = self.sequence[beam].twiss(strengths=False)
+        ap = self._aperture.apertures[beam - 1]
+        if p0c is None:
+            p0c = tw.particle_on_co.p0c
+        bsx = np.sqrt(tw.betx * emit / p0c + (tw.dx*delta_err)**2)
+        xap =ap.offset[:,0]+tw.x  # position of the beam with respect to the aperture
+        ap_xmarg=ap.bbox[:,0]-abs(xap)-co_error
+        ap_x=ap_xmarg/bsx
+        ap_x*=(ap.profile!=-1)
+        tw["ap_x"]=ap_x
+        tw["ap_xmarg"]=ap_xmarg
+        return tw.rows[ap.profile!=-1]
+
 
 
 def test_coupling_knobs(collider):
