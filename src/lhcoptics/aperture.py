@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import json
 
+import xdeps as xd
+
 
 class Rectellipse:
     """
@@ -214,11 +216,11 @@ class AperList:
     @property
     def offset(self):
         return self.apertures["offset"]
-    
+
     @property
     def ap_x(self):
         return self.apertures["offset"][:, 0]
-    
+
     @property
     def ap_y(self):
         return self.apertures["offset"][:, 1]
@@ -235,10 +237,16 @@ class AperList:
     def mask(self):
         return self.apertures["profile"] != -1
 
-
     def to_list(self):
         return [
-            (name, s, offset.tolist(), bbox.tolist(), int(profile), tols.tolist())
+            (
+                name,
+                s,
+                offset.tolist(),
+                bbox.tolist(),
+                int(profile),
+                tols.tolist(),
+            )
             for name, s, offset, bbox, profile, tols in self.apertures
         ]
 
@@ -249,9 +257,75 @@ class AperList:
         if ax is None:
             fig, ax = plt.subplots()
 
-        plt.plot(self.ap_s[self.mask], self.ap_x[self.mask], label="ap_x")
+        mask = self.mask
+        ap= self.apertures[mask]
+
+        (line,) = plt.plot(
+            ap["ap_s"], ap["offset"][:,0], ".-", label="ap_x"
+        )
+
+        annot = ax.annotate(
+            "",
+            xy=(0, 0),
+            xytext=(20, 20),
+            textcoords="offset points",
+            bbox=dict(boxstyle="round", fc="w"),
+            arrowprops=dict(arrowstyle="->"),
+        )
+        annot.set_visible(False)
+
+        def update_annot(event, ind):
+            # pos = line.get_offsets()[ind["ind"][0]]
+            annot.xy = event.xdata, event.ydata
+            idxs= ind["ind"]
+            ttplot=[]
+            ttprint=[]
+            for ii in idxs:
+                row= ap[ii]
+                ttplot.append(f"{row['name']}")
+                ttprint.append(f"{row['name']} {row['offset'][0]:5.3f} {row['offset'][1]:5.3f}")
+            print("\n".join(ttprint))
+            annot.set_text("\n".join(ttplot))
+            annot.get_bbox_patch().set_alpha(0.4)
+
+        def hover(event):
+            vis = annot.get_visible()
+            if event.inaxes == ax:
+                cont, ind = line.contains(event)
+                if cont:
+                    update_annot(event, ind)
+                    annot.set_visible(True)
+                    fig.canvas.draw_idle()
+                else:
+                    if vis:
+                        annot.set_visible(False)
+                        fig.canvas.draw_idle()
+
+        fig.canvas.mpl_connect("motion_notify_event", hover)
+
         return ax
 
+    @property
+    def tab(self):
+        dct= {"name": self.name, "s": self.ap_s, "x": self.ap_x, "y": self.ap_y}
+        return xd.Table(dct, index="name")
+
+
+offsets1={
+    "tanar.4r1": (0.08, 0.000, 0.000),
+    "tanc.4l5": (-0.08, 0.000, 0.000),
+    "tanc.4r5": (0.08, 0.000, 0.000),
+    "tanal.4l1": (-0.08, 0.000, 0.000),
+}
+
+offsets2={
+    "tanc.4l5": (-0.08, 0.000, 0.000),
+    "tanc.4r5": (0.08, 0.000, 0.000),
+    "tanal.4l1": (-0.08, 0.000, 0.000),
+    "tanar.4r1": (0.08, 0.000, 0.000),
+}
+
+offsets=(   offsets1,   offsets2)
 
 
 class LHCAperture:
@@ -275,44 +349,58 @@ class LHCAperture:
         profile_def = {}
         profiles = {}
         aplists = []
-        for ld, su in zip(layout_data, survey):
+        for ld, su, off, beam in zip(layout_data, survey,offsets,(1,2)):
             aplist = []
             for ii in range(len(su)):
                 name = su.name[ii]
+                #default values
+                dx, dy, dpsi = 0, 0, 0
+                ah, av = 0, 0
+                profile_id = -1
+                tols = (0, 0, 0)
                 if name.split("..")[0].split("_")[0] in ld:
                     data = ld[name]
                     shape, spec, tols = data["aperture"]
-                    tols = tuple(tols)
-                    spec = tuple(spec)
-                    aperture = (shape, spec)
-                    if aperture in profile_def:
-                        profile_id = profile_def[aperture]
-                        profile = profiles[profile_id]
-                    else:
-                        profile_id = len(profiles)
-                        profile_def[aperture] = profile_id
-                        profile_cls = globals()[shape.capitalize()]
-                        profile = profile_cls.from_layout_spec(spec)
-                        profiles[len(profiles)] = profile
-                    ah, av = profile.bbox()
-                    offset = data.get("offset", (0, 0))
-                    if len(offset) == 0:
-                        dx, dy, dpsi = 0, 0, 0
-                    elif len(offset) == 2:
-                        dx, dy = offset[:2]
-                        dpsi = 0
-                    elif len(offset) == 3:
-                        dx, dy, dpsi = offset
-                    dx = su.X[ii] - dx
-                    dy = su.Y[ii] - dy
-                else:
-                    dx, dy, dpsi = 0, 0, 0
-                    ah, av = 0, 0
-                    profile_id = -1
-                    tols = (0, 0, 0)
+                    if spec[0]<1 and spec[0] > 0 and not name.startswith("x") and not name.startswith("br"):
+                        tols = tuple(tols)
+                        spec = tuple(spec)
+                        aperture = (shape, spec)
+                        if aperture in profile_def:
+                            profile_id = profile_def[aperture]
+                            profile = profiles[profile_id]
+                        else:
+                            profile_id = len(profiles)
+                            profile_def[aperture] = profile_id
+                            profile_cls = globals()[shape.capitalize()]
+                            profile = profile_cls.from_layout_spec(spec)
+                            profiles[len(profiles)] = profile
+                        ah, av = profile.bbox()
+                        if name in off:
+                            offset = off[name]
+                        else:
+                            offset = data.get("offset", (0, 0))
+                        if len(offset) == 0:
+                            dx, dy, dpsi = 0, 0, 0
+                        elif len(offset) == 2:
+                            dx, dy = offset[:2]
+                            dpsi = 0
+                        elif len(offset) == 3:
+                            dx, dy, dpsi = offset
+                        if beam==2: #layout data multiplied by bv!!!!!
+                            dx= -dx
+                            dy= -dy
+                        dx = su.X[ii] - dx
+                        dy = su.Y[ii] - dy
                 aplist.append(
-                        (name, su.s[ii], (dx, dy, dpsi), (ah, av), profile_id, tols)
+                    (
+                        name,
+                        su.s[ii],
+                        (dx, dy, dpsi),
+                        (ah, av),
+                        profile_id,
+                        tols,
                     )
+                )
             aplists.append(AperList(aplist))
         return cls(aplists, profiles, model, survey)
 
@@ -334,7 +422,9 @@ class LHCAperture:
     @classmethod
     def from_json(cls, fn):
         data = json.load(open(fn))
-        apertures = [AperList(list(map(tuple,aplist))) for aplist in data["apertures"]]
+        apertures = [
+            AperList(list(map(tuple, aplist))) for aplist in data["apertures"]
+        ]
         profiles = {
             ii: globals()[d["shape"].capitalize()].from_dict(d)
             for ii, d in enumerate(data["profiles"])

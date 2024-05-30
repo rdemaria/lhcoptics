@@ -298,7 +298,6 @@ class LHCArcTable(LHCSectionTable):
             arc0.name, strengths=strengths, params=params, parent=self.parent
         )
 
-
 class LHCOpticsTable(LHCSectionTable):
     def tab_from_lsa(self,beamprocess, parameters=None):
         if parameters is None:
