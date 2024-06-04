@@ -258,11 +258,9 @@ class AperList:
             fig, ax = plt.subplots()
 
         mask = self.mask
-        ap= self.apertures[mask]
+        ap = self.apertures[mask]
 
-        (line,) = plt.plot(
-            ap["ap_s"], ap["offset"][:,0], ".-", label="ap_x"
-        )
+        (line,) = plt.plot(ap["ap_s"], ap["offset"][:, 0], ".-", label="ap_x")
 
         annot = ax.annotate(
             "",
@@ -277,13 +275,15 @@ class AperList:
         def update_annot(event, ind):
             # pos = line.get_offsets()[ind["ind"][0]]
             annot.xy = event.xdata, event.ydata
-            idxs= ind["ind"]
-            ttplot=[]
-            ttprint=[]
+            idxs = ind["ind"]
+            ttplot = []
+            ttprint = []
             for ii in idxs:
-                row= ap[ii]
+                row = ap[ii]
                 ttplot.append(f"{row['name']}")
-                ttprint.append(f"{row['name']} {row['offset'][0]:5.3f} {row['offset'][1]:5.3f}")
+                ttprint.append(
+                    f"{row['name']:20} {row['offset'][0]:5.3f} {row['offset'][1]:5.3f} {row['bbox'][0]:5.3f} {row['bbox'][1]:5.3f}"
+                )
             print("\n".join(ttprint))
             annot.set_text("\n".join(ttplot))
             annot.get_bbox_patch().set_alpha(0.4)
@@ -307,25 +307,36 @@ class AperList:
 
     @property
     def tab(self):
-        dct= {"name": self.name, "s": self.ap_s, "x": self.ap_x, "y": self.ap_y}
+        dct = {
+            "name": self.name,
+            "s": self.ap_s,
+            "x": self.ap_x,
+            "y": self.ap_y,
+        }
         return xd.Table(dct, index="name")
 
 
-offsets1={
+offsets1 = {
     "tanar.4r1": (0.08, 0.000, 0.000),
     "tanc.4l5": (-0.08, 0.000, 0.000),
     "tanc.4r5": (0.08, 0.000, 0.000),
     "tanal.4l1": (-0.08, 0.000, 0.000),
+    "btvse.a4l6.b1": (-0.025, 0.000, 0.000),
+    "bpmse.4l6.b1": (-0.025, 0.000, 0.000),
+    "tcdsa.4l6.b1": (-0.025, 0.000, 0.000),
 }
 
-offsets2={
+offsets2 = {
     "tanc.4l5": (-0.08, 0.000, 0.000),
     "tanc.4r5": (0.08, 0.000, 0.000),
     "tanal.4l1": (-0.08, 0.000, 0.000),
     "tanar.4r1": (0.08, 0.000, 0.000),
+    "btvse.a4l6.b1": (0.025, 0.000, 0.000),
+    "bpmse.4l6.b1": (0.025, 0.000, 0.000),
+    "tcdsa.4l6.b1": (0.025, 0.000, 0.000),
 }
 
-offsets=(   offsets1,   offsets2)
+offsets = (offsets1, offsets2)
 
 
 class LHCAperture:
@@ -349,11 +360,11 @@ class LHCAperture:
         profile_def = {}
         profiles = {}
         aplists = []
-        for ld, su, off, beam in zip(layout_data, survey,offsets,(1,2)):
+        for ld, su, off, beam in zip(layout_data, survey, offsets, (1, 2)):
             aplist = []
             for ii in range(len(su)):
                 name = su.name[ii]
-                #default values
+                # default values
                 dx, dy, dpsi = 0, 0, 0
                 ah, av = 0, 0
                 profile_id = -1
@@ -361,7 +372,12 @@ class LHCAperture:
                 if name.split("..")[0].split("_")[0] in ld:
                     data = ld[name]
                     shape, spec, tols = data["aperture"]
-                    if spec[0]<1 and spec[0] > 0 and not name.startswith("x") and not name.startswith("br"):
+                    if (
+                        spec[0] < 1
+                        and spec[0] > 0
+                        and not name.startswith("x")
+                        and not name.startswith("br")
+                    ):
                         tols = tuple(tols)
                         spec = tuple(spec)
                         aperture = (shape, spec)
@@ -386,9 +402,9 @@ class LHCAperture:
                             dpsi = 0
                         elif len(offset) == 3:
                             dx, dy, dpsi = offset
-                        if beam==2: #layout data multiplied by bv!!!!!
-                            dx= -dx
-                            dy= -dy
+                        if beam == 2:  # layout data multiplied by bv!!!!!
+                            dx = -dx
+                            dy = -dy
                         dx = su.X[ii] - dx
                         dy = su.Y[ii] - dy
                 aplist.append(

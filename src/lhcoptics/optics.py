@@ -378,6 +378,8 @@ class LHCOptics:
         return self
 
     def update(self, src=None, verbose=False, full=True):
+        if isinstance(src, str) or isinstance(src, Path):
+            src = self.from_json(src)
         if full:
             if src is None:
                 if verbose:
@@ -492,13 +494,17 @@ class LHCOptics:
             compute_chromatic_properties=chrom, strengths=strengths
         )
 
-    def cmin(self, beam=None):
+    def cmin(self, beam=None, pos="ip1"):
         if beam is None:
             return [
-                self.cmin(beam=1),
-                self.cmin(beam=2),
+                self.cmin(beam=1, pos=pos),
+                self.cmin(beam=2, pos=pos),
             ]
-        tw = self.twiss(beam=beam)
+        line = self.model.sequence[beam]
+        if line.element_names[0] != pos:
+            line.cycle(pos, inplace=True)
+        tw = line.twiss(compute_chromatic_properties=False, strengths=True)
+        # print(tw.name)
         k1sl = tw["k1sl"]
         pi2 = 2 * np.pi
         j2pi = 1j * pi2
@@ -510,6 +516,8 @@ class LHCOptics:
             )
             / pi2
         )
+        if line.element_names[0] != "ip1":
+            line.cycle("ip1", inplace=True)
         return cmin.real, cmin.imag
 
     def plot(self, beam=None):
@@ -747,3 +755,27 @@ class LHCOptics:
     def set_init(self):
         for ir in self.irs:
             ir.set_init()
+
+    def test_coupling_knobs(self):
+        self.model.cycle("ip7")
+        for ri,ii in zip("ri",(0,1)):
+            for beam in [1, 2]:
+                for ext in ["_op", "_sq", ""]:
+                    name = f"cm{ri}s.b{beam}{ext}"
+                    oldvalue = self.model[name]
+                    self.model[name] = 0.001
+                    cmim= self.cmin(beam=beam)[ii]
+                    print(f"{name:10} {cmim-0.001:.3f}")
+                    self.model[name] = oldvalue
+
+    def test_tune_knobs(self):
+        for beam in [1, 2]:
+            for ext in ["_op", "_sq", ""]:
+                for xy in "xy":
+                    name = f"dq{xy}.b{beam}{ext}"
+                    oldtune = self.twiss(beam=beam)[f"q{xy}"]
+                    oldvalue = self.model[name]
+                    self.model[name] = 0.01
+                    tune = self.twiss(beam=beam)[f"q{xy}"]
+                    print(f"{name:10} {oldtune:.3f} {tune:.3f} {tune-oldtune-0.01:.3f}")
+                    self.model[name] = oldvalue

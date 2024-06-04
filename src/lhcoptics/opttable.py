@@ -20,10 +20,24 @@ class Col:
     def __repr__(self) -> str:
         return f"<Col {self.attr!r} {len(self.rows)} rows>"
 
+class ColKnob:
+    def __init__(self, attr, rows):
+        self.attr = attr
+        self.rows = rows
+
+    def __getitem__(self, k):
+        attrs = [getattr(row, self.attr) for row in self.rows]
+        return np.array([attr[k].value for attr in attrs])
+
+    def __repr__(self) -> str:
+        return f"<ColKnob {self.attr!r} {len(self.rows)} rows>"
+
+
 
 class LHCSectionTable:
     def __init__(self, rows, parent=None):
-        self.rows = list(rows)
+        rows = list(rows)
+        self.rows = rows
         self.strengths = Col("strengths", rows)
         self.params = Col("params", rows)
         self.knobs = Col("knobs", rows)
@@ -117,6 +131,28 @@ class LHCSectionTable:
             return "<Table: 0 rows>"
         cls = self.rows[0].__class__.__name__
         return f"<Table {cls}: {len(self)} rows>"
+
+    def knob_table(self,knobname,max=True):
+        knob=self.knobs[knobname]
+        weights={"id":self["id"]}
+        for k in knob[0].weights:
+            weights[k]=np.array([kk.weights[k] for kk in knob])
+        tab=xd.Table(weights,index="id")
+        if max:
+           tab._append_row({**{k:abs(v).max() for k,v in weights.items()},"id":"max"})
+        return xd.Table(weights,index="id")
+
+    def knob_plot(self,knobname):
+        tab=self.knob_table(knobname,max=False)
+        fig,ax=plt.subplots(num=knobname)
+        for k in tab:
+            if k=="id":
+                continue
+            ax.plot(tab["id"],tab[k],label=k)
+        ax.legend()
+        ax.set_xlabel("id")
+        ax.set_ylabel("factors")
+        ax.set_title(knobname)
 
 
 class LHCIRTable(LHCSectionTable):
@@ -273,6 +309,8 @@ class LHCIRTable(LHCSectionTable):
             ax.set_visible(False)
         plt.suptitle(title)
         # plt.tight_layout()
+
+
 
 
 class LHCArcTable(LHCSectionTable):

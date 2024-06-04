@@ -5,6 +5,31 @@ import xtrack as xt
 
 from .utils import print_diff_dict_float
 
+class ActionCmin(xt.Action):
+# see Eq. 47 in https://cds.cern.ch/record/522049/files/lhc-project-report-501.pdf
+    def __init__(self, line):
+        self.line = line
+        self.twiss = self.line.twiss()
+        self.betx= self.twiss.betx[:-1]
+        self.bety= self.twiss.bety[:-1]
+        self.mux = self.twiss.mux[:-1]
+        self.muy = self.twiss.muy[:-1]
+        self.reverse = self.line.twiss_default.get('reverse',False)
+
+    def run(self):
+        k1sl = self.line.attr["k1sl"]
+        if self.reverse:
+            k1sl = -k1sl[::-1]
+        c_min = (
+            1
+            / (2 * np.pi)
+            * np.sum(
+                k1sl
+                * np.sqrt(self.betx * self.bety)
+                * np.exp(1j * 2 * np.pi * (self.mux - self.muy))
+            )
+        )
+        return {"r": c_min.real, "i": c_min.imag}
 
 class Knob:
 
@@ -110,6 +135,21 @@ class IPKnob(Knob):
         self.beams = beams
         self.match_value = match_value
         self.kind = kind
+
+    def copy(self):
+        return IPKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            const=self.const,
+            ip=self.ip,
+            xy=self.xy,
+            specs=self.specs,
+            match_value=self.match_value,
+            beams=self.beams,
+            kind=self.kind,
+        )
 
     @classmethod
     def specialize(cls, knob):
@@ -357,6 +397,18 @@ class TuneKnob(Knob):
         self.kind = kind
         self.match_value = match_value
 
+    def copy(self):
+        return TuneKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            xy=self.xy,
+            beam=self.beam,
+            kind=self.kind,
+            match_value=self.match_value,
+        )
+
     @classmethod
     def specialize(cls, knob):
         """
@@ -445,6 +497,18 @@ class ChromaKnob(Knob):
         self.kind = kind
         self.match_value = match_value
 
+    def copy(self):
+        return ChromaKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            xy=self.xy,
+            beam=self.beam,
+            kind=self.kind,
+            match_value=self.match_value,
+        )
+
     @classmethod
     def specialize(cls, knob):
         """
@@ -522,7 +586,7 @@ class ChromaKnob(Knob):
 
 
 class CouplingKnob(Knob):
-    retune = re.compile("cm([ri]s)\.(b[12])_?([a-z]+)?")
+    retune = re.compile("cm([ri])s\.(b[12])_?([a-z]+)?")
 
     def __init__(
         self,
@@ -540,6 +604,19 @@ class CouplingKnob(Knob):
         self.beam = beam
         self.kind = kind
         self.match_value = match_value
+        assert(self.ri in ["r", "i"])
+
+    def copy(self):
+        return CouplingKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            ri=self.ri,
+            beam=self.beam,
+            kind=self.kind,
+            match_value=self.match_value,
+        )
 
     @classmethod
     def specialize(cls, knob):
@@ -562,41 +639,23 @@ class CouplingKnob(Knob):
                 kind=kind,
             )
 
-    def match(self):
+    def match(self, limit=0.1, weights={}, reset=True):
         model = self.parent.model
         xt = model._xt
 
-        # see Eq. 47 in https://cds.cern.ch/record/522049/files/lhc-project-report-501.pdf
-        class ActionCmin(xt.Action):
-            def __init__(self, line):
-                self.line = line
-
-            def run(self):
-                tw = self.line.twiss(strengths=True)
-                k1sl = tw["k1sl"]
-                c_min = (
-                    1
-                    / (2 * np.pi)
-                    * np.sum(
-                        k1sl
-                        * np.sqrt(tw.betx * tw.bety)
-                        * np.exp(1j * 2 * np.pi * (tw.mux - tw.muy))
-                    )
-                )
-                return {"r": c_min.real, "i": c_min.imag}
 
         line = getattr(model, self.beam)
+        #line.cycle("ip7", inplace=True)
 
-        act_cmin = ActionCmin(line)
         kqsa = [
-            wm
-            for wm in self.get_weight_knob_names()
-            if re.match(r"kqs\.a", wm) and model[wm] != 0
+            f"{wm}_from_{self.name}"
+            for wm,wv in self.weights.items()
+            if re.match(r"kqs\.a", wm) and wv != 0
         ]
         kqslr = [
-            wm
-            for wm in self.get_weight_knob_names()
-            if re.match(r"kqs\.[lr]", wm) and model[wm] != 0
+            f"{wm}_from_{self.name}"
+            for wm,wv in self.weights.items()
+            if re.match(r"kqs\.[lr]", wm) and wv != 0
         ]
 
         if self.ri == "r":
@@ -604,6 +663,11 @@ class CouplingKnob(Knob):
         else:
             dq = {"r": 0, "i": self.match_value}
 
+        if reset:
+            for wn in kqsa + kqslr:
+                model[wn] = 0
+
+        act_cmin = ActionCmin(line)
         # find baseline
         knob_start = model[self.name]
         model[self.name] = 0
@@ -615,17 +679,25 @@ class CouplingKnob(Knob):
         mtc = line.match(
             solve=False,
             vary=[
-                xt.VaryList(kqsa, step=5e-5, weight=2),
-                xt.VaryList(kqslr, step=5e-5),
+                xt.VaryList(kqsa, step=5e-5, limits=(-limit, limit)),
+                xt.VaryList(kqslr, step=5e-5, limits=(-limit, limit)),
             ],
             targets=targets,
-            strengths=False,
+            check_limits=False,
         )
+        for kk, val in weights.items():
+            for vv in mtc.vary:
+                if vv.name.startswith(kk):
+                    vv.weight = val
+
         mtc.target_status()
         mtc.vary_status()
         mtc.solve()
+        mtc.vary_status()
         model[self.name] = knob_start
+        print(f"Knob new vs old")
         model.get_knob(self).diff(self)
+        #line.cycle("ip1", inplace=True)
         return mtc
 
     def __repr__(self):

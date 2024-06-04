@@ -1,5 +1,7 @@
+from pathlib import Path
+
 import numpy as np
-import xdeps as xd
+import xdeps
 import xtrack as xt
 
 from .knob import Knob
@@ -8,7 +10,7 @@ from .model_madx import LHCMadxModel
 import matplotlib.pyplot as plt
 
 
-class SinglePassDispersion(xd.Action):
+class SinglePassDispersion(xdeps.Action):
     def __init__(self, line, ele_start, ele_stop, backtrack=False, delta=1e-3):
         self.line = line
         self.ele_start = ele_start
@@ -158,7 +160,7 @@ class LHCXsuiteModel:
         return self.multiline.b1.particle_ref.p0c[0]
 
     def info(self, k):
-        return self.multiline.vars[k]._info()
+        return self.multiline.vars[k]._info(limit=None)
 
     @p0c.setter
     def p0c(self, value):
@@ -403,6 +405,10 @@ class LHCXsuiteModel:
             madxfile=self.madxfile,
         )
 
+    def cycle(self, element):
+        self.b1.cycle(element,inplace=True)
+        self.b2.cycle(element,inplace=True)
+
     def diff(self, other):
         allk = set(self._var_values.keys()) | set(other._var_values.keys())
         for k in allk:
@@ -560,22 +566,33 @@ class LHCXsuiteModel:
 
         return LHCAperture.from_xsuite_model(self)
 
-    def aperture(self, beam, emit=2.5e-6, p0c=None, bbeat=1.1,delta_err=2e-4, ndisp_err=0.1, co_error=2e-3, nsigma=12):
+    def aperture(
+        self,
+        beam,
+        emit=2.5e-6,
+        p0c=None,
+        bbeat=1.1,
+        delta_err=2e-4,
+        ndisp_err=0.1,
+        co_error=2e-3,
+        nsigma=12,
+    ):
         if self._aperture is None:
             self._aperture = self.make_aperture()
         tw = self.sequence[beam].twiss(strengths=False)
         ap = self._aperture.apertures[beam - 1]
         if p0c is None:
             p0c = tw.particle_on_co.p0c
-        bsx = np.sqrt(tw.betx * emit / p0c + (tw.dx*delta_err)**2)
-        xap =ap.offset[:,0]+tw.x  # position of the beam with respect to the aperture
-        ap_xmarg=ap.bbox[:,0]-abs(xap)-co_error
-        ap_x=ap_xmarg/bsx
-        ap_x*=(ap.profile!=-1)
-        tw["ap_x"]=ap_x
-        tw["ap_xmarg"]=ap_xmarg
-        return tw.rows[ap.profile!=-1]
-
+        bsx = np.sqrt(tw.betx * emit / p0c * 0.938e9 + (tw.dx * delta_err) ** 2)
+        xap = (
+            ap.offset[:, 0] + tw.x
+        )  # position of the beam with respect to the aperture
+        ap_xmarg = ap.bbox[:, 0] - abs(xap) - co_error
+        ap_x = ap_xmarg / bsx
+        tw["ap_bsx"] = bsx
+        tw["ap_x"] = ap_x
+        tw["ap_xmarg"] = ap_xmarg
+        return tw.rows[ap.profile != -1]
 
 
 def test_coupling_knobs(collider):

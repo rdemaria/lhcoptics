@@ -430,3 +430,7 @@ use, sequence=lhcb2;
 
     def __setitem__(self, key, value):
         self.madx.globals[key] = value
+
+    def aperture(self, irn, beam):
+        self.madx.exec(f"mk_apir({irn},b{beam})")
+        return xd.Table(self.madx.table.aperture)
