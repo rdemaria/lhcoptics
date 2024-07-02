@@ -239,7 +239,7 @@ class LHCIRTable(LHCSectionTable):
         self,
         n,
         order=1,
-        soft=True,
+        soft=False,
         xaxis="id",
         ax=None,
         title=None,
@@ -252,16 +252,20 @@ class LHCIRTable(LHCSectionTable):
         if figname is None:
             figname = f"{self.rows[0].name.upper()} Q{n}"
         if ax is None:
-            fig, ax = plt.subplots(num=figname)
+            fig, ax = plt.subplots(num=figname,clear=True)
         xx = self[xaxis]
-        for kname in self.get_quads(n):
+        for nkk,kname in enumerate(self.get_quads(n)):
             yy = self[kname]
-            xx_fit = np.linspace(xx[0], xx[-1], 1000)
+            xx_fit = np.linspace(xx[0], xx[-1], 1001)
             yy_fit = self.interp_val(
                 xx_fit, kname, order=order, xname=xaxis, soft=soft
             )
-            ax.plot(xx, yy * brho, label=f"{kname}")
-            ax.plot(xx_fit, yy_fit * brho, label=f"fit {kname}")
+            ax.plot(xx, yy * brho, 'o',label=f"{kname}",color=f'C{nkk}')
+            ax.plot(xx_fit, yy_fit * brho, label=f"fit {kname}",color='k')
+            yy_res = self.interp_val(
+                xx, kname, order=order, xname=xaxis, soft=soft
+            )
+            print("residuals",kname,np.abs(yy-yy_res).max())
         ax.set_title(title)
         ax.set_xlabel(xaxis)
         ax.set_ylabel(r"k [$T/m$]")
