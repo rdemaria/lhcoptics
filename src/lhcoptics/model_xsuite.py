@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 import xdeps
 import xtrack as xt
@@ -524,6 +522,8 @@ class LHCXsuiteModel:
         su = self.get_survey_flat(beam)
         line = self.sequence[beam]
         fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
+        print(su,line, fig, ax1, ax2)
+        raise NotImplementedError("Not implemented")
 
     def get_survey_flat(self, beam=None):
         if beam is None:

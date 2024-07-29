@@ -27,6 +27,10 @@ from .aperture import LHCAperture
 
 
 __all__ = [
+    get_lsa,
+    Knob,
+    LHC,
+    LHCAperture,
     LHCArc,
     LHCCircuits,
     LHCIR1,
@@ -37,13 +41,10 @@ __all__ = [
     LHCIR6,
     LHCIR7,
     LHCIR8,
-    Knob,
     LHCMadxModel,
-    LHCXsuiteModel,
     LHCOptics,
     LHCOpticsTable,
+    LHCXsuiteModel,
     poly_fit,
     poly_val,
-    LHC,
-    get_lsa,
 ]

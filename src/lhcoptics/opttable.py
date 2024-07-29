@@ -93,6 +93,8 @@ class LHCSectionTable:
     def interp_val(self, x, kname, order=1, xname="id", soft=False):
         xx = self[xname]
         yy = self[kname]
+        if isinstance(yy, (int, float)):
+            return yy
         if order == 0:  # Nearest
             return np.interp(x, xx, yy)
         if order == 1:
@@ -202,7 +204,6 @@ class LHCIRTable(LHCSectionTable):
     ):
         if p0c is None:
             p0c = self.get_p0c()
-        brho = p0c / 299792458
         if title is None:
             title = f"{self.rows[0].name.upper()} Q{n}"
         if figname is None:

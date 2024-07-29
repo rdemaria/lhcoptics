@@ -330,7 +330,7 @@ class LHCCircuits:
         else:
             return self.madname[kname].get_klimits(pc)
 
-    def get_current_triplet(self, side, kqx, ktqx1, ktqx2, pc=7e12):
+    def get_current_triplet_from_trims(self, side, kqx, ktqx1, ktqx2, pc=7e12):
         k3 = kqx
         k1 = ktqx1 + kqx
         k2 = -ktqx2 - kqx

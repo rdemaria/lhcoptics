@@ -26,11 +26,6 @@ class LHCIR6(LHCIR):
     def get_params_from_twiss(self, tw1, tw2):
         params = LHCIR.get_params_from_twiss(self, tw1, tw2)
 
-        chi6_nsig = 10.1
-        chi6_dpoverp = 2e-4
-        chi6_emitx=2.5e-6/(7000/0.9382720814)
-        chi6_maxorbitdrift = 0.6e-3
-
         muxmkdb1=tw1["mux","mkd.h5l6.b1"]
         params["dmuxkickb1_tcsg"]=tw1["mux","tcsp.a4r6.b1"]- muxmkdb1
         dmuxb1=np.array([tw1["mux",f"tcdqa.{abc}4r6.b1"] for abc in "abc"])-muxmkdb1

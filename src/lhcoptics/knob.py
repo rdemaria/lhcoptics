@@ -66,8 +66,7 @@ class Knob:
             return cls.from_dict(src)
 
     def from_madx(self, madx, redefine_weights=False):
-        if weights is None:
-            weights = {}
+        raise NotImplementedError
 
     def copy(self):
         return Knob(self.name, self.value, self.weights.copy())
@@ -334,7 +333,8 @@ class IPKnob(Knob):
             mtc.target_status()
             mtc.solve()
             mtc.vary_status()
-        except:
+        except Exception as ex:
+            print(ex)
             print(f"Failed to match {self.name}")
             model.update_knob(self)
         model[self.name] = knob_start
@@ -695,7 +695,7 @@ class CouplingKnob(Knob):
         mtc.solve()
         mtc.vary_status()
         model[self.name] = knob_start
-        print(f"Knob new vs old")
+        print("Knob new vs old")
         model.get_knob(self).diff(self)
         #line.cycle("ip1", inplace=True)
         return mtc

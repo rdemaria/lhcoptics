@@ -418,10 +418,10 @@ use, sequence=lhcb2;
 
     def diff(self, other):
         selfvar = {
-            k: v for k, v in self.madx.globals.items() if type(v) == float
+            k: v for k, v in self.madx.globals.items() if isinstance(v,float)
         }
         othervar = {
-            k: v for k, v in other.madx.globals.items() if type(v) == float
+            k: v for k, v in other.madx.globals.items() if isinstance(v,float)
         }
         print_diff_dict_float(selfvar, othervar)
 

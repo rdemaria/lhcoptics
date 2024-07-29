@@ -9,7 +9,7 @@ from .utils import (
     print_diff_dict_objs,
 )
 
-_lb = [(l, b) for l in "lr" for b in "12"]
+_lb = [(ll, bb) for ll in "lr" for bb in "12"]
 _ac = {
     0: [("h", "l", "1"), ("v", "l", "1"), ("h", "r", "2"), ("v", "r", "2")],
     1: [("h", "l", "2"), ("v", "l", "2"), ("h", "r", "1"), ("v", "r", "1")],
