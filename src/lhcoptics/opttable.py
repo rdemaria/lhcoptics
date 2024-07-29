@@ -93,7 +93,7 @@ class LHCSectionTable:
     def interp_val(self, x, kname, order=1, xname="id", soft=False):
         xx = self[xname]
         yy = self[kname]
-        if isinstance(yy, (int, float)):
+        if not isinstance(yy, (int, float)):
             return yy
         if order == 0:  # Nearest
             return np.interp(x, xx, yy)
