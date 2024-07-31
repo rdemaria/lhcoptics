@@ -1,4 +1,3 @@
-import xdeps as xd
 import xtrack as xt
 
 from .irs import LHCIR

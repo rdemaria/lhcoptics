@@ -23,32 +23,14 @@ from .utils import (
     deliver_list_str,
     print_diff_dict_float,
     print_diff_dict_objs,
+    git_get_current_branch,
+    git_set_branch,
 )
 
 irs = [LHCIR1, LHCIR2]
 
 _opl = ["_op", "_sq", ""]
 
-
-def git_get_current_branch(directory):
-    import subprocess
-
-    return (
-        subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=directory,
-            capture_output=True,
-            text=True,
-        )
-        .stdout.strip()
-        .strip()
-    )
-
-
-def git_set_branch(directory, branch):
-    import subprocess
-
-    subprocess.run(["git", "switch", branch], cwd=directory)
 
 
 class LHCOptics:
