@@ -554,10 +554,10 @@ class LHCOptics:
                 header = False
             tw2.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
         print(
-            f"Tunes:  {tw1.qx:5.3f} {tw2.qx:5.3f} {tw1.qy:5.3f}  {tw2.qy:5.3f}"
+            f"Tunes:  {tw1.qx:9.6f} {tw2.qx:9.6f} {tw1.qy:9.6f} {tw2.qy:9.6f}"
         )
         print(
-            f"Chroma: {tw1.dqx:5.3f} {tw2.dqx:5.3f} {tw1.dqy:5.3f} {tw2.dqy:5.3f}"
+            f"Chroma: {tw1.dqx:9.6f} {tw2.dqx:9.6f} {tw1.dqy:9.6f} {tw2.dqy:9.6f}"
         )
         return self
 
@@ -779,3 +779,6 @@ class LHCOptics:
                     tune = self.twiss(beam=beam)[f"q{xy}"]
                     print(f"{name:10} {oldtune:.3f} {tune:.3f} {tune-oldtune-0.01:.3f}")
                     self.model[name] = oldvalue
+
+    def rematch(self):
+        pass
