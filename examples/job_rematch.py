@@ -34,7 +34,7 @@ inj = LHCOptics.from_json("data/opt_inj.json", xsuite_model="data/lhc.json")
 inj.set_circuits_from_json("data/lhccircuits.json")
 inj.model["phase_change.b1"] = 0
 inj.model["phase_change.b2"] = 0
-inj.disable_bumps()
+inj.set_bumps_off()
 inj.update()
 
 # IR1

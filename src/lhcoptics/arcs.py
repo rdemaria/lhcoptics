@@ -86,17 +86,6 @@ class LHCArc(LHCSection):
         strengths = {st: madx.globals[st] for st in strength_names}
         return cls(name, strengths, params, knobs)
 
-    def twiss_init(self, beam):
-        """Get twiss init at the beginning and end of the arc."""
-        tw = self.twiss(beam, strengths=False)
-        start = tw.get_twiss_init(self.startb12[beam - 1])
-        end = tw.get_twiss_init(self.endb12[beam - 1])
-        start.mux = 0
-        start.muy = 0
-        end.mux = 0
-        end.muy = 0
-        return [start, end]
-
     def twiss_cell(self, beam=None, strengths=True):
         """Get twiss table of periodic cell."""
         if beam is None:
@@ -114,7 +103,7 @@ class LHCArc(LHCSection):
             strengths=strengths,
         )
 
-    def twiss_init_cell(self, beam, strengths=True):
+    def twiss_init_cell(self, beam):
         """Get twiss init at the beginning of the cell."""
         sequence = self.model.sequence[beam]
         start_cell = self.start_cellb12[beam - 1]
@@ -124,9 +113,30 @@ class LHCArc(LHCSection):
             end=end_cell,
             init="periodic",
             only_twiss_init=True,
-            strengths=strengths,
         )
         return twinit_cell
+
+    def twiss_init(self, beam):
+        """Get twiss init at the beginning and end of the arc."""
+        tw = self.twiss(beam, strengths=False)
+        start = tw.get_twiss_init(self.startb12[beam - 1])
+        end = tw.get_twiss_init(self.endb12[beam - 1])
+        start.mux = 0
+        start.muy = 0
+        end.mux = 0
+        end.muy = 0
+        return [start, end]
+
+    def twiss_init_periodic(self, beam):
+        """Get twiss init at the beginning and end of the arc."""
+        tw = self.twiss_periodic(beam, strengths=False)
+        start = tw.get_twiss_init(self.startb12[beam - 1])
+        end = tw.get_twiss_init(self.endb12[beam - 1])
+        start.mux = 0
+        start.muy = 0
+        end.mux = 0
+        end.muy = 0
+        return [start, end]
 
     def twiss_full(self, beam=None, strengths=True):
         """Get twiss table of full arc of the full LHC periodic solution"""
@@ -152,7 +162,7 @@ class LHCArc(LHCSection):
                 self.twiss(beam=2, strengths=strengths),
             ]
         else:
-            twinit_cell = self.twiss_init_cell(beam, strengths=strengths)
+            twinit_cell = self.twiss_init_cell(beam)
             start_arc = self.startb12[beam - 1]
             end_arc = self.endb12[beam - 1]
 

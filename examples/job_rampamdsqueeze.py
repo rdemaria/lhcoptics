@@ -13,7 +13,7 @@ cur = inj.copy()
 cur.params["match_inj"] = False
 cur.set_xsuite_model("data/lhc.json")
 cur.set_circuits_from_json("data/lhccircuits.json")
-cur.knobs_off()
+cur.set_knobs_off()
 cur.check()
 
 cur.update(ramp.interp(0.1)).update_model().check()

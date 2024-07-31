@@ -4,7 +4,7 @@ eor = LHCOptics.from_json("data/opt_inj.json", xsuite_model="data/lhc.json")
 eor.name = "eor"
 eor.params["match_inj"] = False
 eor.set_circuits_from_json("data/lhccircuits.json")
-eor.knobs_off()
+eor.set_knobs_off()
 eor.model.p0c = 6.8e12
 eor.set_params()
 eor.update()

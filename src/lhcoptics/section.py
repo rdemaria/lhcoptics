@@ -16,14 +16,6 @@ _ac = {
 }
 
 
-def lhcprev(n):
-    return (n - 2) % 8 + 1
-
-
-def lhcsucc(n):
-    return n % 8 + 1
-
-
 def sort_n(lst):
     out = []
     for s in lst:
@@ -32,6 +24,14 @@ def sort_n(lst):
         else:
             out.append((0, s))
     return [s for _, s in sorted(out)]
+
+
+def lhcprev(n):
+    return (n - 2) % 8 + 1
+
+
+def lhcsucc(n):
+    return n % 8 + 1
 
 
 class LHCSection:
@@ -49,6 +49,29 @@ class LHCSection:
        get_params_from_twiss() method to return the parameters from a twiss table
 
     """
+
+    @classmethod
+    def from_dict(cls, data, filename=None):
+        return cls(
+            name=data["name"],
+            start=data["start"],
+            end=data["end"],
+            strengths=data["strengths"],
+            params=data["params"],
+            knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
+            filename=filename,
+        )
+
+    @classmethod
+    def from_json(cls, filename):
+        with open(filename) as f:
+            data = json.load(f)
+            return cls.from_dict(data, filename=filename)
+
+    @classmethod
+    def from_madxfile(cls, filename):
+        model = LHCMadxModel.from_madxfile(filename)
+        return cls.from_madx(model.madx, filename=filename)
 
     def __init__(
         self,
@@ -77,6 +100,22 @@ class LHCSection:
         self.filename = filename
         self._model = None
 
+    def __contains__(self, key):
+        return key in self.strengths or key in self.params or key in self.knobs
+
+    def __getitem__(self, key):
+        if key in self.strengths:
+            return self.strengths[key]
+        elif key in self.params:
+            return self.params[key]
+        elif key in self.knobs:
+            return self.knobs[key]
+        else:
+            raise KeyError(f"{key} not found in {self}")
+
+    def __repr__(self):
+        return f"<LHCSection {self.name} {self.start}/{self.end}>"
+
     @property
     def model(self):
         return self.parent.model
@@ -88,32 +127,63 @@ class LHCSection:
         else:
             return self.parent.circuits
 
-    @classmethod
-    def from_dict(cls, data, filename=None):
-        return cls(
-            name=data["name"],
-            start=data["start"],
-            end=data["end"],
-            strengths=data["strengths"],
-            params=data["params"],
-            knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
-            filename=filename,
+    def copy(self):
+        return self.__class__(
+            name=self.name,
+            start=self.start,
+            end=self.end,
+            strengths=self.strengths.copy(),
+            params=self.params.copy(),
+            knobs={k: knob.copy() for k, knob in self.knobs.items()},
+            parent=self.parent,
+            filename=self.filename,
         )
 
-    @classmethod
-    def from_json(cls, filename):
-        with open(filename) as f:
-            data = json.load(f)
-            return cls.from_dict(data, filename=filename)
+    def diff(self, other):
+        self.diff_strengths(other)
+        self.diff_knobs(other)
+        self.diff_params(other)
 
-    @classmethod
-    def from_madxfile(cls, filename):
-        model = LHCMadxModel.from_madxfile(filename)
-        return cls.from_madx(model.madx, filename=filename)
+    def diff_strengths(self, other):
+        print_diff_dict_float(self.strengths, other.strengths)
 
-    def update_from_madxfile(self, filename):
-        self.__class__.from_madxfile(filename)
-        self.update(self.__class__.from_madxfile(filename))
+    def diff_params(self, other):
+        print_diff_dict_float(self.params, other.params)
+
+    def diff_knobs(self, other):
+        print_diff_dict_objs(self.knobs, other.knobs)
+
+    def get_current(self, kname, p0c=7e12):
+        if self.parent.circuit is None:
+            raise ValueError("Circuit not set")
+        return self.parent.circuit.get_current(kname, self[kname], p0c)
+
+    def plot(self, beam=None, method="periodic", figlabel=None):
+        if beam is None:
+            return [self.plot(beam=1), self.plot(beam=2)]
+        else:
+            twiss = self.twiss(beam, method=method, strengths=True)
+            if figlabel is None:
+                figlabel = f"{self.name}b{beam}"
+            return twiss.plot(figlabel=figlabel)
+
+    def set_params(self):
+        """
+        Copy all parameters from get_params() to self.params
+        """
+        self.params.update(self.get_params())
+        return self
+
+    def set_bumps_off(self):
+        pass
+
+    def set_knobs_off(self):
+        for k in self.knobs:
+            self.parent.model[k] = 0
+
+    def set_knobs_on(self):
+        for k, knob in self.knobs.items():
+            self.parent.model[k] = knob.value
 
     def to_dict(self):
         return {
@@ -152,23 +222,48 @@ class LHCSection:
             out.append("")
         return deliver_list_str(out, output)
 
-    def copy(self):
-        return self.__class__(
-            name=self.name,
-            start=self.start,
-            end=self.end,
-            strengths=self.strengths.copy(),
-            params=self.params.copy(),
-            knobs={k: knob.copy() for k, knob in self.knobs.items()},
-            parent=self.parent,
-            filename=self.filename,
-        )
+    def twiss(self, beam=None, method=None, strengths=True):
+        """Return twiss table from the model using specific methods."""
+        if method is None:
+            method = self.default_twiss_method
+        return getattr(self, "twiss_" + method)(beam, strengths=strengths)
 
-    def set_params(self):
+    def update(
+        self, src=None, verbose=False, knobs=True, strengths=True, params=True
+    ):
         """
-        Copy all parameters from get_params() to self.params
+        Update existing strengths, knobs, params from self. model or src.params or src
         """
-        self.params.update(self.get_params())
+        if isinstance(src, str):
+            src = self.__class__.from_json(src)
+        if strengths:
+            self.update_strengths(src, verbose=verbose)
+        if knobs:
+            self.update_knobs(src, verbose=verbose)
+        if params:
+            self.update_params(src, verbose=verbose)
+        return self
+
+    def update_from_madxfile(self, filename):
+        self.__class__.from_madxfile(filename)
+        self.update(self.__class__.from_madxfile(filename))
+
+    def update_knobs(self, src=None, verbose=False):
+        """
+        Update existing knobs from self. model or src.knobs or src
+        """
+        if src is None:
+            src = self.model
+        if hasattr(src, "get_knob"):
+            src = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
+        elif hasattr(src, "knobs"):
+            src = src.knobs
+        for k in self.knobs:
+            if k in src:
+                if verbose:
+                    self.knobs[k].print_update_diff(src[k])
+                self.knobs[k] = Knob.from_src(src[k])
+                self.knobs[k].parent = self.parent
         return self
 
     def update_model(self, src=None, verbose=False, knobs_off=False):
@@ -214,24 +309,6 @@ class LHCSection:
                 self.strengths[k] = src[k]
         return self
 
-    def update_knobs(self, src=None, verbose=False):
-        """
-        Update existing knobs from self. model or src.knobs or src
-        """
-        if src is None:
-            src = self.model
-        if hasattr(src, "get_knob"):
-            src = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
-        elif hasattr(src, "knobs"):
-            src = src.knobs
-        for k in self.knobs:
-            if k in src:
-                if verbose:
-                    self.knobs[k].print_update_diff(src[k])
-                self.knobs[k] = Knob.from_src(src[k])
-                self.knobs[k].parent = self.parent
-        return self
-
     def update_params(self, src=None, add=False, verbose=False):
         """
         Update existing params from self.model or src.params or src
@@ -255,80 +332,3 @@ class LHCSection:
                         )
                     self.params[k] = src[k]
         return self
-
-    def update(
-        self, src=None, verbose=False, knobs=True, strengths=True, params=True
-    ):
-        """
-        Update existing strengths, knobs, params from self. model or src.params or src
-        """
-        if isinstance(src, str):
-            src = self.__class__.from_json(src)
-        if strengths:
-            self.update_strengths(src, verbose=verbose)
-        if knobs:
-            self.update_knobs(src, verbose=verbose)
-        if params:
-            self.update_params(src, verbose=verbose)
-        return self
-
-    def twiss(self, beam=None, method=None, strengths=True):
-        """Return twiss table from the model using specific methods."""
-        if method is None:
-            method = self.default_twiss_method
-        return getattr(self, "twiss_" + method)(beam, strengths=strengths)
-
-    def plot(self, beam=None, method="periodic", figlabel=None):
-        if beam is None:
-            return [self.plot(beam=1), self.plot(beam=2)]
-        else:
-            twiss = self.twiss(beam, method=method, strengths=True)
-            if figlabel is None:
-                figlabel = f"{self.name}b{beam}"
-            return twiss.plot(figlabel=figlabel)
-
-    def get_current(self, kname, p0c=7e12):
-        if self.parent.circuit is None:
-            raise ValueError("Circuit not set")
-        return self.parent.circuit.get_current(kname, self[kname], p0c)
-
-    def disable_bumps(self):
-        pass
-
-    def knobs_off(self):
-        for k in self.knobs:
-            self.parent.model[k] = 0
-
-    def knobs_on(self):
-        for k, knob in self.knobs.items():
-            self.parent.model[k] = knob.value
-
-    def diff(self, other):
-        self.diff_strengths(other)
-        self.diff_knobs(other)
-        self.diff_params(other)
-
-    def diff_strengths(self, other):
-        print_diff_dict_float(self.strengths, other.strengths)
-
-    def diff_params(self, other):
-        print_diff_dict_float(self.params, other.params)
-
-    def diff_knobs(self, other):
-        print_diff_dict_objs(self.knobs, other.knobs)
-
-    def __getitem__(self, key):
-        if key in self.strengths:
-            return self.strengths[key]
-        elif key in self.params:
-            return self.params[key]
-        elif key in self.knobs:
-            return self.knobs[key]
-        else:
-            raise KeyError(f"{key} not found in {self}")
-
-    def __contains__(self, key):
-        return key in self.strengths or key in self.params or key in self.knobs
-
-    def __repr__(self):
-        return f"<LHCSection {self.name} {self.start}/{self.end}>"

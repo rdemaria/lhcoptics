@@ -21,60 +21,6 @@ class LHCIR(LHCSection):
     _extra_param_names = []
     default_twiss_method = "init"
 
-    def _get_param_default_names(self):
-        ipname = self.ipname
-        params = []
-        for param in "betx bety alfx alfy dx dy".split():
-            for beam in "12":
-                params.append(f"{param}{ipname}{beam}")
-        for param in "mux muy".split():
-            for beam in "12":
-                params.append(f"{param}{ipname}b{beam}")
-                params.append(f"{param}{ipname}b{beam}_l")
-                params.append(f"{param}{ipname}b{beam}_r")
-        return params
-
-    def __init__(
-        self,
-        name=None,
-        strengths=None,
-        params=None,
-        knobs=None,
-        start=None,
-        end=None,
-        filename=None,
-        parent=None,
-    ):
-        if name is None:
-            name = self.__class__.name
-        irn = int(name[-1])
-        start = f"s.ds.l{irn}"
-        end = f"e.ds.r{irn}"
-        super().__init__(
-            name,
-            start,
-            end,
-            strengths,
-            params,
-            knobs,
-            filename=filename,
-            parent=parent,
-        )
-        self.arc_left_name = f"a{lhcprev(irn)}{irn}"
-        self.arc_right_name = f"a{irn}{lhcsucc(irn)}"
-        self.init_left = None
-        self.init_right = None
-        self.irn = irn
-        self.ipname = f"ip{irn}"
-        self.startb1 = f"s.ds.l{irn}.b1"
-        self.startb2 = f"s.ds.l{irn}.b2"
-        self.endb1 = f"e.ds.r{irn}.b1"
-        self.endb2 = f"e.ds.r{irn}.b2"
-        self.startb12 = (self.startb1, self.startb2)
-        self.endb12 = (self.endb1, self.endb2)
-        self.param_names = self._get_param_default_names()
-        self.param_names.extend(self._extra_param_names)
-
     @classmethod
     def from_madx(cls, madx, name=None):
         madmodel = LHCMadxModel(madx)
@@ -121,8 +67,75 @@ class LHCIR(LHCSection):
         madx.call(filename)
         return cls.from_madx(madx, name)
 
-    def to_table(self, *rows):
-        return LHCIRTable([self] + list(rows))
+    def __init__(
+        self,
+        name=None,
+        strengths=None,
+        params=None,
+        knobs=None,
+        start=None,
+        end=None,
+        filename=None,
+        parent=None,
+    ):
+        if name is None:
+            name = self.__class__.name
+        irn = int(name[-1])
+        start = f"s.ds.l{irn}"
+        end = f"e.ds.r{irn}"
+        super().__init__(
+            name,
+            start,
+            end,
+            strengths,
+            params,
+            knobs,
+            filename=filename,
+            parent=parent,
+        )
+        self.arc_left_name = f"a{lhcprev(irn)}{irn}"
+        self.arc_right_name = f"a{irn}{lhcsucc(irn)}"
+        self.init_left = None
+        self.init_right = None
+        self.irn = irn
+        self.ipname = f"ip{irn}"
+        self.startb1 = f"s.ds.l{irn}.b1"
+        self.startb2 = f"s.ds.l{irn}.b2"
+        self.endb1 = f"e.ds.r{irn}.b1"
+        self.endb2 = f"e.ds.r{irn}.b2"
+        self.startb12 = (self.startb1, self.startb2)
+        self.endb12 = (self.endb1, self.endb2)
+        self.param_names = self._get_param_default_names()
+        self.param_names.extend(self._extra_param_names)
+
+
+
+    def __getitem__(self, key):
+        if re.match(r"kqx[123]\.[lr]", key):
+            return self.get_kqx(int(key[3]), key[-2])
+        return super().__getitem__(key)
+
+
+    def __repr__(self):
+        if self.parent is not None:
+            return f"<LHCIR{self.irn} in {self.parent.name!r}>"
+        elif self.filename is not None:
+            return f"<LHCIR{self.irn} from {self.filename!r}>"
+        else:
+            return f"<LHCIR{self.irn}>"
+
+    def _get_param_default_names(self):
+        ipname = self.ipname
+        params = []
+        for param in "betx bety alfx alfy dx dy".split():
+            for beam in "12":
+                params.append(f"{param}{ipname}{beam}")
+        for param in "mux muy".split():
+            for beam in "12":
+                params.append(f"{param}{ipname}b{beam}")
+                params.append(f"{param}{ipname}b{beam}_l")
+                params.append(f"{param}{ipname}b{beam}_r")
+        return params
 
     @property
     def arc_left(self):
@@ -146,10 +159,15 @@ class LHCIR(LHCSection):
     def kqxr(self):
         return [k for k in self.quads if "r" in k and "x" in k]
 
-    def __getitem__(self, key):
-        if re.match(r"kqx[123]\.[lr]", key):
-            return self.get_kqx(int(key[3]), key[-2])
-        return super().__getitem__(key)
+    def check_quad_strengths(
+        self, verbose=False, p0c=None, ratio_threshold=1.5
+    ):
+        if p0c is None:
+            p0c = self.parent.params["p0c"]
+        self.get_quad_max_ratio(
+            verbose=verbose, ratio_threshold=ratio_threshold
+        )
+
 
     def get_kqx(self, n, lr):
         side = lr + f"{self.irn}"
@@ -161,101 +179,6 @@ class LHCIR(LHCSection):
             return kq + ktq
         else:
             raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
-
-    def set_init(self):
-        arcleft = self.arc_left
-        self.init_left = {
-            1: arcleft.twiss_init(1)[1],
-            2: arcleft.twiss_init(2)[1],
-        }
-        arcright = self.arc_right
-        self.init_right = {
-            1: arcright.twiss_init(1)[0],
-            2: arcright.twiss_init(2)[0],
-        }
-
-    def twiss_from_init(self, beam=None, strengths=True):
-        if beam is None:
-            return [
-                self.twiss_from_init(beam=1, strengths=strengths),
-                self.twiss_from_init(beam=2, strengths=strengths),
-            ]
-        if self.init_left is None:
-            self.set_init()
-        start = self.startb12[beam - 1]
-        end = self.endb12[beam - 1]
-        return self.model.sequence[beam].twiss(
-            start=start,
-            end=end,
-            init=self.init_left[beam],
-            strengths=strengths,
-        )
-
-    def twiss_from_params(self, beam):
-        if beam is None:
-            return [
-                self.twiss_from_params(beam=1),
-                self.twiss_from_params(beam=2),
-            ]
-        sequence = self.model.sequence[beam]
-        init = xt.TwissInit(
-            element_name=self.ipname,
-            betx=self.params[f"betx{self.ipname}{beam}"],
-            alfx=self.params[f"alfx{self.ipname}{beam}"],
-            bety=self.params[f"bety{self.ipname}{beam}"],
-            alfy=self.params[f"alfy{self.ipname}{beam}"],
-            dx=self.params[f"dx{self.ipname}{beam}"],
-            dy=self.params[f"dy{self.ipname}{beam}"],
-        )
-        return sequence.twiss(
-            start=self.startb12[beam - 1], end=self.endb12[beam - 1], init=init
-        )
-
-    def twiss_full(self, beam, strengths=True):
-        if beam is None:
-            return [
-                self.twiss_full(beam=1, strengths=strengths),
-                self.twiss_full(beam=2, strengths=strengths),
-            ]
-        sequence = self.model.sequence[beam]
-        start = self.startb12[beam - 1]
-        end = self.endb12[beam - 1]
-        init = sequence.twiss(strengths=strengths).get_twiss_init(start)
-        return sequence.twiss(
-            start=start, end=end, init=init, strengths=strengths
-        )
-
-    def twiss(self, beam=None, method="init", strengths=True):
-        if method == "init":
-            return self.twiss_from_init(beam, strengths=strengths)
-        elif method == "full":
-            return self.twiss_full(beam, strengths=strengths)
-        elif method == "params":
-            return self.twiss_from_params(beam, strengths=strengths)
-
-    def plot(self, beam=None, method="init", figlabel=None, yr="", yl=""):
-        if beam is None:
-            if figlabel is None:
-                figlabel1 = f"{self.name}b1"
-                figlabel2 = f"{self.name}b2"
-            return [
-                self.plot(
-                    beam=1, method=method, figlabel=figlabel1, yr=yr, yl=yl
-                ),
-                self.plot(
-                    beam=2, method=method, figlabel=figlabel2, yr=yr, yl=yl
-                ),
-            ]
-        else:
-            if method == "init":
-                mktwiss = self.twiss_from_init
-            elif method == "full":
-                mktwiss = self.twiss_full
-            elif method == "params":
-                mktwiss = self.twiss_from_params
-            if figlabel is None:
-                figlabel = f"{self.name}b{beam}"
-            return mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
 
     def get_params_from_twiss(self, tw1, tw2):
         ipname = self.ipname
@@ -399,11 +322,20 @@ class LHCIR(LHCSection):
                 varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
 
-    def disable_bumps(self):
-        for k, knob in self.knob_names.items():
-            if re.match(r"on_[xsao]", k):
-                knob.value = 0
-                self.parent.model[k] = 0
+    def get_quad_max_ratio(self, verbose=False, ratio_threshold=1.5):
+        rmax = 1
+        for k, v in self.strengths.items():
+            if "b1" in k and abs(v) > 0 and "kqt" not in k:
+                k2 = k.replace("b1", "b2")
+                rat = abs(v / self.strengths[k2])
+                rat1 = rat if rat > 1 else 1 / rat
+                if verbose and rat1 > ratio_threshold:
+                    print(f"Ratio {k}/{k2} = {rat:.5f}")
+                if rat1 > rmax:
+                    rmax = rat1
+        if verbose:
+            print(f"Max ratio {self}: {rmax:.5f}")
+        return rmax
 
     def match(
         self,
@@ -553,6 +485,44 @@ class LHCIR(LHCSection):
         match.vary_status()
         return match
 
+
+    def match_knobs(self, **kwargs):
+        for knob in self.knobs.values():
+            if hasattr(knob, "match"):
+                knob.match(**kwargs)
+        return self
+
+ 
+    def plot(self, beam=None, method="init", figlabel=None, yr="", yl=""):
+        if beam is None:
+            if figlabel is None:
+                figlabel1 = f"{self.name}b1"
+                figlabel2 = f"{self.name}b2"
+            return [
+                self.plot(
+                    beam=1, method=method, figlabel=figlabel1, yr=yr, yl=yl
+                ),
+                self.plot(
+                    beam=2, method=method, figlabel=figlabel2, yr=yr, yl=yl
+                ),
+            ]
+        else:
+            if method == "init":
+                mktwiss = self.twiss_from_init
+            elif method == "full":
+                mktwiss = self.twiss_full
+            elif method == "params":
+                mktwiss = self.twiss_from_params
+            if figlabel is None:
+                figlabel = f"{self.name}b{beam}"
+            return mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
+
+    def set_bumps_off(self):
+        for k, knob in self.knob_names.items():
+            if re.match(r"on_[xsao]", k):
+                knob.value = 0
+                self.parent.model[k] = 0
+
     def set_betastar(self, beta=None, ratio=1.0):
         if self.irn in [1, 2, 5, 8]:
             self.params[f"betx{self.ipname}b1"] = beta
@@ -561,6 +531,18 @@ class LHCIR(LHCSection):
             self.params[f"bety{self.ipname}b2"] = beta / ratio
         else:
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")
+ 
+    def set_init(self):
+        arcleft = self.arc_left
+        self.init_left = {
+            1: arcleft.twiss_init(1)[1],
+            2: arcleft.twiss_init(2)[1],
+        }
+        arcright = self.arc_right
+        self.init_right = {
+            1: arcright.twiss_init(1)[0],
+            2: arcright.twiss_init(2)[0],
+        }
 
     def specialize_knobs(self):
         for k, knob in list(self.knobs.items()):
@@ -568,40 +550,66 @@ class LHCIR(LHCSection):
             ## of an already specialized knob
             self.knobs[k] = knob.specialize(knob)
 
-    def __repr__(self):
-        if self.parent is not None:
-            return f"<LHCIR{self.irn} in {self.parent.name!r}>"
-        elif self.filename is not None:
-            return f"<LHCIR{self.irn} from {self.filename!r}>"
-        else:
-            return f"<LHCIR{self.irn}>"
+    def to_table(self, *rows):
+        return LHCIRTable([self] + list(rows))
 
-    def get_quad_max_ratio(self, verbose=False, ratio_threshold=1.5):
-        rmax = 1
-        for k, v in self.strengths.items():
-            if "b1" in k and abs(v) > 0 and "kqt" not in k:
-                k2 = k.replace("b1", "b2")
-                rat = abs(v / self.strengths[k2])
-                rat1 = rat if rat > 1 else 1 / rat
-                if verbose and rat1 > ratio_threshold:
-                    print(f"Ratio {k}/{k2} = {rat:.5f}")
-                if rat1 > rmax:
-                    rmax = rat1
-        if verbose:
-            print(f"Max ratio {self}: {rmax:.5f}")
-        return rmax
 
-    def check_quad_strengths(
-        self, verbose=False, p0c=None, ratio_threshold=1.5
-    ):
-        if p0c is None:
-            p0c = self.parent.params["p0c"]
-        self.get_quad_max_ratio(
-            verbose=verbose, ratio_threshold=ratio_threshold
+    def twiss(self, beam=None, method="init", strengths=True):
+        if method == "init":
+            return self.twiss_from_init(beam, strengths=strengths)
+        elif method == "full":
+            return self.twiss_full(beam, strengths=strengths)
+        elif method == "params":
+            return self.twiss_from_params(beam, strengths=strengths)
+
+    def twiss_from_init(self, beam=None, strengths=True):
+        if beam is None:
+            return [
+                self.twiss_from_init(beam=1, strengths=strengths),
+                self.twiss_from_init(beam=2, strengths=strengths),
+            ]
+        if self.init_left is None:
+            self.set_init()
+        start = self.startb12[beam - 1]
+        end = self.endb12[beam - 1]
+        return self.model.sequence[beam].twiss(
+            start=start,
+            end=end,
+            init=self.init_left[beam],
+            strengths=strengths,
         )
 
-    def match_knobs(self, **kwargs):
-        for knob in self.knobs.values():
-            if hasattr(knob, "match"):
-                knob.match(**kwargs)
-        return self
+    def twiss_from_params(self, beam):
+        if beam is None:
+            return [
+                self.twiss_from_params(beam=1),
+                self.twiss_from_params(beam=2),
+            ]
+        sequence = self.model.sequence[beam]
+        init = xt.TwissInit(
+            element_name=self.ipname,
+            betx=self.params[f"betx{self.ipname}{beam}"],
+            alfx=self.params[f"alfx{self.ipname}{beam}"],
+            bety=self.params[f"bety{self.ipname}{beam}"],
+            alfy=self.params[f"alfy{self.ipname}{beam}"],
+            dx=self.params[f"dx{self.ipname}{beam}"],
+            dy=self.params[f"dy{self.ipname}{beam}"],
+        )
+        return sequence.twiss(
+            start=self.startb12[beam - 1], end=self.endb12[beam - 1], init=init
+        )
+
+    def twiss_full(self, beam, strengths=True):
+        if beam is None:
+            return [
+                self.twiss_full(beam=1, strengths=strengths),
+                self.twiss_full(beam=2, strengths=strengths),
+            ]
+        sequence = self.model.sequence[beam]
+        start = self.startb12[beam - 1]
+        end = self.endb12[beam - 1]
+        init = sequence.twiss(strengths=strengths).get_twiss_init(start)
+        return sequence.twiss(
+            start=start, end=end, init=init, strengths=strengths
+        )
+

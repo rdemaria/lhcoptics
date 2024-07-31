@@ -153,12 +153,12 @@ class LHCXsuiteModel:
     def b2s(self):
         return self.multiline.b2s
 
+    def info(self, k):
+        return self.multiline.vars[k]._info(limit=None)
+
     @property
     def p0c(self):
         return self.multiline.b1.particle_ref.p0c[0]
-
-    def info(self, k):
-        return self.multiline.vars[k]._info(limit=None)
 
     @p0c.setter
     def p0c(self, value):
