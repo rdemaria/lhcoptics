@@ -54,6 +54,14 @@ class LHCOptics:
     knob_names += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
 
     @classmethod
+    def get_default_knob_names(cls):
+        out = cls.knob_names[:]
+        for ss in cls._irs:
+            out.extend(ss.knob_names)
+        return out
+
+
+    @classmethod
     def from_dict(
         cls,
         data,
@@ -71,8 +79,6 @@ class LHCOptics:
         arcs = [LHCArc.from_dict(d) for d in data["arcs"]]
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
-        if isinstance(circuits, str) or isinstance(circuits, Path):
-            circuits = LHCCircuits.from_json(circuits)
         out = cls(
             name=data.get("name", name),
             irs=irs,
@@ -86,8 +92,7 @@ class LHCOptics:
         elif madx_model is not None:
             out.set_madx_model(madx_model)
         if circuits is not None:
-            if isinstance(circuits, str) or isinstance(circuits, Path):
-                out.set_circuits_from_json(circuits)
+            out.set_circuits(circuits)
         if aperture is not None:
             if isinstance(aperture, str) or isinstance(aperture, Path):
                 out.aperture = LHCAperture.from_json(aperture)
@@ -121,12 +126,6 @@ class LHCOptics:
             )
             return out
 
-    @classmethod
-    def get_default_knob_names(cls):
-        out = cls.knob_names[:]
-        for ss in cls._irs:
-            out.extend(ss.knob_names)
-        return out
 
     @classmethod
     def from_madx(
@@ -153,7 +152,7 @@ class LHCOptics:
         if xsuite_model is not None:
             self.set_xsuite_model(xsuite_model, verbose=verbose)
         if circuits is not None:
-            self.set_circuits_from_json(circuits)
+            self.set_circuits(circuits)
         return self
 
     @classmethod
@@ -428,6 +427,14 @@ class LHCOptics:
         )
         return ratios.max()
 
+    def is_ats(self):
+        return (
+            self.params.get("rx_ip1", 1) != 1
+            or self.params.get("ry_ip1", 1) != 1
+            or self.params.get("rx_ip5", 1) != 1
+            or self.params.get("ry_ip5", 1) != 1
+        )
+
     def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="all", solve=True):
         """
         NB: breaks knobs and restore them
@@ -496,13 +503,6 @@ class LHCOptics:
             )
             self.check()
 
-    def round_params(self, full=False):
-        if full:
-            for ss in self.irs + self.arcs:
-                ss.round_params()
-        for k, v in self.params.items():
-            self.params[k] = round(v, 6)
-
     def plot(self, beam=None):
         if beam is None:
             for beam in [1, 2]:
@@ -511,14 +511,23 @@ class LHCOptics:
             self.twiss(beam=beam).plot()
         return self
 
+    def round_params(self, full=False):
+        if full:
+            for ss in self.irs + self.arcs:
+                ss.round_params()
+        for k, v in self.params.items():
+            self.params[k] = round(v, 6)
+
     def set_bumps_off(self):
         for ir in self.irs:
             ir.set_bumps_off()
 
-    def set_circuits_from_json(self, filename):
-        from .circuits import LHCCircuits
-
-        self.circuits = LHCCircuits.from_json(filename)
+    def set_circuits(self, circuits):       
+        if isinstance(circuits, str) or isinstance(circuits, Path):
+            from .circuits import LHCCircuits
+            self.circuits = LHCCircuits.from_json(circuits)
+        else:
+            self.circuits = circuits
         return self
 
     def set_init(self):
@@ -645,7 +654,7 @@ class LHCOptics:
                 if verbose:
                     print(f"Update {self} from model")
                 for ss in self.irs + self.arcs:
-                    ss.update(src, verbose=verbose)
+                    ss.update(getattr(src,ss.name), verbose=verbose)
             else:
                 for ss in self.irs + self.arcs:
                     if hasattr(src, ss.name):

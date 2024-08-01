@@ -533,15 +533,16 @@ class LHCIR(LHCSection):
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")
  
     def set_init(self):
+        
         arcleft = self.arc_left
         self.init_left = {
-            1: arcleft.twiss_init(1)[1],
-            2: arcleft.twiss_init(2)[1],
+            1: arcleft.get_init_right(1),
+            2: arcleft.get_init_right(2),
         }
         arcright = self.arc_right
         self.init_right = {
-            1: arcright.twiss_init(1)[0],
-            2: arcright.twiss_init(2)[0],
+            1: arcright.get_init_left(1),
+            2: arcright.get_init_left(2),
         }
 
     def specialize_knobs(self):

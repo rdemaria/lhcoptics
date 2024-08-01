@@ -3,7 +3,7 @@ from lhcoptics import LHCOptics
 inj = LHCOptics.from_json("data/opt_inj.json", xsuite_model="data/lhc.json")
 inj.name = "inj"
 inj.params["match_inj"] = True
-inj.set_circuits_from_json("data/lhccircuits.json")
+inj.set_circuits("data/lhccircuits.json")
 inj.set_knobs_off()
 inj.set_params()
 inj.update()

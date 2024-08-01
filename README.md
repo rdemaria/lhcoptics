@@ -68,3 +68,15 @@ Methods:
 - `twiss_init(beam)`: get twiss init at boundaries of the arc from periodic solution
 - `twiss_init_cell(beam)`: get twiss init at boundaries of cell
 - `twiss_cell(beam)`: get periodic solution of cell
+
+
+
+## Code style
+
+Class definitions, camel case alphabetically sorted:
+- class variables lower snake case alphabetically sorted
+- static methods
+- class methods
+- init
+- other special double underscore methods
+- methods starting with verb lower snake case alphabetically sorteddsf

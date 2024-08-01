@@ -80,3 +80,21 @@ class LHCIR6(LHCIR):
         params["tcdqmingapb2"]=tcdq_mingap(params["betxtcdqb2"],params["dxtcdqb2"])
         params["tcdqgapb2"] =tcdq_gap(params["betxtcdqb2"])
         return params
+    
+    
+    def set_init(self):
+        if self.parent.is_ats():
+            self.init_left={
+                1: self.parent.ir5.get_init_ats_right(1),
+                2: self.parent.ir5.get_init_ats_right(2),
+            }
+        else:
+            self.init_left = {
+               1: self.arc_left.get_init_right(1),
+               2: self.arc_left.get_init_right(2),
+        }        
+    
+        self.init_right = {
+                1: self.arc_right.get_init_left(1),
+                2: self.arc_right.get_init_left(2),
+            }
