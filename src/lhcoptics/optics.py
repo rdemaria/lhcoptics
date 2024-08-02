@@ -654,7 +654,7 @@ class LHCOptics:
                 if verbose:
                     print(f"Update {self} from model")
                 for ss in self.irs + self.arcs:
-                    ss.update(getattr(src,ss.name), verbose=verbose)
+                    ss.update(src, verbose=verbose)
             else:
                 for ss in self.irs + self.arcs:
                     if hasattr(src, ss.name):

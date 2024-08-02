@@ -108,13 +108,10 @@ class LHCIR(LHCSection):
         self.param_names = self._get_param_default_names()
         self.param_names.extend(self._extra_param_names)
 
-
-
     def __getitem__(self, key):
         if re.match(r"kqx[123]\.[lr]", key):
             return self.get_kqx(int(key[3]), key[-2])
         return super().__getitem__(key)
-
 
     def __repr__(self):
         if self.parent is not None:
@@ -168,7 +165,6 @@ class LHCIR(LHCSection):
             verbose=verbose, ratio_threshold=ratio_threshold
         )
 
-
     def get_kqx(self, n, lr):
         side = lr + f"{self.irn}"
         kq = self.strengths[f"kqx.{side}"]
@@ -213,9 +209,18 @@ class LHCIR(LHCSection):
             tw2 = self.twiss_full(2, strengths=False)
         params = self.get_params_from_twiss(tw1, tw2)
         return {k: np.round(v, 8) for k, v in params.items()}
+    
+    def get_extra_match_targets(self):
+        return []
 
     def get_match_targets(
-        self, lrphase=False, left=True, right=True, b1=True, b2=True
+        self,
+        lrphase=False,
+        left=True,
+        right=True,
+        b1=True,
+        b2=True,
+        phase=True,
     ):
         lines = []
         inits_r = []
@@ -233,7 +238,7 @@ class LHCIR(LHCSection):
 
         targets = []
 
-        if right:
+        if right and phase:
             for tt in ["mux", "muy"]:
                 for ll, end in zip(lines, ends):
                     targets.append(
@@ -348,6 +353,9 @@ class LHCIR(LHCSection):
         sym_triplets=True,
         no_triplets=False,
         lrphase=False,
+        phase=True,
+        left=True,
+        right=True,
         extra_targets=None,
         vary_ratio=None,
         ratio_threshold=1.5,
@@ -371,7 +379,15 @@ class LHCIR(LHCSection):
         if dkmax is None:
             dkmax = self.parent.params.get("match_dkmax", 0.01)
 
-        targets = LHCIR.get_match_targets(self, b1=b1, b2=b2)
+        targets = LHCIR.get_match_targets(
+            self,
+            b1=b1,
+            b2=b2,
+            phase=phase,
+            left=left,
+            right=right,
+            lrphase=lrphase,
+        )
         if extra_targets is not None:
             for name, attr in extra_targets.items():
                 if name.endswith("b1"):
@@ -392,6 +408,9 @@ class LHCIR(LHCSection):
                         tag=f"{name}_{attr}",
                     )
                 )
+                
+        for target in self.get_extra_match_targets():
+            targets.append(target)
 
         varylst = LHCIR.get_match_vary(
             self,
@@ -485,14 +504,12 @@ class LHCIR(LHCSection):
         match.vary_status()
         return match
 
-
     def match_knobs(self, **kwargs):
         for knob in self.knobs.values():
             if hasattr(knob, "match"):
                 knob.match(**kwargs)
         return self
 
- 
     def plot(self, beam=None, method="init", figlabel=None, yr="", yl=""):
         if beam is None:
             if figlabel is None:
@@ -531,9 +548,9 @@ class LHCIR(LHCSection):
             self.params[f"bety{self.ipname}b2"] = beta / ratio
         else:
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")
- 
+
     def set_init(self):
-        
+
         arcleft = self.arc_left
         self.init_left = {
             1: arcleft.get_init_right(1),
@@ -553,7 +570,6 @@ class LHCIR(LHCSection):
 
     def to_table(self, *rows):
         return LHCIRTable([self] + list(rows))
-
 
     def twiss(self, beam=None, method="init", strengths=True):
         if method == "init":
@@ -613,4 +629,3 @@ class LHCIR(LHCSection):
         return sequence.twiss(
             start=start, end=end, init=init, strengths=strengths
         )
-
