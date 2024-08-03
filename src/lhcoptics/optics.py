@@ -297,14 +297,17 @@ class LHCOptics:
             opt = ss.match()
             print(f"{ss.name} {opt.within_tol}")
 
-    def copy(self):
+    def copy(self,name=None):
+        if name is None:
+            name = self.name
         other = self.__class__(
-            self.name,
+            name=name,
             params=self.params.copy(),
             knobs={k: v.copy() for k, v in self.knobs.items()},
             irs=[ir.copy() for ir in self.irs],
             arcs=[arc.copy() for arc in self.arcs],
             circuits=self.circuits,
+            model=self.model,
         )
         return other
 

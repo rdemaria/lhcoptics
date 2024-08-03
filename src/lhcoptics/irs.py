@@ -234,8 +234,6 @@ class LHCIR(LHCSection):
             inits_r.append(self.init_right[2])
             ends.append(self.endb2)
 
-        lines = [f"b{beam}" for beam in [1, 2]]
-
         targets = []
 
         if right and phase:
@@ -302,28 +300,31 @@ class LHCIR(LHCSection):
     ):
         varylst = []
         for kk in self.quads:
-            limits = self.parent.circuits.get_klimits(
-                kk, self.parent.params["p0c"]
-            )
-            if abs(limits[0]) > abs(limits[1]) * 1.2:
-                limits[0] *= 1 - dkmax
-                limits[1] *= 1 + dkmin
-            elif abs(limits[0]) < abs(limits[1]) * 0.8:
-                limits[0] *= 1 + dkmin
-                limits[1] *= 1 - dkmax
-            else:
-                limits[0] *= 1 - dkmax
-                limits[1] *= 1 - dkmax
-            if "b1" in kk and b1:
-                tag = "b1"
-                add = True
-            elif "b2" in kk and b2:
-                tag = "b2"
-                add = True
+            add=False
+            if "b1" in kk:
+                if b1:
+                   tag = "b1"
+                   add = True
+            elif "b2" in kk:
+                if b2:
+                   tag = "b2"
+                   add = True
             elif common:
                 tag = "common"
                 add = True
             if add:
+                limits = self.parent.circuits.get_klimits(
+                    kk, self.parent.params["p0c"]
+                )
+                if abs(limits[0]) > abs(limits[1]) * 1.2:
+                    limits[0] *= 1 - dkmax
+                    limits[1] *= 1 + dkmin
+                elif abs(limits[0]) < abs(limits[1]) * 0.8:
+                    limits[0] *= 1 + dkmin
+                    limits[1] *= 1 - dkmax
+                else:
+                    limits[0] *= 1 - dkmax
+                    limits[1] *= 1 - dkmax
                 varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
 

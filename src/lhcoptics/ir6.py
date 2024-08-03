@@ -1,5 +1,7 @@
 import numpy as np
 
+import xtrack as xt
+
 from .irs import LHCIR
 
 
@@ -17,12 +19,47 @@ def tcdq_mingap(bet, dx):
         nsig * np.sqrt(emitx * bet) - 3e-4 - abs(dx * dpoverp) - maxorbitdrift
     )
 
-
 def tcdq_gap(bet):
     nsigma = 10.1
     emitx = 2.5e-6 / (7000 / 0.9382720814)
     return nsigma * np.sqrt(emitx * bet)
 
+def dmuxkickb1(tw1):
+    muxmkdb1 = tw1["mux", "mkd.h5l6.b1"]
+    dmuxb1 = (
+        np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"])
+        - muxmkdb1
+    )
+    return abs(dmuxb1 - 0.25).max()
+
+def dmuxkickb2(tw2):
+    muxmkdb2 = tw2["mux", "mkd.h5r6.b2"]
+    dmuxb2 = (
+        muxmkdb2 - 
+        np.array([tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"])
+    )
+    return abs(dmuxb2 - 0.25).max()
+
+def dmuxkickb1_bds(tw1):
+    return tw1["mux", "mkd.h5l6.b1"] - tw1["mux", "s.ds.l6.b1"]
+
+def dmuxkickb2_bds(tw2):
+    return tw2["mux", "mkd.h5r6.b2"] - tw2["mux", "s.ds.l6.b2"]
+
+def dmuxkickb1_eds(tw1):
+    return tw1["mux", "e.ds.r6.b1"] - tw1["mux", "mkd.h5l6.b1"]
+
+def dmuxkickb2_eds(tw2):
+    return tw2["mux", "e.ds.r6.b2"] - tw2["mux", "mkd.h5r6.b2"]
+    
+def betxdump(tw):
+    return beta_dump(tw["betx", "ip6"], tw["alfx", "ip6"])
+
+def betydump(tw):
+    return beta_dump(tw["bety", "ip6"], tw["alfy", "ip6"])
+
+def betxydump(tw):
+    return np.sqrt(betxdump(tw)*betydump(tw))
 
 class LHCIR6(LHCIR):
     name = "ir6"
@@ -189,3 +226,223 @@ class LHCIR6(LHCIR):
             bety=ir5.params[f"betyip5b{beam}"] / ry,
         )
         return tw
+
+    def matchb1(self,dkmin=0.01,dkmax=0.01, 
+                extra=True):
+        lhc=self.parent.model.multiline
+        
+        targets=LHCIR.get_match_targets(
+            self,
+            b1=True,
+            b2=False,
+        )
+        targets.extend([
+            xt.Target(
+                line="b1",
+                tar=dmuxkickb1,
+                value=0,
+                tol=0.012, # 4.2 degrees
+                tag="ex_dmux_kickb1",
+            ),
+            xt.Target(
+                line="b1",
+                tar=betxdump,
+                value=xt.GreaterThan(3200),
+                tol=1,
+                tag="ex_betx_dump",
+            ),
+            xt.Target(
+                line="b1",
+                tar=betydump,
+                value=xt.GreaterThan(3200),#4000
+                tol=1,
+                tag="ex_bety_dump",
+            ),
+            xt.Target(
+                line="b1",
+                tar=betxydump,
+                value=xt.GreaterThan(4400), #4400
+                tol=1,
+                tag="ex_bet_dump",
+            ),
+            xt.Target(
+                line="b1",
+                tar="betx",
+                at="tcdqa.a4r6.b1",
+                value=490,
+                tol=20,
+                tag="ex_betx_tcdqa",
+            ),
+            xt.Target(
+                line="b1",
+                tar="bety",
+                at="tcdqa.a4r6.b1",
+                value=xt.GreaterThan(145),
+                tol=1,
+                tag="ex_bety_tcdqa",
+            ),
+            xt.Target(
+                line="b1",
+                tar="dx",
+                at="tcdqa.a4r6.b1",
+                value=0,
+                tol=0.7,
+                tag="ex_dx_tcdqa",
+            ), 
+            xt.Target(
+                line="b1",
+                tar="bety",
+                at="tcdsa.4l6.b1",
+                value=xt.GreaterThan(145), #200
+                tol=10,
+                tag="ex_bety_tcdsa",
+            ),
+            xt.Target(
+                line="b1",
+                tar=dmuxkickb1_bds,
+                value=0,
+                tol=100,
+                tag="ex_dmuxkickb1_bds",
+            ),
+            ],
+        )
+        
+        vary=LHCIR.get_match_vary(
+            self,
+            b1=True,
+            b2=False,
+            dkmin=dkmin,
+            dkmax=dkmax,
+        )
+        
+        match = lhc.match(
+            solve=False,
+            default_tol={None: 5e-8},
+            solver_options=dict(max_rel_penalty_increase=2.0),
+            lines=["b1"],
+            start=[self.startb1],
+            end=[self.endb1],
+            init=[self.init_left[1]],
+            targets=targets,
+            vary=vary,
+            check_limits=False,
+            strengths=False,
+        )
+        if extra:
+            match.disable(target="ip_.*")
+        else:
+            match.disable(target="ex_.*")
+        
+        match.disable(vary_name="kq4.l6b1")
+        return match
+        
+        
+    def matchb2(self,dkmin=0.01,dkmax=0.01, 
+                extra=True):
+        lhc=self.parent.model.multiline
+        
+        targets=LHCIR.get_match_targets(
+            self,
+            b1=False,
+            b2=True,
+        )
+        targets.extend([
+            xt.Target(
+                line="b2",
+                tar=dmuxkickb2,
+                value=0,
+                tol=0.0123, # 4.4 degrees
+                tag="ex_dmux_kickb2",
+            ),
+            xt.Target(
+                line="b2",
+                tar=betxdump,
+                value=xt.GreaterThan(3200),
+                tol=1,
+                tag="ex_betx_dump",
+            ),
+            xt.Target(
+                line="b2",
+                tar=betydump,
+                value=xt.GreaterThan(3200),#4000
+                tol=1,
+                tag="ex_bety_dump",
+            ),
+            xt.Target(
+                line="b2",
+                tar=betxydump,
+                value=xt.GreaterThan(4400), #4400
+                tol=1,
+                tag="ex_bet_dump",
+            ),
+            xt.Target(
+                line="b2",
+                tar="betx",
+                at="tcdqa.a4l6.b2",
+                value=490,
+                tol=20,
+                tag="ex_betx_tcdqa",
+            ),
+            xt.Target(
+                line="b2",
+                tar="bety",
+                at="tcdqa.a4l6.b2",
+                value=xt.GreaterThan(145),
+                tol=1,
+                tag="ex_bety_tcdqa",
+            ),
+            xt.Target(
+                line="b2",
+                tar="dx",
+                at="tcdqa.a4l6.b2",
+                value=0,
+                tol=0.7,
+                tag="ex_dx_tcdqa",
+            ), 
+            xt.Target(
+                line="b2",
+                tar="bety",
+                at="tcdsa.4r6.b2",
+                value=xt.GreaterThan(145), #200
+                tol=10,
+                tag="ex_bety_tcdsa",
+            ),
+            xt.Target(
+                line="b2",
+                tar=dmuxkickb2_bds,
+                value=0,
+                tol=100,
+                tag="ex_dmuxkickb2_bds",),
+        ])
+        
+        vary=LHCIR.get_match_vary(
+            self,
+            b1=False,
+            b2=True,
+            dkmin=dkmin,
+            dkmax=dkmax,
+        )
+        
+        match = lhc.match(
+            solve=False,
+            default_tol={None: 5e-8},
+            solver_options=dict(max_rel_penalty_increase=2.0),
+            lines=["b2"],
+            start=[self.startb2],
+            end=[self.endb2],
+            init=[self.init_left[2]],
+            targets=targets,
+            vary=vary,
+            check_limits=False,
+            strengths=False,
+        )
+        
+        if extra:
+            match.disable(target="ip_.*")
+        else:
+            match.disable(target="ex_.*")
+            
+        match.disable(vary_name="kq4.r6b2")
+        
+        return match
+            
