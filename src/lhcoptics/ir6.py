@@ -151,8 +151,8 @@ class LHCIR6(LHCIR):
         muxmkdb2 = tw2["mux", "mkd.h5r6.b2"]
         params["dmuxkickb2_tcsg"] = tw2["mux", "tcsp.a4l6.b2"] - muxmkdb2
         dmuxb2 = (
-            np.array([tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"])
-            - muxmkdb2
+            muxmkdb2
+            - np.array([tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"])
         )
         for i, abc in enumerate("abc"):
             params[f"dmuxkickb2_tcdq{abc}"] = dmuxb2[i]

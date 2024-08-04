@@ -60,7 +60,6 @@ class LHCOptics:
             out.extend(ss.knob_names)
         return out
 
-
     @classmethod
     def from_dict(
         cls,
@@ -125,7 +124,6 @@ class LHCOptics:
                 name=name,
             )
             return out
-
 
     @classmethod
     def from_madx(
@@ -276,11 +274,12 @@ class LHCOptics:
             if header:
                 header = False
             tw2.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
+        print("         HB1         HB2         VB1         VB2")
         print(
-            f"Tunes:  {tw1.qx:9.6f} {tw2.qx:9.6f} {tw1.qy:9.6f} {tw2.qy:9.6f}"
+            f"Tunes:  {tw1.qx:11.6f} {tw2.qx:11.6f} {tw1.qy:11.6f} {tw2.qy:11.6f}"
         )
         print(
-            f"Chroma: {tw1.dqx:9.6f} {tw2.dqx:9.6f} {tw1.dqy:9.6f} {tw2.dqy:9.6f}"
+            f"Chroma: {tw1.dqx:11.6f} {tw2.dqx:11.6f} {tw1.dqy:11.6f} {tw2.dqy:11.6f}"
         )
         return self
 
@@ -297,7 +296,7 @@ class LHCOptics:
             opt = ss.match()
             print(f"{ss.name} {opt.within_tol}")
 
-    def copy(self,name=None):
+    def copy(self, name=None):
         if name is None:
             name = self.name
         other = self.__class__(
@@ -387,6 +386,67 @@ class LHCOptics:
         if line.element_names[0] != "ip1":
             line.cycle("ip1", inplace=True)
         return cmin.real, cmin.imag
+
+    def get_mkdtct(self, tw1=None, tw2=None):
+        """
+        B1: IP1 TCT IP5       MKD IP6      TCP IP7        TCT IP1
+        B2: IP1     IP5 TCT       IP6 MKD      IP7 TCP        IP1 TCT
+        """
+        if tw1 is None:
+            tw1 = self.twiss(1, strengths=False)
+        if tw2 is None:
+            tw2 = self.twiss(2, strengths=False)
+        mux_tcphb1 = tw1["mux", "tcp.b6l7.b1"]
+        muy_tcpvb1 = tw1["muy", "tcp.d6l7.b1"]
+        mux_tct5b1 = tw1["mux", "tctph.4l5.b1"]
+        muy_tct5b1 = tw1["muy", "tctpv.4l5.b1"]
+        mux_tct1b1 = tw1["mux", "tctph.4l1.b1"]
+        muy_tct1b1 = tw1["muy", "tctpv.4l1.b1"]
+        mux_tct8b1 = tw1["mux", "tctph.4l8.b1"]
+        muy_tct8b1 = tw1["muy", "tctpv.4l8.b1"]
+        mux_mkdob1 = tw1["mux", "mkd.o5l6.b1"]
+        mux_mkdab1 = tw1["mux", "mkd.a5l6.b1"]
+
+        mux_tcphb2 = tw2["mux", "tcp.b6r7.b2"]
+        muy_tcpvb2 = tw2["muy", "tcp.d6r7.b2"]
+        mux_tct5b2 = tw2["mux", "tctph.4r5.b2"]
+        muy_tct5b2 = tw2["muy", "tctpv.4r5.b2"]
+        mux_tct1b2 = tw2["mux", "tctph.4r1.b2"]
+        muy_tct1b2 = tw2["muy", "tctpv.4r1.b2"]
+        mux_tct8b2 = tw2["mux", "tctph.4r8.b2"]
+        muy_tct8b2 = tw2["muy", "tctpv.4r8.b2"]
+        mux_mkdob2 = tw2["mux", "mkd.o5r6.b2"]
+        mux_mkdab2 = tw2["mux", "mkd.a5r6.b2"]
+
+        qx = 61.31
+        qy = 60.32
+
+        out = {
+            "mkda_tct1_b1": mux_tct1b1 - mux_mkdab1,
+            "mkdo_tct1_b1": mux_tct1b1 - mux_mkdob1,
+            "mkda_tct5_b1": mux_tct5b1 - mux_mkdab1 + qx,
+            "mkdo_tct5_b1": mux_tct5b1 - mux_mkdob1 + qx,
+            "mkda_tct8_b1": mux_tct8b1 - mux_mkdab1,
+            "mkdo_tct8_b1": mux_tct8b1 - mux_mkdob1,
+            "mkda_tct1_b2": -mux_tct1b2 + mux_mkdab2,
+            "mkdo_tct1_b2": -mux_tct1b2 + mux_mkdob2,
+            "mkda_tct5_b2": -mux_tct5b2 + mux_mkdab2,
+            "mkdo_tct5_b2": -mux_tct5b2 + mux_mkdob2,
+            "mkda_tct8_b2": -mux_tct8b2 + mux_mkdab2 + qx,
+            "mkdo_tct8_b2": -mux_tct8b2 + mux_mkdob2 + qx,
+            "tcph_tct1_b1": mux_tct1b1 - mux_tcphb1,
+            "tcpv_tct1_b1": muy_tct1b1 - muy_tcpvb1,
+            "tcph_tct5_b1": mux_tct5b1 - mux_tcphb1 + qx,
+            "tcpv_tct5_b1": muy_tct5b1 - muy_tcpvb1 + qy,
+            "tcph_tct8_b1": mux_tct8b1 - mux_tcphb1,
+            "tcpv_tct8_b1": muy_tct8b1 - muy_tcpvb1,
+            "tcph_tct1_b2": -mux_tct1b2 + mux_tcphb2,
+            "tcpv_tct1_b2": -muy_tct1b2 + muy_tcpvb2,
+            "tcph_tct5_b2": -mux_tct5b2 + mux_tcphb2,
+            "tcpv_tct5_b2": -muy_tct5b2 + muy_tcpvb2 + qx,
+            "tcph_tct8_b2": -mux_tct8b2 + mux_tcphb2 + qy,
+        }
+        return out
 
     def get_params(self):
         tw1 = self.model.b1.twiss(
@@ -525,9 +585,10 @@ class LHCOptics:
         for ir in self.irs:
             ir.set_bumps_off()
 
-    def set_circuits(self, circuits):       
+    def set_circuits(self, circuits):
         if isinstance(circuits, str) or isinstance(circuits, Path):
             from .circuits import LHCCircuits
+
             self.circuits = LHCCircuits.from_json(circuits)
         else:
             self.circuits = circuits

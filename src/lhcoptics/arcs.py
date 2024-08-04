@@ -86,7 +86,6 @@ class LHCArc(LHCSection):
             f"muy{self.name}b2",
         ]
 
-
     def __repr__(self):
         if self.parent is None:
             return f"<LHCArc {self.name}>"
@@ -103,7 +102,7 @@ class LHCArc(LHCSection):
         end.mux = 0
         end.muy = 0
         return [start, end]
-    
+
     def get_init_cell(self, beam):
         """Get twiss init at the beginning of the cell."""
         sequence = self.model.sequence[beam]
@@ -124,7 +123,7 @@ class LHCArc(LHCSection):
         start.mux = 0
         start.muy = 0
         return start
-    
+
     def get_init_right(self, beam):
         """Get twiss init at the end of the arc."""
         tw = self.twiss(beam, strengths=False)
@@ -159,7 +158,6 @@ class LHCArc(LHCSection):
             return sequence.twiss(
                 start=start, end=end, init=init, strengths=strengths
             )
-
 
     def get_params_from_twiss(self, tw1, tw2):
         params = {
@@ -259,22 +257,25 @@ class LHCArc(LHCSection):
         irb = getattr(self.parent, f"ir{self.i2}")
         return ira, irb
 
-    def shift_phase(self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0):
+    def shift_phase(
+        self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0, rematch_irs=True
+    ):
         arc = self.name
         self.params[f"mux{arc}b1"] += dmuxb1
         self.params[f"muy{arc}b1"] += dmuyb1
         self.params[f"mux{arc}b2"] += dmuxb2
         self.params[f"muy{arc}b2"] += dmuyb2
-        self.match_phase()
+        self.match_phase(rematch_irs=rematch_irs)
 
-    def match_phase(self):
+    def match_phase(self, rematch_irs=True):
         print(f"Match {self}")
         self.match().solve()
-        ira, irb = self.get_close_irs()
-        print(f"Match {ira}")
-        ira.match().solve()
-        print(f"Match {irb}")
-        irb.match().solve()
+        if rematch_irs:
+            ira, irb = self.get_close_irs()
+            print(f"Match {ira}")
+            ira.match().solve()
+            print(f"Match {irb}")
+            irb.match().solve()
 
     def get_phase(self):
         params = self.get_params()
@@ -324,4 +325,3 @@ class LHCArc(LHCSection):
             res["muy"] = res["muy"] - res["muy", start_arc]
 
             return res
-

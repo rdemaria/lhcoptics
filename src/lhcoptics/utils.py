@@ -54,7 +54,7 @@ def iter_rows(table):
 
 def print_diff_dict_float(dct1, dct2):
     allk = set(dct1.keys()) | set(dct2.keys())
-    for k in allk:
+    for k in sorted(allk):
         if k not in dct1:
             print(f"{k:20} {dct2[k]:15.6g} only in other")
         elif k not in dct2:
@@ -65,7 +65,7 @@ def print_diff_dict_float(dct1, dct2):
 
 def print_diff_dict_objs(dct1, dct2):
     allk = set(dct1.keys()) | set(dct2.keys())
-    for k in allk:
+    for k in sorted(allk):
         if k not in dct1:
             print(f"{k:20} only in other")
         elif k not in dct2:

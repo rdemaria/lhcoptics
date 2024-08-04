@@ -187,11 +187,13 @@ class LHCIR(LHCSection):
                 params[f"{param}{ipname}b{beam}"] = (
                     tw[param, self.endb12[beam - 1]]
                     - tw[param, self.startb12[beam - 1]]
+                    +getattr(self.init_left[beam],param)  #ATS change
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_l"] = (
                     tw[param, ipname] - tw[param, self.startb12[beam - 1]]
+                    +getattr(self.init_left[beam],param)  #ATS change
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
@@ -362,9 +364,9 @@ class LHCIR(LHCSection):
         ratio_threshold=1.5,
     ):
         if self.parent.model is None:
-            raise ValueError("Model not set for {self)")
+            raise ValueError(f"Model not set for {self}")
         if self.parent.circuits is None:
-            raise ValueError("Circuits not set for {self)")
+            raise ValueError(f"Circuits not set for {self}")
         if not hold_init:
             self.set_init()
         if len(self.params) == 0:

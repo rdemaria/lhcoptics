@@ -20,6 +20,11 @@ class Col:
     def __repr__(self) -> str:
         return f"<Col {self.attr!r} {len(self.rows)} rows>"
 
+    def show(self):
+        attrs=getattr(self.rows[0],self.attr)
+        for k in attrs:
+            print(k,self[k])
+
 class ColKnob:
     def __init__(self, attr, rows):
         self.attr = attr
@@ -93,8 +98,8 @@ class LHCSectionTable:
     def interp_val(self, x, kname, order=1, xname="id", soft=False):
         xx = self[xname]
         yy = self[kname]
-        if not isinstance(yy, (int, float)):
-            return yy
+        if not isinstance(yy[0], (int, float)):
+            return yy[0]
         if order == 0:  # Nearest
             return np.interp(x, xx, yy)
         if order == 1:
