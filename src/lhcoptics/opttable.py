@@ -21,9 +21,10 @@ class Col:
         return f"<Col {self.attr!r} {len(self.rows)} rows>"
 
     def show(self):
-        attrs=getattr(self.rows[0],self.attr)
+        attrs = getattr(self.rows[0], self.attr)
         for k in attrs:
-            print(k,self[k])
+            print(k, self[k])
+
 
 class ColKnob:
     def __init__(self, attr, rows):
@@ -36,7 +37,6 @@ class ColKnob:
 
     def __repr__(self) -> str:
         return f"<ColKnob {self.attr!r} {len(self.rows)} rows>"
-
 
 
 class LHCSectionTable:
@@ -139,23 +139,25 @@ class LHCSectionTable:
         cls = self.rows[0].__class__.__name__
         return f"<Table {cls}: {len(self)} rows>"
 
-    def knob_table(self,knobname,max=True):
-        knob=self.knobs[knobname]
-        weights={"id":self["id"]}
+    def knob_table(self, knobname, max=True):
+        knob = self.knobs[knobname]
+        weights = {"id": self["id"]}
         for k in knob[0].weights:
-            weights[k]=np.array([kk.weights[k] for kk in knob])
-        tab=xd.Table(weights,index="id")
+            weights[k] = np.array([kk.weights[k] for kk in knob])
+        tab = xd.Table(weights, index="id")
         if max:
-           tab._append_row({**{k:abs(v).max() for k,v in weights.items()},"id":"max"})
-        return xd.Table(weights,index="id")
+            tab._append_row(
+                {**{k: abs(v).max() for k, v in weights.items()}, "id": "max"}
+            )
+        return xd.Table(weights, index="id")
 
-    def knob_plot(self,knobname):
-        tab=self.knob_table(knobname,max=False)
-        fig,ax=plt.subplots(num=knobname)
+    def knob_plot(self, knobname):
+        tab = self.knob_table(knobname, max=False)
+        fig, ax = plt.subplots(num=knobname)
         for k in tab:
-            if k=="id":
+            if k == "id":
                 continue
-            ax.plot(tab["id"],tab[k],label=k)
+            ax.plot(tab["id"], tab[k], label=k)
         ax.legend()
         ax.set_xlabel("id")
         ax.set_ylabel("factors")
@@ -203,6 +205,39 @@ class LHCIRTable(LHCSectionTable):
             p0c = self.get_p0c()
         brho = p0c / 299792458
         return self[kname] * brho
+
+    def plot_params(self, xaxis="id", ax=None, figname=None):
+        xx = self[xaxis]
+        if figname is None:
+            figname = f"{self} Params"
+        rows = 2
+        cols = 3
+        irn = self.rows[0].irn
+        plt.figure(num=figname, figsize=(6 * cols, 4 * rows)).clear()
+        fig, axs = plt.subplots(rows, cols, num=figname)
+        # axs = fig.axes
+        axs=axs.flatten()
+        atn = "bet alf mu".split()
+        for atn, ax in zip(atn, axs):
+            ax.clear()
+            for xy in "xy":
+                for b12 in "12":
+                    attr = f"{atn}{xy}ip{irn}b{b12}"
+                    ax.plot(xx, self.params[attr], label=attr)
+                    ax.set_ylabel(atn)
+                    ax.set_xlabel(xaxis)
+            ax.legend()
+        atn = "dx dpx".split()
+        for atn, ax in zip(atn, axs[3:]):
+            ax.clear()
+            for b12 in "12":
+                attr = f"{atn}ip{irn}b{b12}"
+                ax.plot(xx, self.params[attr], label=attr)
+                ax.set_ylabel(atn)
+                ax.set_xlabel(xaxis)
+            ax.legend()
+        plt.suptitle(figname)
+        # plt.tight_layout()
 
     def plot_quad(
         self, n, xaxis="id", ax=None, title=None, figname=None, p0c=None
@@ -258,20 +293,20 @@ class LHCIRTable(LHCSectionTable):
         if figname is None:
             figname = f"{self.rows[0].name.upper()} Q{n}"
         if ax is None:
-            fig, ax = plt.subplots(num=figname,clear=True)
+            fig, ax = plt.subplots(num=figname, clear=True)
         xx = self[xaxis]
-        for nkk,kname in enumerate(self.get_quads(n)):
+        for nkk, kname in enumerate(self.get_quads(n)):
             yy = self[kname]
             xx_fit = np.linspace(xx[0], xx[-1], 1001)
             yy_fit = self.interp_val(
                 xx_fit, kname, order=order, xname=xaxis, soft=soft
             )
-            ax.plot(xx, yy * brho, 'o',label=f"{kname}",color=f'C{nkk}')
-            ax.plot(xx_fit, yy_fit * brho, label=f"fit {kname}",color='k')
+            ax.plot(xx, yy * brho, "o", label=f"{kname}", color=f"C{nkk}")
+            ax.plot(xx_fit, yy_fit * brho, label=f"fit {kname}", color="k")
             yy_res = self.interp_val(
                 xx, kname, order=order, xname=xaxis, soft=soft
             )
-            print("residuals",kname,np.abs(yy-yy_res).max())
+            print("residuals", kname, np.abs(yy - yy_res).max())
         ax.set_title(title)
         ax.set_xlabel(xaxis)
         ax.set_ylabel(r"k [$T/m$]")
@@ -321,8 +356,6 @@ class LHCIRTable(LHCSectionTable):
         # plt.tight_layout()
 
 
-
-
 class LHCArcTable(LHCSectionTable):
 
     def interp(self, n, order=1, xaxis="id", soft=True):
@@ -346,19 +379,22 @@ class LHCArcTable(LHCSectionTable):
             arc0.name, strengths=strengths, params=params, parent=self.parent
         )
 
+
 class LHCOpticsTable(LHCSectionTable):
-    def tab_from_lsa(self,beamprocess, parameters=None):
+    def tab_from_lsa(self, beamprocess, parameters=None):
         if parameters is None:
             parameters = ["LHCBEAM/MOMENTUM"]
         lsa = get_lsa()
-        opttable=lsa.getOpticTable(beamprocess)
-        out={"name":np.array([oo.name for oo in opttable]),
-             "time":np.array([oo.time for oo in opttable])}
+        opttable = lsa.getOpticTable(beamprocess)
+        out = {
+            "name": np.array([oo.name for oo in opttable]),
+            "time": np.array([oo.time for oo in opttable]),
+        }
         for pp in parameters:
-            trim=lsa.getLastTrim(pp,beamprocess)
-            ptime=trim.data[0]
-            pval=trim.data[1]
-            out[pp]=np.interp(out["time"],ptime,pval)
+            trim = lsa.getLastTrim(pp, beamprocess)
+            ptime = trim.data[0]
+            pval = trim.data[1]
+            out[pp] = np.interp(out["time"], ptime, pval)
         return xd.Table(out)
 
     def __init__(self, rows):

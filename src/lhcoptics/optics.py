@@ -777,6 +777,7 @@ class LHCOptics:
         verbose=False,
         knobs_off=False,
         set_init=True,
+        knobs=True,
     ):
         """
         Update model from an optics or a dict.
@@ -802,11 +803,12 @@ class LHCOptics:
                     src=src_ss, verbose=verbose, knobs_off=knobs_off
                 )
         # knobs must be updated after the strengths
-        if verbose:
-            print(f"Update knobs from {src}")
-        self.model.update_knobs(
-            src.knobs, verbose=verbose, knobs_off=knobs_off
-        )
+        if knobs:
+            if verbose:
+                print(f"Update knobs from {src}")
+            self.model.update_knobs(
+                src.knobs, verbose=verbose, knobs_off=knobs_off
+            )
         if "p0c" in self.params:
             self.model.p0c = self.params["p0c"]
         if set_init:
