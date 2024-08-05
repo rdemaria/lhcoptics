@@ -512,6 +512,12 @@ class LHCOptics:
             line = getattr(model, beam)
             for fd in "fd":
                 for ks in self.find_strengths(f"ks{fd}.*{beam}"):
+                    if arcs == "weak":
+                        if "a81" in ks or "a12" in ks or "a45" in ks or "a56" in ks: 
+                            continue
+                    if arcs == "strong":
+                        if "a23" in ks or "a34" in ks or "a67" in ks or "a78" in ks: 
+                            continue
                     tmp = f"ks{fd}_{beam}"
                     model[tmp] = model[ks]
                     print(f"Set {tmp} from {ks} to {model[tmp]}")

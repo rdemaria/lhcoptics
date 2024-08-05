@@ -131,8 +131,9 @@ class LHCSectionTable:
         if isinstance(k, int):
             self.rows[k] = row
             if hasattr(self, "irs") and hasattr(row, "irs"):
-               for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
-                  ss.rows.remove(ss_row)
+                print(k,row)
+                for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
+                  ss.rows[k]=ss_row
         else:
             raise ValueError(f"Cannot set item {k}")
 
