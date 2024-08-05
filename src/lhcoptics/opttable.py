@@ -127,6 +127,15 @@ class LHCSectionTable:
         else:
             return np.array([ss[k] for ss in self.rows])
 
+    def __setitem__(self, k, row):
+        if isinstance(k, int):
+            self.rows[k] = row
+            if hasattr(self, "irs") and hasattr(row, "irs"):
+               for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
+                  ss.rows.remove(ss_row)
+        else:
+            raise ValueError(f"Cannot set item {k}")
+
     def __iter__(self):
         return iter(self.rows)
 
@@ -437,14 +446,20 @@ class LHCOpticsTable(LHCSectionTable):
 
     def extend(self, rows):
         self.rows.extend(rows)
+        for ss, ss_rows in zip(self.irs + self.arcs, zip(*[row.irs for row in rows])):
+            ss.extend(ss_rows)
         return self
 
     def insert(self, i, row):
         self.rows.insert(i, row)
+        for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
+            ss.rows.insert(i, ss_row)
         return self
 
     def remove(self, row):
         self.rows.remove(row)
+        for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
+            ss.rows.remove(ss_row)
         return self
 
     def plot_quads(self, current=False, p0c=None):
