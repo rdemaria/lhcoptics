@@ -572,6 +572,7 @@ class ChromaKnob(Knob):
         )
         mtc.target_status()
         mtc.vary_status()
+        mtc.step(20)
         mtc.solve()
         model[self.name] = knob_start
         # reset weights
