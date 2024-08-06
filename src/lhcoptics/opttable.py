@@ -322,6 +322,22 @@ class LHCIRTable(LHCSectionTable):
         ax.set_ylabel(r"k [$T/m$]")
         ax.legend()
 
+    def plot_param_fit(self, attr, order=1, xaxis="id", soft=False, ax=None, title=None):
+        if title is None:
+            title = f"{self.rows[0].name.upper()} {attr}"
+        if ax is None:
+            fig, ax = plt.subplots(num=title)
+        xx = self[xaxis]
+        yy = self[attr]
+        xx_fit = np.linspace(xx[0], xx[-1], 1001)
+        yy_fit = self.interp_val(xx_fit, attr, order=order, xname=xaxis, soft=soft)
+        ax.plot(xx, yy, "o", label=attr)
+        ax.plot(xx_fit, yy_fit, label=f"fit {attr}")
+        ax.set_title(title)
+        ax.set_xlabel(xaxis)
+        ax.set_ylabel(attr)
+        ax.legend()
+
     def plot_quads(
         self,
         xaxis="id",
