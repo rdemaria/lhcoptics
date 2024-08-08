@@ -4,7 +4,6 @@ import numpy as np
 import xtrack as xt
 
 from .model_madx import LHCMadxModel
-from .opttable import LHCIRTable
 from .section import LHCSection, lhcprev, lhcsucc, sort_n
 
 
@@ -572,6 +571,7 @@ class LHCIR(LHCSection):
             self.knobs[k] = knob.specialize(knob)
 
     def to_table(self, *rows):
+        from .opttable import LHCIRTable
         return LHCIRTable([self] + list(rows))
 
     def twiss(self, beam=None, method="init", strengths=True):

@@ -1,7 +1,6 @@
 import xtrack as xt
 
 from .model_xsuite import LHCMadxModel
-from .opttable import LHCArcTable
 from .section import LHCSection
 
 
@@ -282,6 +281,7 @@ class LHCArc(LHCSection):
         return {k: params[k] for k in self.phase_names}
 
     def to_table(self, *rows):
+        from .opttable import LHCArcTable
         return LHCArcTable([self] + list(rows))
 
     def twiss_cell(self, beam=None, strengths=True):

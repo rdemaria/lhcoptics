@@ -1,12 +1,22 @@
 import re
+import json
 
 import matplotlib.pyplot as plt
 import numpy as np
 import xdeps as xd
 
-from .rdmsignal import poly_fit, poly_val
+from .arcs import LHCArc
+from .ir1 import LHCIR1
+from .ir2 import LHCIR2
+from .ir3 import LHCIR3
+from .ir4 import LHCIR4
+from .ir5 import LHCIR5
+from .ir6 import LHCIR6
+from .ir7 import LHCIR7
+from .ir8 import LHCIR8
 from .lsa_util import get_lsa
-
+from .optics import LHCOptics
+from .rdmsignal import poly_fit, poly_val
 
 class Col:
     def __init__(self, attr, rows):
@@ -40,6 +50,19 @@ class ColKnob:
 
 
 class LHCSectionTable:
+    def to_json(self,filename):
+        rows=[row.to_dict() for row in self.rows]
+        clsname=self.rows[0].__class__.__name__
+        dct={"class":clsname,"rows":rows}
+        json.dump(dct,open(filename,"w"))
+        
+    @classmethod
+    def from_json(cls,filename):
+        dct=json.load(open(filename))
+        rowcls=globals()[dct["class"]]
+        rows=[rowcls.from_dict(row) for row in dct["rows"]]
+        return cls(rows)
+    
     def __init__(self, rows, parent=None):
         rows = list(rows)
         self.rows = rows

@@ -17,7 +17,6 @@ from .ir7 import LHCIR7
 from .ir8 import LHCIR8
 from .model_xsuite import LHCMadxModel, LHCXsuiteModel
 from .aperture import LHCAperture
-from .opttable import LHCOpticsTable
 from .section import Knob
 from .utils import (
     deliver_list_str,
@@ -706,6 +705,7 @@ class LHCOptics:
         return deliver_list_str(out, output)
 
     def to_table(self, *rows):
+        from .opttable import LHCOpticsTable
         return LHCOpticsTable([self] + list(rows))
 
     def twiss(self, beam=None, chrom=False, strengths=True):
