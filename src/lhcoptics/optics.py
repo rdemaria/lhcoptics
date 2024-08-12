@@ -233,7 +233,7 @@ class LHCOptics:
         self.model = model
         self.circuits = circuits
         self.aperture = aperture
-        print(f"Optics {self.name} created")
+        #print(f"Optics {self.name} created")
         for knob in knobs.values():
             knob.parent = self
         for ss in irs + arcs:

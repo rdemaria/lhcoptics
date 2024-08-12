@@ -20,7 +20,7 @@ from .knob import Knob
 from .model_madx import LHCMadxModel
 from .model_xsuite import LHCXsuiteModel
 from .optics import LHCOptics
-from .opttable import LHCOpticsTable
+from .opttable import LHCOpticsTable, LHCIRTable, LHCArcTable
 from .rdmsignal import poly_fit, poly_val
 from .repo import LHC
 from .aperture import LHCAperture
@@ -41,6 +41,8 @@ __all__ = [
     LHCIR6,
     LHCIR7,
     LHCIR8,
+    LHCIRTable,
+    LHCArcTable,
     LHCMadxModel,
     LHCOptics,
     LHCOpticsTable,
