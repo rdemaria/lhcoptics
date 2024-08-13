@@ -18,6 +18,7 @@ from .lsa_util import get_lsa
 from .optics import LHCOptics
 from .rdmsignal import poly_fit, poly_val
 
+
 class Col:
     def __init__(self, attr, rows):
         self.attr = attr
@@ -26,6 +27,15 @@ class Col:
     def __getitem__(self, k):
         attrs = [getattr(row, self.attr) for row in self.rows]
         return np.array([attr[k] for attr in attrs])
+
+    def __setitem__(self, k, v):
+        attrs = [getattr(row, self.attr) for row in self.rows]
+        if np.isscalar(v):
+            for attr in attrs:
+                attr[k] = v
+        else:
+            for attr, vv in zip(attrs, v):
+                attr[k] = vv
 
     def __repr__(self) -> str:
         return f"<Col {self.attr!r} {len(self.rows)} rows>"
@@ -50,19 +60,20 @@ class ColKnob:
 
 
 class LHCSectionTable:
-    def to_json(self,filename):
-        rows=[row.to_dict() for row in self.rows]
-        clsname=self.rows[0].__class__.__name__
-        dct={"class":clsname,"rows":rows}
-        json.dump(dct,open(filename,"w"))
-        
+    def to_json(self, filename):
+        rows = [row.to_dict() for row in self.rows]
+        clsname = self.rows[0].__class__.__name__
+        dct = {"class": clsname, "rows": rows}
+        json.dump(dct, open(filename, "w"))
+        return self
+
     @classmethod
-    def from_json(cls,filename):
-        dct=json.load(open(filename))
-        rowcls=globals()[dct["class"]]
-        rows=[rowcls.from_dict(row) for row in dct["rows"]]
+    def from_json(cls, filename):
+        dct = json.load(open(filename))
+        rowcls = globals()[dct["class"]]
+        rows = [rowcls.from_dict(row) for row in dct["rows"]]
         return cls(rows)
-    
+
     def __init__(self, rows, parent=None):
         rows = list(rows)
         self.rows = rows
@@ -103,6 +114,9 @@ class LHCSectionTable:
     def get_p0c(self):
         return [row.params["p0c"] for row in self.rows]
 
+    def copy(self):
+        return self.__class__([row.copy() for row in self.rows], self.parent)
+
     @property
     def tab(self):
         tab = {}
@@ -123,12 +137,12 @@ class LHCSectionTable:
         yy = self[kname]
         if not isinstance(yy[0], (int, float)):
             return yy[0]
-        if order == 0:  # Nearest
+        if order == -1:  # Nearest
             return np.interp(x, xx, yy)
-        if order == 1:
+        if order == 0:  # piecewise linear
             # return scipy.interpolate.interp1d(xx, yy, kind="linear")(x)
             return np.interp(x, xx, yy)
-        if order > 1:
+        if order > 0:
             x0 = [xx[0], xx[-1]]
             y0 = [yy[0], yy[-1]]
             if soft:
@@ -154,9 +168,11 @@ class LHCSectionTable:
         if isinstance(k, int):
             self.rows[k] = row
             if hasattr(self, "irs") and hasattr(row, "irs"):
-                print(k,row)
-                for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
-                  ss.rows[k]=ss_row
+                print(k, row)
+                for ss, ss_row in zip(
+                    self.irs + self.arcs, row.irs + row.arcs
+                ):
+                    ss.rows[k] = ss_row
         else:
             raise ValueError(f"Cannot set item {k}")
 
@@ -228,7 +244,10 @@ class LHCIRTable(LHCSectionTable):
             return {k: [ir.quads[k] for ir in self.rows] for k in quad_names}
 
     def get_p0c(self):
-        return np.array([row.parent.params["p0c"] for row in self.rows])
+        if self.rows[0].parent is None or self.rows[-1].parent is None:
+            return np.array([7e12 for row in self.rows])
+        else:
+            return np.array([row.parent.params["p0c"] for row in self.rows])
 
     def get(self, k):
         return np.array([ir[k] for ir in self.rows])
@@ -249,7 +268,7 @@ class LHCIRTable(LHCSectionTable):
         plt.figure(num=figname, figsize=(6 * cols, 4 * rows)).clear()
         fig, axs = plt.subplots(rows, cols, num=figname)
         # axs = fig.axes
-        axs=axs.flatten()
+        axs = axs.flatten()
         atn = "bet alf mu".split()
         for atn, ax in zip(atn, axs):
             ax.clear()
@@ -269,6 +288,15 @@ class LHCIRTable(LHCSectionTable):
                 ax.set_ylabel(atn)
                 ax.set_xlabel(xaxis)
             ax.legend()
+        ax = axs[-1]
+        ax.clear()
+        for xy in "xy":
+            for b12 in "12":
+                attr = f"mu{xy}ip{irn}b{b12}_l"
+                ax.plot(xx, self.params[attr], label=attr)
+                ax.set_ylabel("mu")
+                ax.set_xlabel(xaxis)
+        ax.legend()
         plt.suptitle(figname)
         # plt.tight_layout()
 
@@ -345,7 +373,9 @@ class LHCIRTable(LHCSectionTable):
         ax.set_ylabel(r"k [$T/m$]")
         ax.legend()
 
-    def plot_param_fit(self, attr, order=1, xaxis="id", soft=False, ax=None, title=None):
+    def plot_param_fit(
+        self, attr, order=1, xaxis="id", soft=False, ax=None, title=None
+    ):
         if title is None:
             title = f"{self.rows[0].name.upper()} {attr}"
         if ax is None:
@@ -353,7 +383,9 @@ class LHCIRTable(LHCSectionTable):
         xx = self[xaxis]
         yy = self[attr]
         xx_fit = np.linspace(xx[0], xx[-1], 1001)
-        yy_fit = self.interp_val(xx_fit, attr, order=order, xname=xaxis, soft=soft)
+        yy_fit = self.interp_val(
+            xx_fit, attr, order=order, xname=xaxis, soft=soft
+        )
         ax.plot(xx, yy, "o", label=attr)
         ax.plot(xx_fit, yy_fit, label=f"fit {attr}")
         ax.set_title(title)
@@ -486,7 +518,9 @@ class LHCOpticsTable(LHCSectionTable):
 
     def extend(self, rows):
         self.rows.extend(rows)
-        for ss, ss_rows in zip(self.irs + self.arcs, zip(*[row.irs for row in rows])):
+        for ss, ss_rows in zip(
+            self.irs + self.arcs, zip(*[row.irs for row in rows])
+        ):
             ss.extend(ss_rows)
         return self
 

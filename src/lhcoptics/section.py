@@ -34,6 +34,31 @@ def lhcsucc(n):
     return n % 8 + 1
 
 
+def filter_lrb12(irn, left=True, right=True, b1=True, b2=True):
+    if b1 and b2 and left and right:
+        return lambda x: True
+    else:
+        if b1 and b2:
+            if not right:
+                return lambda x: f"l{irn}" in x
+            elif not left:
+                return lambda x: f"r{irn}" in x
+        elif right and left:
+            if not b2:
+                return lambda x: "b1" in x
+            elif not b1:
+                return lambda x: "b2" in x
+        else:
+            if b1 and left:
+                return lambda x: "b1" in x and f"l{irn}" in x
+            elif b1 and right:
+                return lambda x: "b1" in x and f"r{irn}" in x
+            elif b2 and left:
+                return lambda x: "b2" in x and f"l{irn}" in x
+            elif b2 and right:
+                return lambda x: "b2" in x and f"r{irn}" in x
+
+
 class LHCSection:
     """
     Model a section of the machine.
@@ -292,7 +317,9 @@ class LHCSection:
         self.model.update_knobs(knobs, verbose=verbose, knobs_off=knobs_off)
         return self
 
-    def update_strengths(self, src=None, verbose=False):
+    def update_strengths(
+        self, src=None, verbose=False, b1=True, b2=True, left=True, right=True
+    ):
         """
         Update existing stregnths from self. model or src.strengths or src
         """
@@ -300,16 +327,34 @@ class LHCSection:
             src = self.model
         elif hasattr(src, "strengths"):
             src = src.strengths
-        for k in self.strengths:
-            if k in src:
-                if verbose and self.strengths[k] != src[k]:
+        if hasattr(self, "irn"):
+            filter = filter_lrb12(
+                self.irn, left=left, right=right, b1=b1, b2=b2
+            )
+        else:
+
+            def filter(x):
+                return True
+
+        for kk in self.strengths:
+            if kk in src and filter(kk):
+                if verbose and self.strengths[kk] != src[kk]:
                     print(
-                        f"Updating {k!r} from {self.strengths[k]} to {src[k]}"
+                        f"Updating {kk!r} from {self.strengths[kk]} to {src[kk]}"
                     )
-                self.strengths[k] = src[k]
+                self.strengths[kk] = src[kk]
         return self
 
-    def update_params(self, src=None, add=False, verbose=False):
+    def update_params(
+        self,
+        src=None,
+        add=False,
+        verbose=False,
+        b1=True,
+        b2=True,
+        left=True,
+        right=True,
+    ):
         """
         Update existing params from self.model or src.params or src
         """
@@ -317,15 +362,20 @@ class LHCSection:
             src = self.get_params()
         elif hasattr(src, "params"):
             src = src.params
+        if hasattr(self, "irn"):
+            filter=filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
+        else:
+            def filter(x):
+                return True
         if add:
             for k in src:
-                if k not in self.params:
+                if k not in self.params and filter(k):
                     if verbose:
                         print(f"Adding {k!r:18} = {src[k]}")
                     self.params[k] = src[k]
         else:
             for k in self.params:
-                if k in src:
+                if k in src and filter(k):
                     if verbose and self.params[k] != src[k]:
                         print(
                             f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}"

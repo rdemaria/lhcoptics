@@ -63,28 +63,19 @@ class LHCIR8(LHCIR):
         dmuy = -tw["muy", ds] - muy
         return init, dmux, dmuy
 
-    def set_init(self):
-        self.init_left = {
-            1: self.arc_left.get_init_right(1),
-            2: self.arc_left.get_init_right(2),
-        }
 
+    def set_init_ats(self, beam):
+        initb, dmuxb, dmuyb = self.get_init_ats(beam)
+        self.init_left[beam].mux = dmuxb
+        self.init_left[beam].muy = dmuyb
+        self.init_right[beam] = initb
+
+    def set_init_right(self, beam):
         if self.parent.is_ats():
-            initb1, dmuxb1, dmuyb1 = self.get_init_ats(1)
-            initb2, dmuxb2, dmuyb2 = self.get_init_ats(2)
-            self.init_left[1].mux += dmuxb1
-            self.init_left[1].muy += dmuyb1
-            self.init_left[2].mux += dmuxb2
-            self.init_left[2].muy += dmuyb2
-            self.init_right = {
-                1: initb1,
-                2: initb2,
-            }
+            return self.set_init_ats(beam)
         else:
-            self.init_right = {
-                1: self.arc_right.get_init_left(1),
-                2: self.arc_right.get_init_left(2),
-            }
+            super().set_init_right(beam)
+
 
     def twiss_ats_init(self, beam):
         line = self.model.sequence[beam]
