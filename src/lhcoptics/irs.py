@@ -156,13 +156,31 @@ class LHCIR(LHCSection):
         return [k for k in self.quads if "r" in k and "x" in k]
 
     def check_quad_strengths(
-        self, verbose=False, p0c=None, ratio_threshold=1.5
+        self,
+        verbose=False,
+        p0c=None,
+        ratio=1.5,
+        margin=0.1,
     ):
         if p0c is None:
             p0c = self.parent.params["p0c"]
-        self.get_quad_max_ratio(
-            verbose=verbose, ratio_threshold=ratio_threshold
-        )
+        out={}
+        if ratio is not None:
+            self.get_quad_max_ratio(
+                verbose=verbose, ratio=ratio
+            )
+        if margin is not None:
+            #if verbose:
+            #    print(f"Name                  Strength      Low    High")
+            for k, v in self.quads.items():
+                kmin, kmax = self.parent.get_quad_margin(k)
+                if kmin < margin or kmax < margin:
+                    out[k] = (v, kmin, kmax)
+                    if verbose:
+                      print(
+                        f"{k:20} {v:12.8f} {kmin*100:5.1f}% {kmax*100:5.1f}%"
+                    )
+        return out
 
     def get_kqx(self, n, lr):
         side = lr + f"{self.irn}"
@@ -186,13 +204,14 @@ class LHCIR(LHCSection):
                 params[f"{param}{ipname}b{beam}"] = (
                     tw[param, self.endb12[beam - 1]]
                     - tw[param, self.startb12[beam - 1]]
-                    +getattr(self.init_left[beam],param)  #ATS change
+                    + getattr(self.init_left[beam], param)  # ATS change
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}_l"] = (
-                    tw[param, ipname] - tw[param, self.startb12[beam - 1]]
-                    +getattr(self.init_left[beam],param)  #ATS change
+                    tw[param, ipname]
+                    - tw[param, self.startb12[beam - 1]]
+                    + getattr(self.init_left[beam], param)  # ATS change
                 )
         for param in "mux muy".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
@@ -210,7 +229,7 @@ class LHCIR(LHCSection):
             tw2 = self.twiss_full(2, strengths=False)
         params = self.get_params_from_twiss(tw1, tw2)
         return {k: np.round(v, 8) for k, v in params.items()}
-    
+
     def get_extra_match_targets(self):
         return []
 
@@ -301,15 +320,15 @@ class LHCIR(LHCSection):
     ):
         varylst = []
         for kk in self.quads:
-            add=False
+            add = False
             if "b1" in kk:
                 if b1:
-                   tag = "b1"
-                   add = True
+                    tag = "b1"
+                    add = True
             elif "b2" in kk:
                 if b2:
-                   tag = "b2"
-                   add = True
+                    tag = "b2"
+                    add = True
             elif common:
                 tag = "common"
                 add = True
@@ -329,14 +348,14 @@ class LHCIR(LHCSection):
                 varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
 
-    def get_quad_max_ratio(self, verbose=False, ratio_threshold=1.5):
+    def get_quad_max_ratio(self, verbose=False, ratio=1.5):
         rmax = 1
         for k, v in self.strengths.items():
             if "b1" in k and abs(v) > 0 and "kqt" not in k:
                 k2 = k.replace("b1", "b2")
                 rat = abs(v / self.strengths[k2])
                 rat1 = rat if rat > 1 else 1 / rat
-                if verbose and rat1 > ratio_threshold:
+                if verbose and rat1 > ratio:
                     print(f"Ratio {k}/{k2} = {rat:.5f}")
                 if rat1 > rmax:
                     rmax = rat1
@@ -410,7 +429,7 @@ class LHCIR(LHCSection):
                         tag=f"{name}_{attr}",
                     )
                 )
-                
+
         for target in self.get_extra_match_targets():
             targets.append(target)
 
@@ -572,6 +591,7 @@ class LHCIR(LHCSection):
 
     def to_table(self, *rows):
         from .opttable import LHCIRTable
+
         return LHCIRTable([self] + list(rows))
 
     def twiss(self, beam=None, method="init", strengths=True):
