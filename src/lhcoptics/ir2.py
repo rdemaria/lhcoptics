@@ -60,22 +60,14 @@ class LHCIR2(LHCIR):
         init.muy -= muy
         return init
 
-    def set_init(self):
-        if self.parent.is_ats():
-            self.init_left = {
-                1: self.get_init_ats(1),
-                2: self.get_init_ats(2),
-            }
-        else:
-            self.init_left = {
-                1: self.arc_left.get_init_right(1),
-                2: self.arc_left.get_init_right(2),
-            }
+    def set_init_ats(self, beam):
+        self.init_left[beam] = self.get_init_ats(beam)
 
-        self.init_right = {
-            1: self.arc_right.get_init_left(1),
-            2: self.arc_right.get_init_left(2),
-        }
+    def set_init_left(self,beam):
+        if self.parent.is_ats():
+            self.set_init_ats(beam)
+        else:
+            super().set_init_left(beam)
 
     def twiss_ats_init(self, beam):
         line = self.model.sequence[beam]

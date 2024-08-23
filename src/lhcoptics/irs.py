@@ -269,7 +269,7 @@ class LHCIR(LHCSection):
                         )
                     )
 
-        if lrphase:
+        if lrphase and left:
             for tt in ["mux", "muy"]:
                 for ll in lines:
                     targets.append(
@@ -279,6 +279,19 @@ class LHCIR(LHCSection):
                             line=ll,
                             at=self.ipname,
                             tag=f"{tt}{self.ipname}{ll}_l",
+                        )
+                    )
+
+        if lrphase and right:
+            for tt in ["mux", "muy"]:
+                for ll in lines:
+                    targets.append(
+                        xt.Target(
+                            tt,
+                            self.params[f"{tt}{self.ipname}{ll}_r"],
+                            line=ll,
+                            at=self.ipname,
+                            tag=f"{tt}{self.ipname}{ll}_r",
                         )
                     )
 
@@ -314,6 +327,8 @@ class LHCIR(LHCSection):
         self,
         b1=True,
         b2=True,
+        left=True,
+        right=True,
         common=True,
         dkmin=0.0,
         dkmax=0.0,
@@ -332,6 +347,10 @@ class LHCIR(LHCSection):
             elif common:
                 tag = "common"
                 add = True
+            if not left and f"l{self.irn}" in kk:
+                add = False
+            if not right and f"r{self.irn}" in kk:
+                add = False
             if add:
                 limits = self.parent.circuits.get_klimits(
                     kk, self.parent.params["p0c"]
@@ -438,6 +457,8 @@ class LHCIR(LHCSection):
             b1=b1,
             b2=b2,
             common=common,
+            right=right,
+            left=left,
             dkmin=dkmin,
             dkmax=dkmax,
         )
@@ -531,17 +552,35 @@ class LHCIR(LHCSection):
                 knob.match(**kwargs)
         return self
 
-    def plot(self, beam=None, method="init", figlabel=None, yr="", yl=""):
+    def plot(
+        self,
+        beam=None,
+        method="init",
+        figlabel=None,
+        yr="",
+        yl="",
+        filename=None,
+    ):
         if beam is None:
             if figlabel is None:
                 figlabel1 = f"{self.name}b1"
                 figlabel2 = f"{self.name}b2"
             return [
                 self.plot(
-                    beam=1, method=method, figlabel=figlabel1, yr=yr, yl=yl
+                    beam=1,
+                    method=method,
+                    figlabel=figlabel1,
+                    yr=yr,
+                    yl=yl,
+                    filename=filename,
                 ),
                 self.plot(
-                    beam=2, method=method, figlabel=figlabel2, yr=yr, yl=yl
+                    beam=2,
+                    method=method,
+                    figlabel=figlabel2,
+                    yr=yr,
+                    yl=yl,
+                    filename=filename,
                 ),
             ]
         else:
@@ -553,7 +592,10 @@ class LHCIR(LHCSection):
                 mktwiss = self.twiss_from_params
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
-            return mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
+            plt = mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
+            if filename is not None:
+                plt.savefig(filename.format(figlabel=figlabel))
+            return plt
 
     def set_bumps_off(self):
         for k, knob in self.knob_names.items():
@@ -570,18 +612,19 @@ class LHCIR(LHCSection):
         else:
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")
 
-    def set_init(self):
+    def set_init_left(self, beam):
+        self.init_left[beam] = self.arc_left.get_init_right(beam)
 
-        arcleft = self.arc_left
-        self.init_left = {
-            1: arcleft.get_init_right(1),
-            2: arcleft.get_init_right(2),
-        }
-        arcright = self.arc_right
-        self.init_right = {
-            1: arcright.get_init_left(1),
-            2: arcright.get_init_left(2),
-        }
+    def set_init_right(self, beam):
+        self.init_right[beam] = self.arc_right.get_init_left(beam)
+
+    def set_init(self):
+        self.init_left = {}
+        self.set_init_left(1),
+        self.set_init_left(2),
+        self.init_right = {}
+        self.set_init_right(1),
+        self.set_init_right(2),
 
     def specialize_knobs(self):
         for k, knob in list(self.knobs.items()):
