@@ -234,7 +234,7 @@ class LHCOptics:
         self.model = model
         self.circuits = circuits
         self.aperture = aperture
-        #print(f"Optics {self.name} created")
+        # print(f"Optics {self.name} created")
         for knob in knobs.values():
             knob.parent = self
         for ss in irs + arcs:
@@ -284,12 +284,24 @@ class LHCOptics:
         return self
 
     def check_quad_strengths(
-        self, verbose=False, p0c=None, ratio_threshold=1.5
+        self,
+        verbose=False,
+        p0c=None,
+        ratio=1.5,
+        margin=0.1,
     ):
+        out={}
         for ir in self.irs:
-            ir.check_quad_strengths(
-                verbose=verbose, p0c=p0c, ratio_threshold=ratio_threshold
+            if verbose:
+                print(f"       Check {ir.name.upper()}")
+            irout=ir.check_quad_strengths(
+                verbose=verbose,
+                p0c=p0c,
+                ratio=ratio,
+                margin=margin,
             )
+            out.update(irout)
+        return out
 
     def check_match(self):
         for ss in self.irs + self.arcs:
@@ -490,6 +502,23 @@ class LHCOptics:
         )
         return ratios.max()
 
+    def get_quad_margin(self, name, verbose=False, p0c=None, absvalue=False):
+        if p0c is None:
+            p0c = self.params["p0c"]
+        v = self.model[name]
+        p0c = self.params["p0c"]
+        limits = self.circuits.get_klimits(name, p0c)
+        if absvalue:
+            kmin = min(abs(limits[0]), abs(limits[1]))
+            kmax = max(abs(limits[0]), abs(limits[1]))
+            margin0 = abs(abs(v) - kmin) / kmax
+            margin1 = abs(kmax - abs(v)) / kmax
+        else:
+            maxv = max(abs(limits[0]), abs(limits[1]))
+            margin0 = (v - limits[0]) / maxv
+            margin1 = (limits[1] - v) / maxv
+        return (margin0, margin1)
+
     def is_ats(self):
         return (
             self.params.get("rx_ip1", 1) != 1
@@ -512,12 +541,24 @@ class LHCOptics:
             line = getattr(model, beam)
             for fd in "fd":
                 for ks in self.find_strengths(f"ks{fd}.*{beam}"):
-                    model.vars[ks] = model[ks]  #reset otherwise error in knobs
+                    model.vars[ks] = model[
+                        ks
+                    ]  # reset otherwise error in knobs
                     if arcs == "weak":
-                        if "a81" in ks or "a12" in ks or "a45" in ks or "a56" in ks:
+                        if (
+                            "a81" in ks
+                            or "a12" in ks
+                            or "a45" in ks
+                            or "a56" in ks
+                        ):
                             continue
                     if arcs == "strong":
-                        if "a23" in ks or "a34" in ks or "a67" in ks or "a78" in ks: 
+                        if (
+                            "a23" in ks
+                            or "a34" in ks
+                            or "a67" in ks
+                            or "a78" in ks
+                        ):
                             continue
                     tmp = f"ks{fd}_{beam}"
                     model[tmp] = model[ks]
@@ -708,6 +749,7 @@ class LHCOptics:
 
     def to_table(self, *rows):
         from .opttable import LHCOpticsTable
+
         return LHCOpticsTable([self] + list(rows))
 
     def twiss(self, beam=None, chrom=False, strengths=True):

@@ -156,13 +156,31 @@ class LHCIR(LHCSection):
         return [k for k in self.quads if "r" in k and "x" in k]
 
     def check_quad_strengths(
-        self, verbose=False, p0c=None, ratio_threshold=1.5
+        self,
+        verbose=False,
+        p0c=None,
+        ratio=1.5,
+        margin=0.1,
     ):
         if p0c is None:
             p0c = self.parent.params["p0c"]
-        self.get_quad_max_ratio(
-            verbose=verbose, ratio_threshold=ratio_threshold
-        )
+        out={}
+        if ratio is not None:
+            self.get_quad_max_ratio(
+                verbose=verbose, ratio=ratio
+            )
+        if margin is not None:
+            #if verbose:
+            #    print(f"Name                  Strength      Low    High")
+            for k, v in self.quads.items():
+                kmin, kmax = self.parent.get_quad_margin(k)
+                if kmin < margin or kmax < margin:
+                    out[k] = (v, kmin, kmax)
+                    if verbose:
+                      print(
+                        f"{k:20} {v:12.8f} {kmin*100:5.1f}% {kmax*100:5.1f}%"
+                    )
+        return out
 
     def get_kqx(self, n, lr):
         side = lr + f"{self.irn}"
@@ -349,14 +367,14 @@ class LHCIR(LHCSection):
                 varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
 
-    def get_quad_max_ratio(self, verbose=False, ratio_threshold=1.5):
+    def get_quad_max_ratio(self, verbose=False, ratio=1.5):
         rmax = 1
         for k, v in self.strengths.items():
             if "b1" in k and abs(v) > 0 and "kqt" not in k:
                 k2 = k.replace("b1", "b2")
                 rat = abs(v / self.strengths[k2])
                 rat1 = rat if rat > 1 else 1 / rat
-                if verbose and rat1 > ratio_threshold:
+                if verbose and rat1 > ratio:
                     print(f"Ratio {k}/{k2} = {rat:.5f}")
                 if rat1 > rmax:
                     rmax = rat1

@@ -6,6 +6,18 @@ import numpy as np
 
 from .lsa_util import get_lsa
 
+kqx_limits = {
+    "kqx.l1": [0, 205.0],
+    "kqx.r1": [-205.0, 0],
+    "kqx.l2": [0, 205.0],
+    "kqx.r2": [-205.0, 0],
+    "kqx.l5": [-205.0, 0],
+    "kqx.r5": [0, 205.0],
+    "kqx.l8": [0, 205.0],
+    "kqx.r8": [-205.0, 0],
+}
+
+
 
 def madname_from_pcname(pc):
     name = ".".join(pc.split(".")[2:]).lower()
@@ -324,9 +336,14 @@ class LHCCircuits:
         return self.pcname[kname].get_field(current)
 
     def get_klimits(self, kname, pc=7e12):
-        if kname.startswith("kqx") or kname.startswith("ktqx"):
+        if kname.startswith("kqx"):
             brho = pc / 299792458
-            return [-205 / brho, 205 / brho]
+            minval, maxval = kqx_limits[kname]
+            return [minval / brho, maxval / brho]
+        elif kname.startswith("ktqx"):
+            brho = pc / 299792458
+            minval, maxval = [-20, 20] ## arbitrary limits
+            return [minval / brho, maxval / brho]
         else:
             return self.madname[kname].get_klimits(pc)
 
