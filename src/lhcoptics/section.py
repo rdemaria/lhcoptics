@@ -222,7 +222,7 @@ class LHCSection:
 
     def to_json(self, filename):
         with open(filename, "w") as f:
-            json.dump(self.to_dict(), f)
+            json.dump(self.to_dict(), f,indent=2)
         return self
 
     def to_madx(self, output=None, knobs=True):

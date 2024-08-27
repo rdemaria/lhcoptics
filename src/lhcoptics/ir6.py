@@ -199,11 +199,11 @@ class LHCIR6(LHCIR):
     def set_init_ats(self, beam):
         self.init_left[beam] = self.get_init_ats(beam)
 
-    def set_init_left(self,beam):
+    def set_init_left(self, beam):
         if self.parent.is_ats():
             self.set_init_ats(beam)
         else:
-            super().set_init_left(beam)
+            LHCIR.set_init_left(self, beam)
 
     def twiss_ats_init(self, beam):
         line = self.model.sequence[beam]

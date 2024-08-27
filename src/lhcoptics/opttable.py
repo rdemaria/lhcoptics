@@ -64,7 +64,7 @@ class LHCSectionTable:
         rows = [row.to_dict() for row in self.rows]
         clsname = self.rows[0].__class__.__name__
         dct = {"class": clsname, "rows": rows}
-        json.dump(dct, open(filename, "w"))
+        json.dump(dct, open(filename, "w"), indent=2)
         return self
 
     @classmethod

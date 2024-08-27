@@ -59,7 +59,7 @@ class LHCIR4(LHCIR):
         if self.parent.is_ats():
             return self.set_init_ats(beam)
         else:
-            super().set_init_right(beam)
+            LHCIR.set_init_right(self, beam)
 
     def twiss_ats_init(self, beam):
         line = self.model.sequence[beam]

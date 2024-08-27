@@ -34,7 +34,7 @@ class LHCIR8(LHCIR):
     def get_mux_ats(self, beam):
         line = self.model.sequence[beam]
         ir1 = self.parent.ir1
-        ds= f"e.ds.r8.b{beam}"
+        ds = f"e.ds.r8.b{beam}"
         tw = line.twiss(
             start=ds,
             end="ip1",
@@ -63,7 +63,6 @@ class LHCIR8(LHCIR):
         dmuy = -tw["muy", ds] - muy
         return init, dmux, dmuy
 
-
     def set_init_ats(self, beam):
         initb, dmuxb, dmuyb = self.get_init_ats(beam)
         self.init_left[beam].mux = dmuxb
@@ -74,8 +73,7 @@ class LHCIR8(LHCIR):
         if self.parent.is_ats():
             return self.set_init_ats(beam)
         else:
-            super().set_init_right(beam)
-
+            LHCIR.set_init_right(self, beam)
 
     def twiss_ats_init(self, beam):
         line = self.model.sequence[beam]

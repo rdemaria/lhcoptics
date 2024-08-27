@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 import numpy as np
+import matplotlib.pyplot as plt
 from cpymad.madx import Madx
 
 from .arcs import LHCArc
@@ -578,7 +579,9 @@ class LHCOptics:
             for beam in [1, 2]:
                 self.plot(beam)
         else:
-            self.twiss(beam=beam).plot()
+            self.twiss(beam=beam).plot(
+                figlabel=f"lhcb{beam}")
+            plt.title(f"LHCB{beam}")
         return self
 
     def round_params(self, full=False):
@@ -594,7 +597,6 @@ class LHCOptics:
 
     def set_circuits(self, circuits):
         if isinstance(circuits, str) or isinstance(circuits, Path):
-            from .circuits import LHCCircuits
 
             self.circuits = LHCCircuits.from_json(circuits)
         else:

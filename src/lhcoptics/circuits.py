@@ -314,7 +314,7 @@ class LHCCircuits:
 
     def to_json(self, filename):
         with open(filename, "w") as f:
-            json.dump(self.to_dict(), f)
+            json.dump(self.to_dict(), f, indent=2)
         return self
 
     def get_current(self, kname, kval, pc=7e12):

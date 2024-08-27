@@ -539,8 +539,8 @@ class LHCIR(LHCSection):
         beam=None,
         method="init",
         figlabel=None,
-        yr="",
-        yl="",
+        yr=None,
+        yl=None,
         filename=None,
     ):
         if beam is None:
