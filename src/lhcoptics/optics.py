@@ -1,6 +1,7 @@
 import json
 import re
 from pathlib import Path
+import gzip
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,6 +27,8 @@ from .utils import (
     git_get_current_branch,
     git_set_branch,
 )
+
+np.set_printoptions(legacy="1.25")
 
 _opl = ["_op", "_sq", ""]
 
@@ -110,7 +113,11 @@ class LHCOptics:
         aperture=None,
         verbose=False,
     ):
-        with open(filename) as f:
+        if filename.endswith(".gz"):
+            fh = gzip.open(filename, "rt")
+        else:
+            fh = open(filename, "r")
+        with fh as f:
             data = json.load(f)
             if name is None:
                 name = Path(filename).stem
@@ -323,6 +330,8 @@ class LHCOptics:
         return other
 
     def diff(self, other, full=True):
+        if isinstance(other, str) or isinstance(other, Path):
+            other = self.__class__.from_json(other)
         self.diff_knobs(other)
         self.diff_params(other)
         if full:
@@ -455,8 +464,9 @@ class LHCOptics:
             "tcph_tct1_b2": -mux_tct1b2 + mux_tcphb2,
             "tcpv_tct1_b2": -muy_tct1b2 + muy_tcpvb2,
             "tcph_tct5_b2": -mux_tct5b2 + mux_tcphb2,
-            "tcpv_tct5_b2": -muy_tct5b2 + muy_tcpvb2 + qx,
-            "tcph_tct8_b2": -mux_tct8b2 + mux_tcphb2 + qy,
+            "tcpv_tct5_b2": -muy_tct5b2 + muy_tcpvb2,
+            "tcph_tct8_b2": -mux_tct8b2 + mux_tcphb2 + qx,
+            "tcpv_tct8_b2": -muy_tct8b2 + muy_tcpvb2 + qy,
         }
         return out
 
@@ -491,11 +501,11 @@ class LHCOptics:
             phases.update(arc.get_phase())
         return phases
 
-    def get_quad_max_ratio(self, verbose=False, ratio_threshold=1.5):
+    def get_quad_max_ratio(self, verbose=False, ratio=1.5):
         ratios = np.array(
             [
                 ir.get_quad_max_ratio(
-                    verbose=verbose, ratio_threshold=ratio_threshold
+                    verbose=verbose, ratio=ratio
                 )
                 for ir in self.irs
             ]

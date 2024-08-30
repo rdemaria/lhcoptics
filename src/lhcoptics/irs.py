@@ -367,14 +367,14 @@ class LHCIR(LHCSection):
                 varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
 
-    def get_quad_max_ratio(self, verbose=False, ratio=1.5):
+    def get_quad_max_ratio(self, verbose=False, ratio=2):
         rmax = 1
         for k, v in self.strengths.items():
             if "b1" in k and abs(v) > 0 and "kqt" not in k:
                 k2 = k.replace("b1", "b2")
                 rat = abs(v / self.strengths[k2])
                 rat1 = rat if rat > 1 else 1 / rat
-                if verbose and rat1 > ratio:
+                if rat1 > ratio or verbose:
                     print(f"Ratio {k}/{k2} = {rat:.5f}")
                 if rat1 > rmax:
                     rmax = rat1
@@ -399,6 +399,7 @@ class LHCIR(LHCSection):
         extra_targets=None,
         vary_ratio=None,
         ratio_threshold=1.5,
+        verbose=True,
     ):
         if self.parent.model is None:
             raise ValueError(f"Model not set for {self}")
@@ -542,8 +543,9 @@ class LHCIR(LHCSection):
             match.disable(vary_name="kq4.l6b1")
             match.disable(vary_name="kq4.r6b2")
         self.optimizer = match
-        match.target_status()
-        match.vary_status()
+        if verbose:
+            match.target_status()
+            match.vary_status()
         return match
 
     def match_knobs(self, **kwargs):
@@ -671,12 +673,12 @@ class LHCIR(LHCSection):
         sequence = self.model.sequence[beam]
         init = xt.TwissInit(
             element_name=self.ipname,
-            betx=self.params[f"betx{self.ipname}{beam}"],
-            alfx=self.params[f"alfx{self.ipname}{beam}"],
-            bety=self.params[f"bety{self.ipname}{beam}"],
-            alfy=self.params[f"alfy{self.ipname}{beam}"],
-            dx=self.params[f"dx{self.ipname}{beam}"],
-            dy=self.params[f"dy{self.ipname}{beam}"],
+            betx=self.params[f"betx{self.ipname}b{beam}"],
+            alfx=self.params[f"alfx{self.ipname}b{beam}"],
+            bety=self.params[f"bety{self.ipname}b{beam}"],
+            alfy=self.params[f"alfy{self.ipname}b{beam}"],
+            dx=self.params[f"dx{self.ipname}b{beam}"],
+            dpx=self.params[f"dpx{self.ipname}b{beam}"],
         )
         return sequence.twiss(
             start=self.startb12[beam - 1], end=self.endb12[beam - 1], init=init
