@@ -272,7 +272,7 @@ class LHCOptics:
     def irs(self):
         return [getattr(self, ir.name) for ir in self._irs]
 
-    def check(self):
+    def twissip(self):
         tw1, tw2 = self.twiss(chrom=True, strengths=False)
         header = True
         cols = "betx bety dx dpx px*1e6 py*1e6 x*1e3 y*1e3"
@@ -289,6 +289,13 @@ class LHCOptics:
             f"Chroma: {tw1.dqx:11.6f} {tw2.dqx:11.6f} {tw1.dqy:11.6f} {tw2.dqy:11.6f}"
         )
         return self
+
+    def check(self, verbose=False):
+        self.twissip()
+
+    def check_knobs(self):
+        for knob in self.find_knobs():
+            knob.check()
 
     def check_quad_strengths(
         self,

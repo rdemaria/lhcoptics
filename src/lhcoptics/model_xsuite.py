@@ -308,11 +308,11 @@ class LHCXsuiteModel:
         if hasattr(src, "knobs"):
             self.update_knobs(src.knobs)
 
-    def twiss_open(self, start, end, init, beam):
+    def twiss_open(self, start, end, init, beam, strengths=True):
         # line=self.sequence[beam]
         # aux=line.element_names[0]
         # line.cycle(init.element_name)
-        tw = self.sequence[beam].twiss(start=start, end=end, init=init)
+        tw = self.sequence[beam].twiss(start=start, end=end, init=init, strengths=strengths)
         # line.cycle(aux)
         return tw
 
@@ -337,6 +337,7 @@ class LHCXsuiteModel:
         beam=None,
         full=True,
         chrom=False,
+        strengths=True,
     ):
         """
         Examples
@@ -359,6 +360,7 @@ class LHCXsuiteModel:
                     full=full,
                     chrom=chrom,
                     beam=1,
+                    strengths=strengths,
                 ),
                 self.twiss(
                     start,
@@ -368,6 +370,7 @@ class LHCXsuiteModel:
                     full=full,
                     chrom=chrom,
                     beam=2,
+                    strengths=strengths,
                 ),
             ]
         if beam == 1:
@@ -393,7 +396,7 @@ class LHCXsuiteModel:
             init.s = 0
             init.mux = 0
             init.muy = 0
-        return self.twiss_open(start, end, init, beam)
+        return self.twiss_open(start, end, init, beam, strengths=strengths)
 
     def copy(self):
         return self.__class__(

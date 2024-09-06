@@ -5,31 +5,6 @@ import xtrack as xt
 
 from .utils import print_diff_dict_float
 
-class ActionCmin(xt.Action):
-# see Eq. 47 in https://cds.cern.ch/record/522049/files/lhc-project-report-501.pdf
-    def __init__(self, line):
-        self.line = line
-        self.twiss = self.line.twiss()
-        self.betx= self.twiss.betx[:-1]
-        self.bety= self.twiss.bety[:-1]
-        self.mux = self.twiss.mux[:-1]
-        self.muy = self.twiss.muy[:-1]
-        self.reverse = self.line.twiss_default.get('reverse',False)
-
-    def run(self):
-        k1sl = self.line.attr["k1sl"]
-        if self.reverse:
-            k1sl = -k1sl[::-1]
-        c_min = (
-            1
-            / (2 * np.pi)
-            * np.sum(
-                k1sl
-                * np.sqrt(self.betx * self.bety)
-                * np.exp(1j * 2 * np.pi * (self.mux - self.muy))
-            )
-        )
-        return {"r": c_min.real, "i": c_min.imag}
 
 class Knob:
 
@@ -67,6 +42,9 @@ class Knob:
 
     def from_madx(self, madx, redefine_weights=False):
         raise NotImplementedError
+
+    def check(self, threshold=1e-10, test_value=1):
+        print(f"Warning knob {self.name!r} check not implemented")
 
     def copy(self):
         return Knob(self.name, self.value, self.weights.copy())
@@ -134,21 +112,6 @@ class IPKnob(Knob):
         self.beams = beams
         self.match_value = match_value
         self.kind = kind
-
-    def copy(self):
-        return IPKnob(
-            name=self.name,
-            value=self.value,
-            weights=self.weights.copy(),
-            parent=self.parent,
-            const=self.const,
-            ip=self.ip,
-            xy=self.xy,
-            specs=self.specs,
-            match_value=self.match_value,
-            beams=self.beams,
-            kind=self.kind,
-        )
 
     @classmethod
     def specialize(cls, knob):
@@ -241,6 +204,74 @@ class IPKnob(Knob):
                 kind=kind,
                 match_value=match_value,
             )
+
+    def check(self, threshold=1e-9, test_value=1):
+        print(f"Checking knob {self.name!r}")
+        model = self.parent.model
+        old_value = model[self.name]
+        model[self.name] = test_value
+        msg = []
+        cols = ["x", "y", "px", "py"]
+        ipname = f"ip{self.ip}"
+        if len(self.beams) == 2:
+            tw1, tw2 = self.parent.twiss(strengths=False)
+            expected = {
+                (col, f"ip{ip}"): (0, 0) for ip in range(1, 9) for col in cols
+            }
+            if self.kind in ["x", "a"]:
+                pp = f"p{self.xy}"
+            else:
+                pp = self.xy
+            expected[pp, ipname] = (
+                self.specs[pp + "b1"] * test_value,
+                self.specs[pp + "b2"] * test_value,
+            )
+            for (col, ips), (v1, v2) in expected.items():
+                for tw, vv in zip([tw1, tw2], [v1, v2]):
+                    if abs(tw[col, ips] - vv) > threshold:
+                        msg.append(
+                            f"Error: {col} at {ips} = {tw[col,ips]:23.15g} != {vv:23.15g}"
+                        )
+        else:
+            tw = self.parent.twiss(strengths=False, beam=int(self.beams[0][1]))
+            expected = {
+                (col, f"ip{ip}"): 0 for ip in range(1, 9) for col in cols
+            }
+            expected[self.xy, ipname] = (
+                self.specs[self.xy + self.beams[0]] * test_value
+            )
+            for (col, ips), vv in expected.items():
+                if abs(tw[col, ips] - vv) > threshold:
+                    msg.append(
+                        f"Error: {col} at {ips} = {tw[col,ips]:23.15g} != {vv:23.15g}"
+                    )
+
+        model[self.name] = old_value
+        if len(msg) > 0:
+            print("\n".join(msg))
+            raise ValueError(f"Knob {self.name!r} failed the check")
+
+    def copy(self):
+        return IPKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            const=self.const,
+            ip=self.ip,
+            xy=self.xy,
+            specs=self.specs,
+            match_value=self.match_value,
+            beams=self.beams,
+            kind=self.kind,
+        )
+
+    def get_mcbx_preset(self):
+        left = [k for k in self.weights if re.match(f"acbx{self.hv}\d.l", k)]
+        right = [k for k in self.weights if re.match(f"acbx{self.hv}\d.r", k)]
+        vleft = sum([self.weights[k] for k in left])
+        vright = sum([self.weights[k] for k in right])
+        return vleft, vright
 
     def match(self):
         model = self.parent.model
@@ -340,12 +371,18 @@ class IPKnob(Knob):
         model[self.name] = knob_start
         return mtc
 
-    def get_mcbx_preset(self):
-        left = [k for k in self.weights if re.match(f"acbx{self.hv}\d.l", k)]
-        right = [k for k in self.weights if re.match(f"acbx{self.hv}\d.r", k)]
-        vleft = sum([self.weights[k] for k in left])
-        vright = sum([self.weights[k] for k in right])
-        return vleft, vright
+    def plot(self, value=None):
+        model = self.parent.model
+        aux = self.value
+        if value is None:
+            value = self.value
+        model[self.name] = value
+        ir = getattr(self.parent, f"ir{self.ip}")
+        if len(self.beams) == 2:
+            ir.plot(yl="x y")
+        else:
+            ir.plot(beam=int(self.beams[0][1]), yl="x y")
+        model[self.name] = aux
 
     def set_mcbx_preset(self, vleft, vright=None):
         if vright is None:
@@ -359,19 +396,6 @@ class IPKnob(Knob):
             self.weights[k] = vleft / len(left)
         for k in right:
             self.weights[k] = vright / len(right)
-
-    def plot(self, value=None):
-        model = self.parent.model
-        aux = self.value
-        if value is None:
-            value = self.value
-        model[self.name] = value
-        ir = getattr(self.parent, f"ir{self.ip}")
-        if len(self.beams) == 2:
-            ir.plot(yl="x y")
-        else:
-            ir.plot(beam=int(self.beams[0][1]), yl="x y")
-        model[self.name] = aux
 
     def __repr__(self):
         return f"<IPKnob {self.name!r} = {self.value}>"
@@ -397,18 +421,6 @@ class TuneKnob(Knob):
         self.kind = kind
         self.match_value = match_value
 
-    def copy(self):
-        return TuneKnob(
-            name=self.name,
-            value=self.value,
-            weights=self.weights.copy(),
-            parent=self.parent,
-            xy=self.xy,
-            beam=self.beam,
-            kind=self.kind,
-            match_value=self.match_value,
-        )
-
     @classmethod
     def specialize(cls, knob):
         """
@@ -430,6 +442,49 @@ class TuneKnob(Knob):
                 kind=kind,
                 match_value=0.01,
             )
+
+    def check(self, threshold=1e-9, test_value=0.01):
+        print(f"Checking knob {self.name!r}")
+        model = self.parent.model
+        old_value = model[self.name]
+        model[self.name] = 0
+        tw = self.parent.twiss(strengths=False, beam=int(self.beam[1]))
+        zero_qxy = tw.qx, tw.qy
+        model[self.name] = test_value
+        tw = self.parent.twiss(strengths=False, beam=int(self.beam[1]))
+        delta = tw.qx - zero_qxy[0], tw.qy - zero_qxy[1]
+        if self.xy == "x":
+            expected = (test_value, 0)
+        else:
+            expected = (0, test_value)
+        msg = []
+        if abs(delta[0] - expected[0]) > threshold:
+            msg.append(
+                f"Error: qx = {tw.qx:23.15g}, delta = {delta[0]:23.15g} != {expected[0]:23.15g}"
+            )
+        if abs(delta[1] - expected[1]) > threshold:
+            msg.append(
+                f"Error: qy = {tw.qy:23.15g}, delta = {delta[0]:23.15g} != {expected[1]:23.15g}"
+            )
+        model[self.name] = old_value
+        if len(msg) > 0:
+            print("\n".join(msg))
+            raise ValueError(f"Knob {self.name!r} failed the check")
+        if len(msg) > 0:
+            print("\n".join(msg))
+            raise ValueError(f"Knob {self.name!r} failed the check")
+
+    def copy(self):
+        return TuneKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            xy=self.xy,
+            beam=self.beam,
+            kind=self.kind,
+            match_value=self.match_value,
+        )
 
     def match(self, solve=True):
         model = self.parent.model
@@ -496,6 +551,41 @@ class ChromaKnob(Knob):
         self.beam = beam
         self.kind = kind
         self.match_value = match_value
+
+    def check(self, threshold=1e-4, test_value=1):
+        print(f"Checking knob {self.name!r}")
+        model = self.parent.model
+        old_value = model[self.name]
+        model[self.name] = 0
+        tw = self.parent.twiss(
+            strengths=False, chrom=True, beam=int(self.beam[1])
+        )
+        zero_dqxy = tw.dqx, tw.dqy
+        model[self.name] = test_value
+        tw = self.parent.twiss(
+            strengths=False, chrom=True, beam=int(self.beam[1])
+        )
+        delta = tw.dqx - zero_dqxy[0], tw.dqy - zero_dqxy[1]
+        if self.xy == "x":
+            expected = (test_value, 0)
+        else:
+            expected = (0, test_value)
+        msg = []
+        if abs(delta[0] - expected[0]) > threshold:
+            msg.append(
+                f"Error: dqx = {tw.dqx:23.15g}, delta = {delta[0]:23.15g} != {expected[0]:23.15g}"
+            )
+        if abs(delta[1] - expected[1]) > threshold:
+            msg.append(
+                f"Error: dqy = {tw.dqy:23.15g}, delta = {delta[0]:23.15g} != {expected[1]:23.15g}"
+            )
+        model[self.name] = old_value
+        if len(msg) > 0:
+            print("\n".join(msg))
+            raise ValueError(f"Knob {self.name!r} failed the check")
+        if len(msg) > 0:
+            print("\n".join(msg))
+            raise ValueError(f"Knob {self.name!r} failed the check")
 
     def copy(self):
         return ChromaKnob(
@@ -586,6 +676,33 @@ class ChromaKnob(Knob):
         return f"ChromaKnob({self.name!r}, {self.value})"
 
 
+class ActionCmin(xt.Action):
+    # see Eq. 47 in https://cds.cern.ch/record/522049/files/lhc-project-report-501.pdf
+    def __init__(self, line):
+        self.line = line
+        self.twiss = self.line.twiss()
+        self.betx = self.twiss.betx[:-1]
+        self.bety = self.twiss.bety[:-1]
+        self.mux = self.twiss.mux[:-1]
+        self.muy = self.twiss.muy[:-1]
+        self.reverse = self.line.twiss_default.get("reverse", False)
+
+    def run(self):
+        k1sl = self.line.attr["k1sl"]
+        if self.reverse:
+            k1sl = -k1sl[::-1]
+        c_min = (
+            1
+            / (2 * np.pi)
+            * np.sum(
+                k1sl
+                * np.sqrt(self.betx * self.bety)
+                * np.exp(1j * 2 * np.pi * (self.mux - self.muy))
+            )
+        )
+        return {"r": c_min.real, "i": c_min.imag}
+
+
 class CouplingKnob(Knob):
     retune = re.compile("cm([ri])s\.(b[12])_?([a-z]+)?")
 
@@ -605,7 +722,7 @@ class CouplingKnob(Knob):
         self.beam = beam
         self.kind = kind
         self.match_value = match_value
-        assert(self.ri in ["r", "i"])
+        assert self.ri in ["r", "i"]
 
     def copy(self):
         return CouplingKnob(
@@ -618,6 +735,36 @@ class CouplingKnob(Knob):
             kind=self.kind,
             match_value=self.match_value,
         )
+
+    def check(self, threshold=1e-3, test_value=0.0001):
+        print(f"Checking knob {self.name!r}")
+        model = self.parent.model
+        old_value = model[self.name]
+        model[self.name] = 0
+        zero_cmin = self.parent.get_cmin(beam=int(self.beam[1]))
+        model[self.name] = test_value
+        new_cmin = self.parent.get_cmin(beam=int(self.beam[1]))
+        delta = zero_cmin[0] - new_cmin[0], zero_cmin[1] - new_cmin[1]
+        if self.ri == "r":
+            expected = (test_value, 0)
+        else:
+            expected = (0, test_value)
+        msg = []
+        if abs(delta[0] - expected[0]) > threshold:
+            msg.append(
+                f"Error: cmin_re = {new_cmin[0]:23.15g}, delta = {delta[0]:23.15g} != {expected[0]:23.15g}"
+            )
+        if abs(delta[1] - expected[1]) > threshold:
+            msg.append(
+                f"Error: cmin_im = {new_cmin:23.15g}, delta = {delta[0]:23.15g} != {expected[1]:23.15g}"
+            )
+        model[self.name] = old_value
+        if len(msg) > 0:
+            print("\n".join(msg))
+            raise ValueError(f"Knob {self.name!r} failed the check")
+        if len(msg) > 0:
+            print("\n".join(msg))
+            raise ValueError(f"Knob {self.name!r} failed the check")
 
     @classmethod
     def specialize(cls, knob):
@@ -644,18 +791,17 @@ class CouplingKnob(Knob):
         model = self.parent.model
         xt = model._xt
 
-
         line = getattr(model, self.beam)
-        #line.cycle("ip7", inplace=True)
+        # line.cycle("ip7", inplace=True)
 
         kqsa = [
             f"{wm}_from_{self.name}"
-            for wm,wv in self.weights.items()
+            for wm, wv in self.weights.items()
             if re.match(r"kqs\.a", wm) and wv != 0
         ]
         kqslr = [
             f"{wm}_from_{self.name}"
-            for wm,wv in self.weights.items()
+            for wm, wv in self.weights.items()
             if re.match(r"kqs\.[lr]", wm) and wv != 0
         ]
 
@@ -698,7 +844,7 @@ class CouplingKnob(Knob):
         model[self.name] = knob_start
         print("Knob new vs old")
         model.get_knob(self).diff(self)
-        #line.cycle("ip1", inplace=True)
+        # line.cycle("ip1", inplace=True)
         return mtc
 
     def __repr__(self):
