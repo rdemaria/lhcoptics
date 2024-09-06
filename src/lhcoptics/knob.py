@@ -267,8 +267,8 @@ class IPKnob(Knob):
         )
 
     def get_mcbx_preset(self):
-        left = [k for k in self.weights if re.match(f"acbx{self.hv}\d.l", k)]
-        right = [k for k in self.weights if re.match(f"acbx{self.hv}\d.r", k)]
+        left = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.l", k)]
+        right = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.r", k)]
         vleft = sum([self.weights[k] for k in left])
         vright = sum([self.weights[k] for k in right])
         return vleft, vright
@@ -390,8 +390,8 @@ class IPKnob(Knob):
                 vright = -vleft
             else:
                 vright = vleft
-        left = [k for k in self.weights if re.match(f"acbx{self.hv}\d.l", k)]
-        right = [k for k in self.weights if re.match(f"acbx{self.hv}\d.r", k)]
+        left = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.l", k)]
+        right = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.r", k)]
         for k in left:
             self.weights[k] = vleft / len(left)
         for k in right:
@@ -402,7 +402,7 @@ class IPKnob(Knob):
 
 
 class TuneKnob(Knob):
-    retune = re.compile("dq([xy])\.(b[12])_?([a-z]+)?")
+    retune = re.compile(r"dq([xy])\.(b[12])_?([a-z]+)?")
 
     def __init__(
         self,
@@ -533,7 +533,7 @@ class TuneKnob(Knob):
 
 
 class ChromaKnob(Knob):
-    retune = re.compile("dqp([xy])\.(b[12])_?([a-z]+)?")
+    retune = re.compile(r"dqp([xy])\.(b[12])_?([a-z]+)?")
 
     def __init__(
         self,
@@ -704,7 +704,7 @@ class ActionCmin(xt.Action):
 
 
 class CouplingKnob(Knob):
-    retune = re.compile("cm([ri])s\.(b[12])_?([a-z]+)?")
+    retune = re.compile(r"cm([ri])s\.(b[12])_?([a-z]+)?")
 
     def __init__(
         self,

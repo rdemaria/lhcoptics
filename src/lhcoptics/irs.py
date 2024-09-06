@@ -27,16 +27,16 @@ class LHCIR(LHCSection):
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        quads = madmodel.filter(f"kt?q[xt]?[0-9]?\.[lr]{irn}$")
-        quads += madmodel.filter(f"kq[0-9]\.lr{irn}$")
-        quads += madmodel.filter(f"kqt?l?[0-9][0-9]?\..*[lr]{irn}b[12]$")
+        quads = madmodel.filter(f"kt?q[xt]?[0-9]?\\.[lr]{irn}$")
+        quads += madmodel.filter(f"kq[0-9]\\.lr{irn}$")
+        quads += madmodel.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
         if irn == 7:
             if "kqt5.l7" in quads:
                 quads.remove("kqt5.l7")
             if "kqt5.r7" in quads:
                 quads.remove("kqt5.r7")
         strength_names += sort_n(quads)
-        strength_names += madmodel.filter(f"kqs\..*[lr]{irn}b[12]$")
+        strength_names += madmodel.filter(f"kqs\\..*[lr]{irn}b[12]$")
         acb = madmodel.filter(f"acbx.*[lr]{irn}$")
         acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)
@@ -559,8 +559,8 @@ class LHCIR(LHCSection):
         beam=None,
         method="init",
         figlabel=None,
-        yr=None,
-        yl=None,
+        yr="",
+        yl="",
         filename=None,
     ):
         if beam is None:
