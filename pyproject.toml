@@ -10,7 +10,7 @@ authors = [{ name = "Riccardo De Maria", email = "riccardodemaria@gmail.com" }]
 license = { text = "MIT" }
 urls = { homepage = "https://github.com/rdemaria/optics", repository = "https://github.com/ rdemaria/optics" }
 keywords = ["LHC", "beam dynamics"]
-dependencies = [ "numpy", "matplotlib", "xsuite", "pyoptics", "cpymad"]
+dependencies = [ "numpy", "matplotlib", "xsuite", "cpymad"]
 
 [tool.black]
 line-length = 79

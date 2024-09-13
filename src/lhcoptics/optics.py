@@ -28,8 +28,6 @@ from .utils import (
     git_set_branch,
 )
 
-np.set_printoptions(legacy="1.25")
-
 _opl = ["_op", "_sq", ""]
 
 

@@ -1,6 +1,5 @@
 import re
 
-import pyoptics
 import xdeps as xd
 
 
@@ -149,13 +148,13 @@ class MADSequence:
         if use:
             self.madx.use(sequence=self.sequence)
         tw = self.madx.twiss(sequence=self.sequence)
-        return pyoptics.optics(tw)
+        return xd.Table(tw)
 
     def twiss_line(self, betx=1, bety=1, alfx=0, alfy=0):
         tw = self.madx.twiss(
             betx=betx, bety=bety, alfx=alfx, alfy=alfy, sequence=self.sequence
         )
-        return pyoptics.optics(tw)
+        return xd.Table(tw)
 
     def rmatrix(self, start=None, end=None):
         if start is None:
