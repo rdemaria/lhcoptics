@@ -106,7 +106,7 @@ class IPKnob(Knob):
         self.xy = xy
         self.hv = "h" if xy == "x" else "v"
         self.ipname = f"ip{ip}"
-        self.tols = {"": 1e-9, "p": 1e-11}
+        self.tols = {"": 1e-8, "p": 1e-10}
         self.step = 1e-9
         self.specs = specs
         self.beams = beams

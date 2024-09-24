@@ -155,6 +155,12 @@ class LHCCircuit:
     def __repr__(self) -> str:
         return f"<LHCCircuit {self.pcname!r}>"
 
+    def plot_calib(self):
+        self._calib.plot()
+
+    def plot_calib_deviation(self):
+        self._calib.plot_deviation()
+
 
 class LHCCalibration:
 
@@ -232,6 +238,17 @@ class LHCCalibration:
         plt.title(self.name)
         plt.grid(True)
         plt.legend()
+
+    def plot_deviation(self):
+        plt.figure(num=self.name + " deviation")
+        dfdi = (self.field[-1] - self.field[0]) / (
+            self.current[-1] - self.current[0]
+        )
+        plt.plot(self.current, self.field - dfdi * self.current, "k")
+        plt.xlabel("Current [A]")
+        plt.ylabel("Field Deviation [T/m^n]")
+        plt.title(self.name + " deviation")
+        plt.grid(True)
 
     def __repr__(self) -> str:
         if len(self.current) > 0:

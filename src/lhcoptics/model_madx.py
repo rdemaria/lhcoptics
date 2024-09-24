@@ -329,11 +329,12 @@ use, sequence=lhcb2;
                 print(f"{k:20} {self[k]:15.6g} -> {v:15.6g}")
             self[k] = v
 
-    def update_knobs(self, knobs, verbose=False):
+    def update_knobs(self, knobs, verbose=False, knobs_off=False):
         for k, knob in knobs.items():
-            if verbose:
-                print(f"{k:20} {self[k]:15.6g} -> {knob.value:15.6g}")
-            self[k] = knob.value
+            if not knobs_off:
+              if verbose:
+                  print(f"{k:20} {self[k]:15.6g} -> {knob.value:15.6g}")
+              self[k] = knob.value
             for wn, value in knob.weights.items():
                 name = f"{wn}_from_{k}"
                 self[name] = value
