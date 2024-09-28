@@ -5,17 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xdeps as xd
 
-from .arcs import LHCArc
-from .ir1 import LHCIR1
-from .ir2 import LHCIR2
-from .ir3 import LHCIR3
-from .ir4 import LHCIR4
-from .ir5 import LHCIR5
-from .ir6 import LHCIR6
-from .ir7 import LHCIR7
-from .ir8 import LHCIR8
 from .lsa_util import get_lsa
-from .optics import LHCOptics
 from .rdmsignal import poly_fit, poly_val
 
 
@@ -478,7 +468,7 @@ class LHCOpticsTable(LHCSectionTable):
             out[pp] = np.interp(out["time"], ptime, pval)
         return xd.Table(out)
 
-    def __init__(self, rows):
+    def __init__(self, rows, time=None ,beamprocess=None):
         self.rows = rows
         self.params = Col("params", rows)
         self.knobs = Col("knobs", rows)
@@ -494,6 +484,9 @@ class LHCOpticsTable(LHCSectionTable):
             setattr(self, ir.rows[0].name, ir)
         for arc in self.arcs:
             setattr(self, arc.rows[0].name, arc)
+
+        self.time = time
+        self.beamprocess = beamprocess
 
     def interp(self, n, order=1, xaxis="id"):
         opt0 = self.rows[0]
@@ -539,3 +532,28 @@ class LHCOpticsTable(LHCSectionTable):
     def plot_quads(self, current=False, p0c=None):
         for ir in self.irs:
             ir.plot_quads(current=current, p0c=p0c)
+
+
+class BeamProcess:
+
+    def __init__(self, name, opticstable, parameters=None):
+        self.name = name
+        self.opticstable = opticstable
+        self.parameters = parameters
+
+    @classmethod
+    def from_lsa(cls, name, beamprocess, parameters=None):
+        if parameters is None:
+            parameters = ["LHCBEAM/MOMENTUM"]
+        lsa = get_lsa()
+        opttable = lsa.getOpticTable(beamprocess)
+        out = {
+            "name": np.array([oo.name for oo in opttable]),
+            "time": np.array([oo.time for oo in opttable]),
+        }
+        for pp in parameters:
+            trim = lsa.getLastTrim(pp, beamprocess)
+            ptime = trim.data[0]
+            pval = trim.data[1]
+            out[pp] = np.interp(out["time"], ptime, pval)
+        return xd.Table(out)

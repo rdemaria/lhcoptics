@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .lsa_util import get_lsa
+from .nxcals_util import get_nxcals
 
 kqx_limits = {
     "kqx.l1": [0, 205.0],
@@ -16,7 +17,6 @@ kqx_limits = {
     "kqx.l8": [0, 205.0],
     "kqx.r8": [-205.0, 0],
 }
-
 
 
 def madname_from_pcname(pc):
@@ -161,6 +161,11 @@ class LHCCircuit:
     def plot_calib_deviation(self):
         self._calib.plot_deviation()
 
+    def get_measurements(self, start, end):
+        nxcals=get_nxcals()
+        variables= [f"{self.pcname}:{ss}" for ss in ["I_MEAS", "V_MEAS","I_REF","V_REF"]]
+        return nxcals.get(variables, start, end)
+
 
 class LHCCalibration:
 
@@ -259,9 +264,10 @@ class LHCCalibration:
             return f"<LHCCalibration {self.name}, empty>"
 
 
+
 class LHCCircuits:
 
-    def __init__(self, circuits, calibrations=None):
+    def __init__(self, circuits, calibrations=None, circuits2in1=None):
         self.pcname = circuits
         if calibrations is None:
             calibrations = {}
@@ -271,11 +277,38 @@ class LHCCircuits:
             if cir._calib is not None and cir._calib.imin < 0:
                 cir.imin = -cir.imax
 
-        self.madname = {cir.madname: cir for cir in self.pcname.values()}
-        self.shortname = {
-            ".".join(cir.pcname.split(".")[2:]): cir
-            for cir in self.pcname.values()
-        }
+        self.madname = {}
+        self.logicalname = {}
+        for cir in self.pcname.values():
+            if hasattr(cir, "madname"):
+                self.madname[cir.madname] = cir
+                logicalname = ".".join(cir.pcname.split(".")[2:])
+                self.logicalname[logicalname] = cir
+        if circuits2in1 is None or len(circuits2in1) == 0:
+            circuits2in1 = {}
+            for pcname1, pc1 in list(self.pcname.items()):
+                if pcname1.endswith("B1"):
+                    name2in1 = pcname1[:-2]
+                    pcname2 = name2in1 + "B2"
+                    pc2 = self.pcname.get(pcname2)
+                    if pc2 is not None:
+                        circuits2in1[name2in1] = LHCCircuit2in1(
+                            name2in1, pcname1, pcname2, pc1, pc2
+                        )
+        else:
+            for cir in circuits2in1.values():
+                cir.pc1 = self.pcname[cir.pcname1]
+                cir.pc2 = self.pcname[cir.pcname2]
+
+        self.pcname2in1 = circuits2in1
+        self.madname2in1 = {}
+        self.logicalname2in1 = {}
+        for cir in self.pcname2in1.values():
+            self.madname2in1[cir.pc1.madname] = cir
+            self.madname2in1[cir.pc2.madname] = cir
+            self.logicalname2in1[cir.pc1.logicalname] = cir
+            self.logicalname2in1[cir.pc2.logicalname] = cir
+            self.logicalname2in1[cir.pc1.logicalname[:-2]] = cir
 
     @staticmethod
     def get_pc_names_from_lsa():
@@ -318,14 +351,16 @@ class LHCCircuits:
 
     @classmethod
     def from_dict(cls, dct):
-        circuits = {
-            k: LHCCircuit.from_dict(v) for k, v in dct["circuits"].items()
-        }
+        circuits = {k: LHCCircuit.from_dict(v) for k, v in dct["circuits"].items()}
         calibrations = {
             k: LHCCalibration.from_dict(v)
             for k, v in dct["calibrations"].items()
         }
-        return cls(circuits, calibrations)
+        circuits2in1 = {
+            k: LHCCircuit2in1.from_dict(v)
+            for k, v in dct.get("circuits2in1", {}).items()
+        }
+        return cls(circuits, calibrations=calibrations, circuits2in1=circuits2in1)
 
     @classmethod
     def from_json(cls, filename):
@@ -339,12 +374,22 @@ class LHCCircuits:
             "calibrations": {
                 k: v.to_dict() for k, v in self.calibrations.items()
             },
+            "circuits2in1": {
+                k: v.to_dict() for k, v in self.pcname2in1.items()
+            },
         }
 
     def to_json(self, filename):
         with open(filename, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
         return self
+
+    def get_2in1(self, madname=None, logicalname=None):
+        if madname:
+            pc = self.madname[madname]
+        elif logicalname:
+            pc = self.logicalname[logicalname]
+        return self.pcname[pc.pcname[:-2]]
 
     def get_current(self, kname, kval, pc=7e12):
         return self.pcname[kname].get_current(kval, pc)
@@ -359,7 +404,7 @@ class LHCCircuits:
             return [minval / brho, maxval / brho]
         elif kname.startswith("ktqx"):
             brho = pc / 299792458
-            minval, maxval = [-20, 20] ## arbitrary limits
+            minval, maxval = [-20, 20]  ## arbitrary limits
             return [minval / brho, maxval / brho]
         else:
             return self.madname[kname].get_klimits(pc)
@@ -405,7 +450,7 @@ class LHCCircuits:
             if re.match(name, cname)
         ]
 
-    def find_pc(self, madname=None, pcname=None, shortname=None):
+    def find_pc(self, madname=None, pcname=None, logicalname=None):
         out = []
         if madname:
             out += [
@@ -419,11 +464,11 @@ class LHCCircuits:
                 for pc in self.pcname.values()
                 if re.match(pcname, pc.pcname)
             ]
-        if shortname:
+        if logicalname:
             out += [
                 pc
                 for pc in self.pcname.values()
-                if re.match(shortname, pc.shortname)
+                if re.match(logicalname, pc.logicalname)
             ]
         return out
 
@@ -436,11 +481,25 @@ class LHCCircuits:
             raise KeyError(f"Key {key} not found in {self}")
 
     def __repr__(self) -> str:
-        return f"<LHCCircuits {len(self.pcname)} circuits>"
+        return f"<LHCCircuits {len(self.pcname)} circuits, {len(self.pcname2in1)} 2-in-1>"
 
 
 class LHCCircuit2in1:
-    def __init__(self, circuit1, circuit2, rc):
-        self.circuit1 = circuit1
-        self.circuit2 = circuit2
+    def __init__(self, pcname, pcname1, pcname2, pc1=None, pc2=None, rc=0):
+        self.pcname = pcname
+        self.pcname1 = pcname1
+        self.pcname2 = pcname2
+        self.pc1 = pc1
+        self.pc2 = pc2
         self.rc = rc
+
+    @classmethod
+    def from_dict(cls, dct):
+        return cls(**dct)
+
+    def to_dict(self):
+        attrs = ["pcname", "pcname1", "pcname2", "rc"]
+        return {k: getattr(self, k) for k in attrs}
+
+    def __repr__(self) -> str:
+        return f"<LHCCircuit2in1 {self.pcname!r}>"

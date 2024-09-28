@@ -7,7 +7,9 @@ LHCArc -> Contains strengths, constraints, knobs
 
 __version__ = "0.0.2"
 from .arcs import LHCArc
-from .circuits import LHCCircuits, get_lsa
+from .circuits import LHCCircuits
+from .lsa_util import get_lsa
+from .nxcals_util import get_spark, get_nxcals
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
 from .ir3 import LHCIR3
@@ -25,9 +27,14 @@ from .rdmsignal import poly_fit, poly_val
 from .repo import LHC
 from .aperture import LHCAperture
 
+import numpy as np
+np.set_printoptions(legacy="1.25")
+
 
 __all__ = [
     get_lsa,
+    get_spark,
+    get_nxcals,
     Knob,
     LHC,
     LHCAperture,
