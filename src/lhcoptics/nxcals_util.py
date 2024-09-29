@@ -49,9 +49,10 @@ class NXCals:
 
     def get(self, variables, start, end, system="CMW"):
         #import pytimber
-        #ldb = pytimber.LoggingDB()
+        #ldb = pytimber.LoggingDB(spark_session=self.spark)
         #return ldb.get(variables, start, end)
         from nxcals.api.extraction.data.builders import DataQuery
+        from pyspark.sql import functions as F
         query = DataQuery.builder(self.spark).variables().system(system)
         if isinstance(variables, str):
             query = query.nameLike(variables)
@@ -60,4 +61,9 @@ class NXCals:
         else:
             raise ValueError("variables must be a string or a list of strings")
         query = query.timeWindow(start, end).build()
+        query=query \
+                .orderBy('nxcals_timestamp',ascending=True)\
+                .groupBy("nxcals_timestamp")\
+                .pivot("nxcals_variable_name")\
+                .agg(F.first("nxcals_value")).toPandas()
         return query

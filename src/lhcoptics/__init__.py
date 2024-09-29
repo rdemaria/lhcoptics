@@ -9,7 +9,7 @@ __version__ = "0.0.2"
 from .arcs import LHCArc
 from .circuits import LHCCircuits
 from .lsa_util import get_lsa
-from .nxcals_util import get_spark, get_nxcals
+from .nxcals_util import get_spark, get_nxcals, NXCals
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
 from .ir3 import LHCIR3
