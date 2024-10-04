@@ -8,7 +8,7 @@ version = "0.0.2"
 description = "Library to build LHC Optics"
 authors = [{ name = "Riccardo De Maria", email = "riccardodemaria@gmail.com" }]
 license = { text = "MIT" }
-urls = { homepage = "https://github.com/rdemaria/optics", repository = "https://github.com/rdemaria/optics" }
+urls = { homepage = "https://github.com/rdemaria/lhcoptics", repository = "https://github.com/rdemaria/lhcoptics" }
 keywords = ["LHC", "beam dynamics"]
 dependencies = [ "numpy", "matplotlib", "xsuite", "cpymad"]
 
