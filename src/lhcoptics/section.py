@@ -222,7 +222,7 @@ class LHCSection:
 
     def to_json(self, filename):
         with open(filename, "w") as f:
-            json.dump(self.to_dict(), f,indent=2)
+            json.dump(self.to_dict(), f, indent=2)
         return self
 
     def to_madx(self, output=None, knobs=True):
@@ -254,7 +254,13 @@ class LHCSection:
         return getattr(self, "twiss_" + method)(beam, strengths=strengths)
 
     def update(
-        self, src=None, verbose=False, knobs=True, strengths=True, params=True
+        self,
+        src=None,
+        verbose=False,
+        knobs=True,
+        strengths=True,
+        params=True,
+        add_params=False,
     ):
         """
         Update existing strengths, knobs, params from self. model or src.params or src
@@ -266,7 +272,7 @@ class LHCSection:
         if knobs:
             self.update_knobs(src, verbose=verbose)
         if params:
-            self.update_params(src, verbose=verbose)
+            self.update_params(src, verbose=verbose, add=add)
         return self
 
     def update_from_madxfile(self, filename):
@@ -363,10 +369,14 @@ class LHCSection:
         elif hasattr(src, "params"):
             src = src.params
         if hasattr(self, "irn"):
-            filter=filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
+            filter = filter_lrb12(
+                self.irn, left=left, right=right, b1=b1, b2=b2
+            )
         else:
+
             def filter(x):
                 return True
+
         if add:
             for k in src:
                 if k not in self.params and filter(k):

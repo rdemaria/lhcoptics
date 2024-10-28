@@ -302,11 +302,11 @@ class LHCOptics:
         ratio=1.5,
         margin=0.1,
     ):
-        out={}
+        out = {}
         for ir in self.irs:
             if verbose:
                 print(f"       Check {ir.name.upper()}")
-            irout=ir.check_quad_strengths(
+            irout = ir.check_quad_strengths(
                 verbose=verbose,
                 p0c=p0c,
                 ratio=ratio,
@@ -509,9 +509,7 @@ class LHCOptics:
     def get_quad_max_ratio(self, verbose=False, ratio=1.5):
         ratios = np.array(
             [
-                ir.get_quad_max_ratio(
-                    verbose=verbose, ratio=ratio
-                )
+                ir.get_quad_max_ratio(verbose=verbose, ratio=ratio)
                 for ir in self.irs
             ]
         )
@@ -635,8 +633,7 @@ class LHCOptics:
             for beam in [1, 2]:
                 self.plot(beam)
         else:
-            self.twiss(beam=beam).plot(
-                figlabel=f"lhcb{beam}")
+            self.twiss(beam=beam).plot(figlabel=f"lhcb{beam}")
             plt.title(f"LHCB{beam}")
         return self
 
@@ -690,6 +687,7 @@ class LHCOptics:
         if full:
             for ss in self.irs + self.arcs:
                 ss.set_params()
+        return self
 
     def set_xsuite_model(self, model, verbose=False):
         if isinstance(model, str):
@@ -777,7 +775,7 @@ class LHCOptics:
             compute_chromatic_properties=chrom, strengths=strengths
         )
 
-    def update(self, src=None, verbose=False, full=True):
+    def update(self, src=None, verbose=False, full=True, add_params=True):
         if isinstance(src, str) or isinstance(src, Path):
             src = self.from_json(src)
         if full:
@@ -785,20 +783,24 @@ class LHCOptics:
                 if verbose:
                     print(f"Update {self} from model")
                 for ss in self.irs + self.arcs:
-                    ss.update(src, verbose=verbose)
+                    ss.update(src, verbose=verbose, add_params=add_params)
             else:
                 for ss in self.irs + self.arcs:
                     if hasattr(src, ss.name):
                         src_ss = getattr(src, ss.name)
                         if verbose:
                             print(f"Update {ss.name} from {src}.{ss.name}")
-                        ss.update(src=src_ss, verbose=verbose)
+                        ss.update(
+                            src=src_ss, verbose=verbose, add_params=add_params
+                        )
                     elif ss.name in src:
                         src_ss = src[ss.name]
                         if verbose:
                             print(f"Update {ss.name} from {src}[{ss.name}]")
-                        ss.update(src=src_ss, verbose=verbose)
-        self.update_params(src, verbose=verbose, full=False)
+                        ss.update(
+                            src=src_ss, verbose=verbose, add_params=add_params
+                        )
+        self.update_params(src, verbose=verbose, full=False, add=True)
         self.update_knobs(src, verbose=verbose, full=False)
         return self
 
@@ -907,5 +909,5 @@ class LHCOptics:
                 # if verbose:
                 # print(f"Update params in {ss}")
                 ssrc = src.get(ss.name)
-                ss.update_params(ssrc, verbose=verbose)
+                ss.update_params(ssrc, verbose=verbose, add=add)
         return self
