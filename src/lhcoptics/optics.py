@@ -763,7 +763,7 @@ class LHCOptics:
     def to_table(self, *rows):
         from .opttable import LHCOpticsTable
 
-        return LHCOpticsTable([self] + list(rows))
+        return LHCOpticsTable([self.copy()] + list(rows))
 
     def twiss(self, beam=None, chrom=False, strengths=True):
         if beam is None:

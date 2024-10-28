@@ -379,10 +379,17 @@ class LHCSection:
 
         if add:
             for k in src:
-                if k not in self.params and filter(k):
-                    if verbose:
-                        print(f"Adding {k!r:18} = {src[k]}")
+                if filter(k):
+                    if k not in self.params:
+                        if verbose:
+                            print(f"Adding {k!r:18} = {src[k]}")
+                    else:
+                        if verbose and self.params[k] != src[k]:
+                            print(
+                                f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}"
+                            )
                     self.params[k] = src[k]
+
         else:
             for k in self.params:
                 if k in src and filter(k):

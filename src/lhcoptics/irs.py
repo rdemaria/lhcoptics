@@ -605,12 +605,14 @@ class LHCIR(LHCSection):
                 knob.value = 0
                 self.parent.model[k] = 0
 
-    def set_betastar(self, beta=None, ratio=1.0):
+    def set_betastar(self, betx=None, bety=None):
+        if bety is None:
+            bety=betx
         if self.irn in [1, 2, 5, 8]:
-            self.params[f"betx{self.ipname}b1"] = beta
-            self.params[f"betx{self.ipname}b2"] = beta
-            self.params[f"bety{self.ipname}b1"] = beta / ratio
-            self.params[f"bety{self.ipname}b2"] = beta / ratio
+            self.params[f"betx{self.ipname}b1"] = betx
+            self.params[f"betx{self.ipname}b2"] = betx
+            self.params[f"bety{self.ipname}b1"] = bety
+            self.params[f"bety{self.ipname}b2"] = bety
         else:
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")
 
@@ -637,7 +639,7 @@ class LHCIR(LHCSection):
     def to_table(self, *rows):
         from .opttable import LHCIRTable
 
-        return LHCIRTable([self] + list(rows))
+        return LHCIRTable([self.copy()] + list(rows))
 
     def twiss(self, beam=None, method="init", strengths=True):
         if method == "init":
