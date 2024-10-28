@@ -1,11 +1,25 @@
 import json
 import re
+import time
+from datetime import datetime
 
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 
 from .lsa_util import get_lsa
-from .nxcals_util import get_nxcals
+#from .nxcals_util import get_nxcals
+
+def str_to_unixtime(datestr):
+    return time.mktime(time.strptime(datestr,"%Y-%m-%d %H:%M:%S.%f"))
+
+def format_xticks_as_datetime():
+    ax=plt.gca()
+    unix_times = ax.get_xticks()
+    ax.set_xticks(unix_times)
+    datetime_labels = [datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') for ts in unix_times]
+    ax.set_xticklabels(datetime_labels, rotation=45, ha='right')
+    plt.tight_layout()
 
 kqx_limits = {
     "kqx.l1": [0, 205.0],
@@ -161,10 +175,15 @@ class LHCCircuit:
     def plot_calib_deviation(self):
         self._calib.plot_deviation()
 
-    def get_measurements(self, start, end):
-        nxcals=get_nxcals()
-        variables= [f"{self.pcname}:{ss}" for ss in ["I_MEAS", "V_MEAS","I_REF","V_REF"]]
-        return nxcals.get(variables, start, end)
+    def get_measurements(self,db, start, end):
+        if isinstance(start, str):
+            start = str_to_unixtime(start)
+        if isinstance(end, str):
+            end = str_to_unixtime(end)
+        return db.get(self.get_nxcals_variables(), start, end)
+
+    def get_nxcals_variables(self):
+        return [f"{self.pcname}:{ss}" for ss in ["I_MEAS", "V_MEAS","I_REF","V_REF"]]
 
 
 class LHCCalibration:

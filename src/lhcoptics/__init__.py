@@ -27,10 +27,6 @@ from .rdmsignal import poly_fit, poly_val
 from .repo import LHC
 from .aperture import LHCAperture
 
-import numpy as np
-np.set_printoptions(legacy="1.25")
-
-
 __all__ = [
     get_lsa,
     get_spark,
