@@ -272,7 +272,7 @@ class LHCSection:
         if knobs:
             self.update_knobs(src, verbose=verbose)
         if params:
-            self.update_params(src, verbose=verbose, add=add)
+            self.update_params(src, verbose=verbose, add=add_params)
         return self
 
     def update_from_madxfile(self, filename):
