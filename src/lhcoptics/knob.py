@@ -21,6 +21,7 @@ class Knob:
         out = cls(data["name"], data["value"], data["weights"])
         # specializations
         out = IPKnob.specialize(out)
+        out = DispKnob.specialize(out)
         out = TuneKnob.specialize(out)
         out = ChromaKnob.specialize(out)
         out = CouplingKnob.specialize(out)
@@ -346,6 +347,7 @@ class IPKnob(Knob):
             vary=vary,
             targets=targets,
             strengths=False,
+            compute_chromatic_properties=False,
         )
 
         mtc.disable(vary_name=self.const)
@@ -367,7 +369,7 @@ class IPKnob(Knob):
         except Exception as ex:
             print(f"Failed to match {self.name}")
             model.update_knob(self)
-            raise(ex)
+            raise (ex)
         model[self.name] = knob_start
         return mtc
 
@@ -503,7 +505,7 @@ class TuneKnob(Knob):
 
         # find baseline
         model[self.name] = 0
-        tw = line.twiss(strengths=False)
+        tw = line.twiss(strengths=False, compute_chromatic_properties=False)
         q0 = {"x": tw["qx"], "y": tw["qy"]}
         targets = [
             tw.target(
@@ -519,6 +521,7 @@ class TuneKnob(Knob):
             vary=vary,
             targets=targets,
             strengths=False,
+            compute_chromatic_properties=False,
         )
         mtc.target_status()
         mtc.vary_status()
@@ -680,7 +683,7 @@ class ActionCmin(xt.Action):
     # see Eq. 47 in https://cds.cern.ch/record/522049/files/lhc-project-report-501.pdf
     def __init__(self, line):
         self.line = line
-        self.twiss = self.line.twiss()
+        self.twiss = self.line.twiss(compute_chromatic_properties=False)
         self.betx = self.twiss.betx[:-1]
         self.bety = self.twiss.bety[:-1]
         self.mux = self.twiss.mux[:-1]
@@ -831,6 +834,7 @@ class CouplingKnob(Knob):
             ],
             targets=targets,
             check_limits=False,
+            compute_chromatic_properties=False,
         )
         for kk, val in weights.items():
             for vv in mtc.vary:
@@ -849,3 +853,181 @@ class CouplingKnob(Knob):
 
     def __repr__(self):
         return f"CouplingKnob({self.name!r}, {self.value})"
+
+
+class DispKnob(Knob):
+    reorb = re.compile("on_([A-z]+)([0-9])_?([hv])?")
+    match_value = {"xx": 170, "ssep": 1}
+    hv = {"h": "x", "v": "y"}
+
+    def __init__(
+        self,
+        name,
+        value=0,
+        weights=None,
+        parent=None,
+        ip=None,
+        xy=None,
+        specs=None,
+        match_value=1,
+        beams=["b1", "b2"],
+        kind=None,
+    ):
+        super().__init__(name, value, weights, parent)
+        self.ip = ip
+        self.xy = xy
+        self.hv = "h" if xy == "x" else "v"
+        self.ipname = f"ip{ip}"
+        self.tols = {"": 1e-8, "p": 1e-10}
+        self.step = 1e-9
+        self.specs = specs
+        self.beams = beams
+        self.match_value = match_value
+        self.kind = kind
+
+    @classmethod
+    def specialize(cls, knob):
+        """
+        Specialize the knob to a specific type or return the original knob.
+        """
+        if isinstance(knob, cls):
+            return knob
+        mtc = cls.reorb.match(knob.name)
+        if mtc is None:
+            return knob
+        else:
+            kind, irn, hv = mtc.groups()
+            if kind not in cls.match_value:
+                return knob
+            else:
+                xy = cls.hv[hv]
+                return cls(
+                    knob.name,
+                    value=knob.value,
+                    weights=knob.weights,
+                    parent=knob.parent,
+                    ip=irn,
+                    xy=xy,
+                    beams=["b1", "b2"],
+                    kind=kind,
+                    match_value=cls.match_value[kind],
+                )
+
+    def copy(self):
+        return IPKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            ip=self.ip,
+            xy=self.xy,
+            specs=self.specs,
+            match_value=self.match_value,
+            beams=self.beams,
+            kind=self.kind,
+        )
+
+    def match(self, beam):
+        model = self.parent.model
+        """
+        In general the problem is to find
+
+        find dv/dk such that
+
+           t(v0+k0*dv/dk) + dt/dk*(k1-k0) == t(v0+k1*dv/dk)
+
+        Here we solve
+
+           t(v0) + dt/dk*k = t(v0+k*dv/dk)
+
+        needs to get limits in vary (limits will be check during the dry-run with currents)
+        """
+
+        xt = model._xt
+        if self.ip == "1":
+            e_arc_right = f"e.ds.r2.b{beam}"
+        elif self.ip == "5":
+            e_arc_right = f"e.ds.r1.b{beam}"
+        targets = [
+            xt.Target(
+                tt + self.xy,
+                value=0,
+                at=at,
+                tol=self.tols[tt],
+            )
+            for tt in ("", "p")
+            for at in (self.ipname, e_arc_right)
+        ]
+        targets += [
+            xt.Target(
+                f"d{tt}{self.xy}", value=0, at=self.ipname, tol=self.tols[tt]
+            )
+            for tt in ("", "p")
+        ]
+        vary = [
+            xt.Vary(wn, step=self.step)
+            for wn in self.get_weight_knob_names(beam)
+            if "b1" in wn and self.weights[wn.split("_from_")[0]] != 0
+        ]
+
+        line = getattr(model, "b" + beam)
+
+        mtc = line.match(
+            solve=False,
+            vary=vary,
+            targets=targets,
+            strengths=False,
+            compute_chromatic_properties=False,
+        )
+
+        knob_start = model[self.name]
+        try:
+            model[self.name] = 0
+            # get present target values
+            mtc._err(None, check_limits=False)
+            # add offsets
+            for val, tt in zip(mtc._err.last_res_values, mtc.targets):
+                tt.value += val
+            # update definitions, potentially mismatched
+            model.update_knob(self)
+            # add offset in the knobs
+            model[self.name] = self.match_value
+            mtc.target_status()
+            mtc.solve()
+            mtc.vary_status()
+        except Exception as ex:
+            print(f"Failed to match {self.name}")
+            model.update_knob(self)
+            raise (ex)
+        model[self.name] = knob_start
+        return mtc
+
+    def plot(self, value=None):
+        model = self.parent.model
+        aux = self.value
+        if value is None:
+            value = self.value
+        model[self.name] = value
+        if self.ip == "1":
+            start,end="ip8","ip2"
+        elif self.ip == "5":
+            start,end="ip2","ip8"
+        model.b1.twiss(start=start).rows[:end].plot(yl="x y")
+        model.b2.twiss(start=start).rows[:end].plot(yl="x y")
+        model[self.name] = aux
+
+    def set_mcbx_preset(self, vleft, vright=None):
+        if vright is None:
+            if self.kind == "x":
+                vright = -vleft
+            else:
+                vright = vleft
+        left = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.l", k)]
+        right = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.r", k)]
+        for k in left:
+            self.weights[k] = vleft / len(left)
+        for k in right:
+            self.weights[k] = vright / len(right)
+
+    def __repr__(self):
+        return f"<IPKnob {self.name!r} = {self.value}>"

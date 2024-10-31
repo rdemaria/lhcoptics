@@ -204,8 +204,8 @@ class MADSequence:
 class LHCMadxModel:
     extra_defs = """
 kd1.lr1       :=  ad1.lr1/l.mbxw;
-kd2.l1        :=  ad2.l5/l.mbrc ;
-kd2.r1        :=  ad2.r5/l.mbrc ;
+kd2.l1        :=  ad2.l1/l.mbrc ;
+kd2.r1        :=  ad2.r1/l.mbrc ;
 kd1.l2        :=  ad1.l2/l.mbx  ;
 kd1.r2        :=  ad1.r2/l.mbx  ;
 kd2.l2        :=  ad2.l2/l.mbrc ;

@@ -2,6 +2,7 @@ import re
 
 import numpy as np
 import xtrack as xt
+import matplotlib.pyplot as plt
 
 from .model_madx import LHCMadxModel
 from .section import LHCSection, lhcprev, lhcsucc, sort_n
@@ -594,10 +595,11 @@ class LHCIR(LHCSection):
                 mktwiss = self.twiss_from_params
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
-            plt = mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
+            plot = mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
+            plot.left.set_title(figlabel)
             if filename is not None:
-                plt.savefig(filename.format(figlabel=figlabel))
-            return plt
+                plot.savefig(filename.format(figlabel=figlabel))
+            return plot
 
     def set_bumps_off(self):
         for k, knob in self.knob_names.items():

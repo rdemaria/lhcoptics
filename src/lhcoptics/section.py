@@ -1,6 +1,9 @@
 import json
 import re
 
+import matplotlib.pyplot as plt
+
+
 from .knob import Knob
 from .model_madx import LHCMadxModel
 from .utils import (
@@ -183,14 +186,27 @@ class LHCSection:
             raise ValueError("Circuit not set")
         return self.parent.circuit.get_current(kname, self[kname], p0c)
 
-    def plot(self, beam=None, method="periodic", figlabel=None):
+    def plot(
+        self,
+        beam=None,
+        method="periodic",
+        figlabel=None,
+        yr=None,
+        yl=None,
+        filename=None,
+    ):
         if beam is None:
             return [self.plot(beam=1), self.plot(beam=2)]
         else:
             twiss = self.twiss(beam, method=method, strengths=True)
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}"
-            return twiss.plot(figlabel=figlabel)
+            plot=twiss.plot(
+                figlabel=figlabel, yl=yl, yr=yr
+            )
+            if filename is not None:
+                plt.savefig(filename.format(figlabel=figlabel))
+            return plot
 
     def set_params(self):
         """

@@ -53,6 +53,7 @@ class LHCOptics:
         for b in "12"
     ]
     knob_names += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
+    knob_names += ["dqxdjy.b1", "dqxdjy.b1"]
 
     @classmethod
     def get_default_knob_names(cls):
@@ -628,14 +629,24 @@ class LHCOptics:
             )
             self.check()
 
-    def plot(self, beam=None):
+    def plot(
+        self,
+        beam=None,
+        figlabel=None,
+        yr=None,
+        yl=None,
+        filename=None,
+    ):
         if beam is None:
-            for beam in [1, 2]:
-                self.plot(beam)
+            return [self.plot(beam=1,figlabel=figlabel, yr=yr, yl=yl), self.plot(beam=2,figlabel=figlabel, yr=yr, yl=yl)]
         else:
-            self.twiss(beam=beam).plot(figlabel=f"lhcb{beam}")
-            plt.title(f"LHCB{beam}")
-        return self
+            if figlabel is None:
+                figlabel = f"LHCB{beam}"
+            plot=self.twiss(beam=beam).plot(figlabel=figlabel, yr=yr, yl=yl)
+            plot.left.set_title(figlabel)
+            if filename is not None:
+                plot.savefig(filename.format(figlabel=figlabel))
+        return plot
 
     def round_params(self, full=False):
         if full:
