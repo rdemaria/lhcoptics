@@ -365,8 +365,8 @@ class IPKnob(Knob):
             model[self.name] = self.match_value
             mtc.target_status()
             mtc.solve()
-            mtc.vary_status()
         except Exception as ex:
+            mtc.vary_status()
             print(f"Failed to match {self.name}")
             model.update_knob(self)
             raise (ex)
