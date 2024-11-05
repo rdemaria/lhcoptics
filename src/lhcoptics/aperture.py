@@ -250,17 +250,23 @@ class AperList:
             for name, s, offset, bbox, profile, tols in self.apertures
         ]
 
-    def plot(self, ax=None):
+    def plotx(self, ax=None):
         """
         Plot the apertures for a given beam.
         """
         if ax is None:
             fig, ax = plt.subplots()
+        else:
+            fig = ax.figure
 
         mask = self.mask
         ap = self.apertures[mask]
 
-        (line,) = plt.plot(ap["ap_s"], ap["offset"][:, 0], ".-", label="ap_x")
+        (line,) = plt.plot(ap["ap_s"], ap["offset"][:, 0], "k.-", label="ap_x")
+        apx=ap["offset"][:, 0]+ap["bbox"][:, 0]
+        plt.plot(ap["ap_s"], apx, "k.-", label="ap_x+")
+        apx=ap["offset"][:, 0]-ap["bbox"][:, 0]
+        plt.plot(ap["ap_s"], apx, "k.-", label="ap_x-")
 
         annot = ax.annotate(
             "",

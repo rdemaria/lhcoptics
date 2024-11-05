@@ -507,17 +507,18 @@ class LHCXsuiteModel:
         yp = tw.y + sy
         ym = tw.y - sy
         fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
-        ax1.plot(tw.s, tw.x, label="x", color="b")
-        ax2.plot(tw.s, tw.y, label="y", color="b")
+        color = "b" if beam == 1 else "r"
+        ax1.plot(tw.s, tw.x, label="x", color=color)
+        ax2.plot(tw.s, tw.y, label="y", color=color)
         ax1.set_ylabel("x [m]")
         ax2.set_ylabel("y [m]")
         ax1.fill_between(
-            tw.s, xp, xm, alpha=0.5, color="b", label=f"{nsigma} sigma"
+            tw.s, xp, xm, alpha=0.5, color=color, label=f"{nsigma} sigma"
         )
         ax2.fill_between(
-            tw.s, yp, ym, alpha=0.5, color="b", label=f"{nsigma} sigma"
+            tw.s, yp, ym, alpha=0.5, color=color, label=f"{nsigma} sigma"
         )
-        return self
+        return ax1, ax2
 
     def plot_aperture(self, beam=None):
         if beam is None:
@@ -536,7 +537,7 @@ class LHCXsuiteModel:
         for name, elem in line.element_dict.items():
             if name.startswith("mb."):
                 elem.h = 0
-        su = line.survey()
+        su = line.survey(reverse=False) #needs to force it because not supported
         if beam == 2:
             su = su.reverse()
         return su

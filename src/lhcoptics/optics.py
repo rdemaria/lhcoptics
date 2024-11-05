@@ -4,7 +4,7 @@ from pathlib import Path
 import gzip
 
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from cpymad.madx import Madx
 
 from .arcs import LHCArc
