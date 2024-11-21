@@ -455,6 +455,7 @@ class LHCXsuiteModel:
         ndisp_err=0.1,
         delta_err=2e-4,
         nsigma=12,
+        survey=False,
     ):
         if beam is None:
             return [
@@ -467,6 +468,7 @@ class LHCXsuiteModel:
                     ndisp_err=ndisp_err,
                     delta_err=delta_err,
                     nsigma=nsigma,
+                    survey=survey,
                 ),
                 self.plot_beamsize(
                     beam=2,
@@ -477,6 +479,7 @@ class LHCXsuiteModel:
                     ndisp_err=ndisp_err,
                     delta_err=delta_err,
                     nsigma=nsigma,
+                    survey=survey,
                 ),
             ]
         line = self.sequence[beam]
@@ -487,11 +490,11 @@ class LHCXsuiteModel:
         ey = ex
         dx_err = 2.0 * np.sqrt(tw.betx / 170) * ndisp_err
         dy_err = 2.0 * np.sqrt(tw.bety / 170) * ndisp_err
-        dx = tw.dx + delta_err
-        dy = tw.dy + delta_err
-        print(f"dx_err={dx_err.max()} dy_err={dy_err.max()}")
-        print(f"dx={dx_err.max()} dy={dy.max()}")
-        print(f"ex={ex} ey={ey}")
+        dx = tw.dx + dx_err
+        dy = tw.dy + dy_err
+        #print(f"dx_err={dx_err.max()} dy_err={dy_err.max()}")
+        #print(f"dx={dx_err.max()} dy={dy.max()}")
+        #print(f"ex={ex} ey={ey}")
         sx = (
             nsigma * bbeat * np.sqrt(tw.betx * ex)
             + abs(dx) * delta_err
@@ -502,14 +505,26 @@ class LHCXsuiteModel:
             + abs(dy) * delta_err
             + co_error
         )
-        xp = tw.x + sx
-        xm = tw.x - sx
-        yp = tw.y + sy
-        ym = tw.y - sy
-        fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
+        x=tw.x
+        y=tw.y
+        if survey:
+            su=self.get_survey_flat(beam)
+            x+=su.X
+            y+=su.Y
+        xp = x + sx
+        xm = x - sx
+        yp = y + sy
+        ym = y - sy
+        if not survey:
+            fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
+        else:
+            if beam==1:
+                fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", figsize=(12, 6))
+            else:
+                ax1, ax2 = plt.gcf().get_axes()
         color = "b" if beam == 1 else "r"
-        ax1.plot(tw.s, tw.x, label="x", color=color)
-        ax2.plot(tw.s, tw.y, label="y", color=color)
+        ax1.plot(tw.s, x, label="x", color=color)
+        ax2.plot(tw.s, y, label="y", color=color)
         ax1.set_ylabel("x [m]")
         ax2.set_ylabel("y [m]")
         ax1.fill_between(
@@ -542,12 +557,42 @@ class LHCXsuiteModel:
             su = su.reverse()
         return su
 
-    def plot_survey_flat(self):
+    def get_survey(self, beam=None):
+        if beam is None:
+            return [self.get_survey(beam=1), self.get_survey(beam=2)]
+        if beam == 1:
+            return self.sequence[beam].survey()
+        else:
+            return self.sequence[beam].survey(reverse=False).reverse()
+
+    def plot_survey(self, beam=None):
+        if beam is None:
+            return [self.plot_survey(beam=1), self.plot_survey(beam=2)]
+        su = self.get_survey(beam)
+
+        plt.figure("LHC Survey",figsize=(6,6))
+        ax=plt.subplot(111)
+        color="b" if beam==1 else "r"
+        ax.plot(su.Z, su.X, label=f"Beam {beam}",color=color)
+        ax.set_xlabel("Z [m]")
+        ax.set_ylabel("X [m]")
+        suips=su.rows["ip[1-8]"].cols["name Z X"]
+        for name,x,y in suips.rows:
+            plt.text(x,y,name.upper(),color="black")
+        return self
+
+    def plot_survey_flat(self, figsize=(12, 3)):
         su1 = self.get_survey_flat(beam=1)
         su2 = self.get_survey_flat(beam=2)
-        plt.figure("survey_flat")
-        plt.plot(su1.s, su1.X)
-        plt.plot(su2.s, su2.X)
+        plt.figure("LHC Survey Flat",figsize=figsize)
+        plt.plot(su1.s, su1.X,label="Beam 1", color="blue")
+        plt.plot(su2.s, su2.X,label="Beam 2", color="red")
+        plt.xlabel("S [m]")
+        plt.ylabel("X [m]")
+        suips=su1.rows["ip[1-8]"].cols["name s X"]
+        for name,x,y in suips.rows:
+            plt.text(x,0,name.upper(),color="black")
+        plt.tight_layout()
         return self
 
     def slice(self, slices=8):

@@ -4,7 +4,8 @@ from pathlib import Path
 import gzip
 
 import numpy as np
-#import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
 from cpymad.madx import Madx
 
 from .arcs import LHCArc
@@ -636,16 +637,43 @@ class LHCOptics:
         yr=None,
         yl=None,
         filename=None,
+        iplabels=False,
+        figsize=(6.4*1.2, 4.8),
     ):
         if beam is None:
-            return [self.plot(beam=1,figlabel=figlabel, yr=yr, yl=yl), self.plot(beam=2,figlabel=figlabel, yr=yr, yl=yl)]
+            return [
+                self.plot(
+                    beam=1,
+                    figlabel=figlabel,
+                    yr=yr,
+                    yl=yl,
+                    iplabels=iplabels,
+                    filename=filename,
+                    figsize=figsize,
+                ),
+                self.plot(
+                    beam=2,
+                    figlabel=figlabel,
+                    yr=yr,
+                    yl=yl,
+                    iplabels=iplabels,
+                    filename=filename,
+                    figsize=figsize,
+                ),
+            ]
         else:
             if figlabel is None:
                 figlabel = f"LHCB{beam}"
-            plot=self.twiss(beam=beam).plot(figlabel=figlabel, yr=yr, yl=yl)
-            plot.left.set_title(figlabel)
+            tw = self.twiss(beam=beam)
+            plot = tw.plot(figlabel=figlabel, yr=yr, yl=yl,figsize=figsize)
+            plot.ax.set_title(figlabel)
             if filename is not None:
                 plot.savefig(filename.format(figlabel=figlabel))
+            if iplabels:
+               twip = tw.rows["ip."]
+               plot.left.set_xticks(twip.s, map(str.upper, twip.name))
+               plot.ax.set_xlabel(None)
+            plot.figure.tight_layout()
         return plot
 
     def round_params(self, full=False):

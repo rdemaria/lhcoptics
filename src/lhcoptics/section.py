@@ -200,12 +200,13 @@ class LHCSection:
         else:
             twiss = self.twiss(beam, method=method, strengths=True)
             if figlabel is None:
-                figlabel = f"{self.name}b{beam}"
+                figlabel = f"{self.name}b{beam}".upper()
             plot=twiss.plot(
                 figlabel=figlabel, yl=yl, yr=yr
             )
             if filename is not None:
                 plt.savefig(filename.format(figlabel=figlabel))
+            plot.ax.set_title(figlabel)
             return plot
 
     def set_params(self):

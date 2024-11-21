@@ -566,8 +566,8 @@ class LHCIR(LHCSection):
     ):
         if beam is None:
             if figlabel is None:
-                figlabel1 = f"{self.name}b1"
-                figlabel2 = f"{self.name}b2"
+                figlabel1 = f"{self.name}b1".upper()
+                figlabel2 = f"{self.name}b2".upper()
             return [
                 self.plot(
                     beam=1,
@@ -594,9 +594,9 @@ class LHCIR(LHCSection):
             elif method == "params":
                 mktwiss = self.twiss_from_params
             if figlabel is None:
-                figlabel = f"{self.name}b{beam}"
+                figlabel = f"{self.name}b{beam}".upper()
             plot = mktwiss(beam).plot(figlabel=figlabel, yr=yr, yl=yl)
-            plot.left.set_title(figlabel)
+            plot.ax.set_title(figlabel)
             if filename is not None:
                 plot.savefig(filename.format(figlabel=figlabel))
             return plot
