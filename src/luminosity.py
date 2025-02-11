@@ -1089,3 +1089,41 @@ class StableBeam:
         self.ip5 = ip5
         self.ip2 = ip2
         self.ip8 = ip8
+
+
+
+class LHCLuminosity:
+    def __init__(self, ips=None, bunches=None, parameters=None):
+        if ips is None:
+            ips=[
+            IP("atlass",
+               betx=0.15,
+               bety=0.15,
+               px=250e-6,
+               ccx=190e-6),
+            IP("cms",
+               betx=0.15,
+               bety=0.15,
+               px=250e-6,
+               ccx=190e-6),
+            IP("lhcb",
+               betx=0.15,
+               bety=1.5,
+               px=250e-6,
+               ccx=190e-6),
+            IP("alice",
+               betx=0.15,
+               bety=1.5,
+               px=250e-6,
+               ccx=190e-6)]
+        self.ips=ips
+        if bunches is None:
+            bunches=[
+            Bunch(nb=2340,
+                  ppb=2.2e11,
+                  emitnx=2.5e-6,
+                  emitny=2.5e-6)
+        ]
+        self.bunches=bunches
+        self.parameters={
+        }
