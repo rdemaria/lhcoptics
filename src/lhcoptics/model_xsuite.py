@@ -55,21 +55,21 @@ class LHCXsuiteModel:
 
     def __init__(
         self,
-        multiline=None,
+        env=None,
         optics=None,
         settings=None,
         jsonfile=None,
         madxfile=None,
     ):
-        self.multiline = multiline
+        self.env = env
         self.optics = optics
         self.settings = settings
         self.jsonfile = jsonfile
-        self._var_values = multiline._xdeps_vref._owner
-        self.vars = multiline._xdeps_vref
-        self.mgr = multiline._xdeps_manager
+        self._var_values = env._xdeps_vref._owner
+        self.vars = env._xdeps_vref
+        self.mgr = env._xdeps_manager
         self.madxfile = madxfile
-        self.sequence = {1: multiline.b1, 2: multiline.b2}
+        self.sequence = {1: env.b1, 2: env.b2}
         self.b1.build_tracker()
         self.b2.build_tracker()
         self._aperture = None
@@ -88,7 +88,7 @@ class LHCXsuiteModel:
     @classmethod
     def from_madx(cls, madx, sliced=False, madxfile=None):
 
-        lines = xt.Multiline.from_madx(
+        lines = xt.Environment.from_madx(
             madx=madx, enable_layout_data=True, return_lines=True
         )
         lines["b1"] = lines.pop("lhcb1")
@@ -99,14 +99,17 @@ class LHCXsuiteModel:
         lines["b2"].particle_ref = xt.Particles(
             mass0=xt.PROTON_MASS_EV, p0c=450e9
         )
-        lines["b1"].twiss_default["method"] = "4d"
-        lines["b2"].twiss_default["method"] = "4d"
-        lines["b1"].twiss_default["co_search_at"] = "ip7"
-        lines["b2"].twiss_default["co_search_at"] = "ip7"
-        lines["b1"].twiss_default["strengths"] = True
-        lines["b2"].twiss_default["strengths"] = True
-        lines["b1"].twiss_default["compute_chromatic_properties"] = False
-        lines["b2"].twiss_default["compute_chromatic_properties"] = False
+
+        lhc = xt.Environment(lines=lines)
+        for ll in lhc.lines.values():
+            ll.twiss_default["method"] = "4d"
+            ll.twiss_default["co_search_at"] = "ip7"
+            ll.twiss_default["strengths"] = True
+            ll.twiss_default["compute_chromatic_properties"] = False
+            if "b2" in ll.name:
+                ll.twiss_default["reverse"] = True
+            ll.metadata=lines[ll.name].metadata
+
         if sliced:
             for ln, ll in list(lines.items()):
                 ls = ll.copy()
@@ -121,49 +124,48 @@ class LHCXsuiteModel:
                         ),
                     ]
                 )
-                lines[f"{ln}s"] = ls
+                lhc.lines[f"{ln}s"] = ls
 
-        lhc = xt.Multiline(lines)
-        out = cls(multiline=lhc, madxfile=madxfile)
+        out = cls(env=lhc, madxfile=madxfile)
         return out
 
     @classmethod
     def from_json(cls, jsonfile):
         import xtrack as xt
 
-        lhc = xt.Multiline.from_json(jsonfile)
+        lhc = xt.Environment.from_json(jsonfile)
         return cls(lhc, jsonfile=jsonfile)
 
     def to_json(self, jsonfile="lhc.json"):
-        self.multiline.to_json(jsonfile)
+        self.env.to_json(jsonfile)
 
     @property
     def b1(self):
-        return self.multiline.b1
+        return self.env.b1
 
     @property
     def b2(self):
-        return self.multiline.b2
+        return self.env.b2
 
     @property
     def b1s(self):
-        return self.multiline.b1s
+        return self.env.b1s
 
     @property
     def b2s(self):
-        return self.multiline.b2s
+        return self.env.b2s
 
     def info(self, k):
-        return self.multiline.vars[k]._info(limit=None)
+        return self.env.vars[k]._info(limit=None)
 
     @property
     def p0c(self):
-        return self.multiline.b1.particle_ref.p0c[0]
+        return self.env.b1.particle_ref.p0c[0]
 
     @p0c.setter
     def p0c(self, value):
-        self.multiline.b1.particle_ref.p0c = value
-        self.multiline.b2.particle_ref.p0c = value
+        self.env.b1.particle_ref.p0c = value
+        self.env.b2.particle_ref.p0c = value
 
     def update_vars(self, strengths, verbose=False):
         for k, v in strengths.items():
@@ -400,7 +402,7 @@ class LHCXsuiteModel:
 
     def copy(self):
         return self.__class__(
-            multiline=self.multiline.copy(),
+            env=self.env.copy(),
             settings=self.settings,
             jsonfile=self.jsonfile,
             madxfile=self.madxfile,
@@ -423,10 +425,10 @@ class LHCXsuiteModel:
                 )
 
     def match(self, *args, **kwargs):
-        return self.multiline.match(*args, **kwargs)
+        return self.env.match(*args, **kwargs)
 
     def match_knob(self, *args, **kwargs):
-        return self.multiline.match_knob(*args, **kwargs)
+        return self.env.match_knob(*args, **kwargs)
 
     def __getitem__(self, key):
         return self._var_values[key]

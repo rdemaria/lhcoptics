@@ -15,7 +15,12 @@ twopi = 2 * np.pi
 fourpi = 4 * np.pi
 
 class Particle:
+"""
+    Particle class representing a particle with properties such as kind, mass, momentum, energy, gamma, betagamma, and beta.
+    
+    The class provides methods to calculate various particle properties based on the provided parameters. It also includes a dictionary of known particle masses.
     """
+        """
     Particle defined by kind, mass and momemtum
     """
     _masses = {"proton": 938.27208816e6, "electron": 510998.95}

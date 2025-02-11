@@ -410,7 +410,7 @@ class LHCIR(LHCSection):
             self.set_init()
         if len(self.params) == 0:
             self.set_params()
-        lhc = self.parent.model.multiline
+        lhc = self.parent.model.env
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
         if lhc.b2.tracker is None:

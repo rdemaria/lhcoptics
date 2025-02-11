@@ -220,7 +220,7 @@ class LHCArc(LHCSection):
         return xt.Vary(name=kname, limits=limits, step=1e-8, tag=tag)
 
     def match(self, b1=True, b2=True):
-        lhc = self.parent.model.multiline
+        lhc = self.parent.model.env
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
         if lhc.b2.tracker is None:

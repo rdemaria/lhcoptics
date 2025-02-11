@@ -333,7 +333,7 @@ class IPKnob(Knob):
         elif self.beams[0] == "b2":
             vary = varyb2
 
-        # assumes using multilines anyway
+        # assumes using all lines anyway
         # TODO use only the relevant lines
         start = ir.startb12
         end = ir.endb12

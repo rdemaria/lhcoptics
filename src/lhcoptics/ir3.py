@@ -96,7 +96,7 @@ class LHCIR3(LHCIR):
 
 """
     def match(self):
-        lhc=self.multiline
+        lhc=self.env
         margin=0
         tw1, tw2 = lhc.twiss()
         bety0=tw1.lhcb1.rows['tcsg.5l3.b1'].bety[0]

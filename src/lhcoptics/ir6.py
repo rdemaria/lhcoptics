@@ -229,7 +229,7 @@ class LHCIR6(LHCIR):
         return tw
 
     def matchb1(self, dkmin=0.01, dkmax=0.01, extra=True):
-        lhc = self.parent.model.multiline
+        lhc = self.parent.model.env
 
         targets = LHCIR.get_match_targets(
             self,
@@ -338,7 +338,7 @@ class LHCIR6(LHCIR):
         return match
 
     def matchb2(self, dkmin=0.01, dkmax=0.01, extra=True):
-        lhc = self.parent.model.multiline
+        lhc = self.parent.model.env
 
         targets = LHCIR.get_match_targets(
             self,
