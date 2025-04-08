@@ -236,11 +236,20 @@ class LHCCalibration:
         return self.field.max()
 
     def get_field(self, current):
+        if current < self.imin or current > self.imax:
+            raise ValueError(
+                f"Current {current} out of range [{self.imin}, {self.imax}]"
+            )
         return np.interp(current, self.current, self.field)
 
     def get_current(self, k, p0c=7e12):
         brho = p0c / 299792458
-        return np.interp(k * brho, self.field, self.current)
+        fieldk = k * brho
+        if fieldk < self.fmin or fieldk > self.fmax:
+            raise ValueError(
+                f"Field {fieldk} out of range [{self.fmin}, {self.fmax}]"
+            )
+        return np.interp(fieldk, self.field, self.current)
 
     def to_dict(self):
         dct = self.__dict__.copy()
