@@ -161,6 +161,27 @@ class LHCOptics:
         return self
 
     @classmethod
+    def from_xsuite(
+        cls,
+        xsuite_model,
+        name=None,
+        circuits=None,
+        verbose=False,
+    ):
+        if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
+            xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
+        knobs = xsuite_model.make_and_set0_knobs(cls.knob_names)
+        irs= [ir.from_xsuite(xsuite_model) for ir in cls._irs]
+        arcs = [LHCArc.from_xsuite(xsuite_model) for arc in cls._arcs]
+        for k, knob in knobs.items():
+            xsuite_model[k] = knob.value
+        self = cls(name=name, irs=irs, arcs=arcs, knobs=knobs)
+        self.set_xsuite_model(xsuite_model, verbose=verbose)
+        if circuits is not None:
+            self.set_circuits(circuits)
+        return self
+
+    @classmethod
     def from_madxfile(
         cls,
         filename,
@@ -215,8 +236,8 @@ class LHCOptics:
     def __init__(
         self,
         name,
-        irs,
-        arcs,
+        irs=None,
+        arcs=None,
         params=None,
         knobs=None,
         model=None,
@@ -226,6 +247,10 @@ class LHCOptics:
         if name is None:
             name = "lhcoptics"
         self.name = name
+        if irs is None:
+            irs = [IR() for IR in self._irs]
+        if arcs is None:
+            arcs = [LHCArc(arc) for arc in self._arcs]
         for ir in irs:
             setattr(self, ir.name, ir)
             ir.parent = self
