@@ -1,46 +1,173 @@
 from pathlib import Path
 import re
+import os
+import time
 
-from yaml import dump, load
-
-
-try:
-    from yaml import CDumper as Dumper
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Loader, Dumper
 
 from .lsa_util import get_lsa
+from .utils import (
+    gitlab_get_branches_and_tags,
+    file_one_day_old,
+    write_yaml,
+    read_yaml,
+    git_get_current_commit,
+    git_pull,
+    git_clone_repo,
+)
 
 
-def read_yaml(filename):
-    with open(filename) as f:
-        return load(f, Loader=Loader)
+default_basedir = os.getenv(
+    "LHCOPTICS_BASEDIR", default=Path.home() / "local" / "acc-models-lhc"
+)
+
+projectt_id = 76507
+git_url = os.getenv(
+    "LHCOPTICS_GIT_URL", "https://gitlab.cern.ch/acc-models/acc-models-lhc.git"
+)
+
+
+def check_repobasedir(basedir):
+    if basedir is None:
+        basedir = default_basedir
+    if not Path(basedir):
+        resp = input(
+            f"""LHC optics base directory does not exists in '{basedir}'.
+               Shall I Create it? [y/n]"""
+        )
+        if resp.lower() == "y":
+            basedir.mkdir(parents=True)
+        else:
+            raise ValueError(f"Repository {basedir} does not exists.")
+        raise ValueError("create ")
+    return basedir
 
 
 class LHC:
-    """LHC optics repository"""
+    """LHC optics repository
+
+    The structure is as follows:
+    branch_or_tag.cycle_or_collection.process_or_stage -> optics model
+
+
+    """
+
+    def __init__(self, basedir=None):
+        self.basedir = check_repobasedir(basedir)
+        self.branches, self.tags = self.get_branches_and_tags()
+        self.check_local_branches()
+
+    def __repr__(self):
+        return f"<LHC Repo at '{self.basedir}'>"
+
+    def __dir__(self):
+        othernames = []
+        for name in self.branches:
+            if name[0] in "0123456789":
+                othernames.append("y" + name)
+            else:
+                othernames.append(name)
+        return super().__dir__() + othernames
+
+    def __getattr__(self, name):
+        if name.startswith("y"):
+            name = name[1:]
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(f"No branch or tag named {name}")
+
+    def _ipython_key_completions_(self):
+        return list(self.branches.keys()) + list(self.tags.keys())
+
+    def __getitem__(self, name):
+        if name in self.branches:
+            return LHCRepo(name, self.basedir/name)
+        elif name in self.tags:
+            return LHCRepo(name, self.basedir/name)
+        else:
+            raise KeyError(f"No branch or tag named {name}")
+
+    def check_local_branches(self, dry_run=False):
+        """
+        Check if the local branches are up to date with the remote branches
+        """
+        for branch, commit in self.branches.items():
+            branch_dir = self.basedir / branch
+            if branch_dir.exists():
+                dir_commit = git_get_current_commit(branch_dir)
+                if dir_commit != commit:
+                    print(f"Branch {branch} is not up to date")
+                    print(f"Local commit: {dir_commit}")
+                    print(f"Remote commit: {commit}")
+                    if not dry_run:
+                        print(git_pull(branch_dir))
+
+    def get_branches_and_tags(self, method="auto"):
+        """
+        Get the list of branches in the repository
+
+        method: str
+            "auto": use gitlab API to get the list of branches if the local list is one day old or use
+            "local": use the local list of branches
+            "update": force update the local list of branches
+        """
+        cache_file = self.basedir / "cache.yaml"
+        cache_file_good = cache_file.exists() and file_one_day_old(cache_file)
+        if (method == "auto" and cache_file_good) or (method == "local"):
+            cache = read_yaml(cache_file)
+        elif (method == "update") or (
+            method == "auto" and not cache_file_good
+        ):
+            print("Getting branches and tags from gitlab")
+            cache = gitlab_get_branches_and_tags(
+                project_id=76507,
+                gitlab_url="https://gitlab.cern.ch",
+                timeout=0.5,
+            )
+            if cache is None:
+                raise ValueError("Error getting branches and tags from gitlab")
+            write_yaml(cache, cache_file)
+        else:
+            raise ValueError("Error getting branches and tags")
+
+        branches = cache["branches"]
+        tags = cache["tags"]
+
+        for name in list(branches):
+            if len(name) != 4 or name[0] not in "2h":
+                del branches[name]
+
+        self.branches = branches
+        self.tags = tags
+
+        return branches, tags
+
+
+class LHCRepo:
+    """LHC optics for a specific branch or tag"""
 
     def __init__(
         self,
         name,
         basedir=None,
-        cycles=None,
-        beam_processes=None,
         collections=None,
     ):
         name = str(name)
         self.name = name
-        self._set_basedir(name, basedir)
-        self.set_beam_processes()
-        self.set_cycles()
-        self.collections = collections if collections is not None else {}
-        self.knobs = LHCKnobDefs.from_file(
-            self.basedir / "operation" / "knobs.txt"
-        )
+        self.basedir = Path(basedir)
+        if not self.basedir.exists():
+            print(f"Cloning {self.basedir}")
+            git_clone_repo( git_url, self.basedir, name)
+
+        # self.set_beam_processes()
+        # self.set_cycles()
+        # self.collections = collections if collections is not None else {}
+        # self.knobs = LHCKnobDefs.from_file(
+        #    self.basedir / "operation" / "knobs.txt"
+        # )
 
     def __repr__(self):
-        return f"<LHC {self.name!r}>"
+        return f"<LHC Repo '{self.basedir}'>"
 
     def __getattr__(self, name):
         if name in self.cycle:
@@ -53,34 +180,6 @@ class LHC:
             return self.cycle[name]
         except KeyError:
             raise AttributeError(f"{name!r} not found in {self}.")
-
-    def _set_basedir(self, name, basedir):
-        if basedir is not None:
-            self.basedir = Path(basedir)
-        else:
-            import subprocess
-
-            accmodels = Path("acc-models-lhc")
-            if accmodels.exists():
-                if not (accmodels / "lhc.seq").exists():
-                    raise FileNotFoundError("acc-models-lhc/lhc.seq not found")
-                # else:
-                #    if (accmodels / ".git").exists():
-                #        subprocess.run(["git", "switch", version], cwd=str(accmodels))
-            elif (
-                lcl := (Path.home() / "local" / "acc-models-lhc" / name)
-            ).exists():
-                accmodels.symlink_to(lcl)
-            else:
-                subprocess.run(
-                    [
-                        "git",
-                        "clone",
-                        "https://gitlab.cern.ch/acc-models/lhc.git",
-                        "acc-models-lhc",
-                    ]
-                )
-            self.basedir = accmodels
 
     def set_cycles(self):
         listfile = self.basedir / "scenarios/cycle/list.yaml"
