@@ -165,7 +165,7 @@ def read_yaml(filename):
     with open(filename) as f:
         return load(f, Loader=Loader)
 
-def write_yaml(data, filename):
+def write_yaml(filename, data):
     with open(filename, "w") as f:
         dump(data, f, Dumper=Dumper)
 

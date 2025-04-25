@@ -1,7 +1,28 @@
+"""
+Repository structure
+
+The structure
+
+repository/branch_or_tag/cycle_or_collection/process_or_stage -> optics model
+
+optics model:
+- params
+- strengths
+- knobs
+- sections
+    - params
+    - strengths
+    - knobs
+
+"""
+
+
+
+
 from pathlib import Path
 import re
 import os
-import time
+import site
 
 
 from .lsa_util import get_lsa
@@ -12,14 +33,16 @@ from .utils import (
     read_yaml,
     git_get_current_commit,
     git_pull,
-    git_clone_repo,
 )
 
 
 default_basedir = os.getenv(
-    "LHCOPTICS_BASEDIR", default=Path.home() / "local" / "acc-models-lhc"
+    "LHCOPTICS_BASEDIR", default=Path(site.getuserbase()) / "acc-models-lhc"
 )
+default_basedir = Path(default_basedir)
 
+
+#gitlab projectt_id for API
 projectt_id = 76507
 git_url = os.getenv(
     "LHCOPTICS_GIT_URL", "https://gitlab.cern.ch/acc-models/acc-models-lhc.git"
@@ -29,7 +52,7 @@ git_url = os.getenv(
 def check_repobasedir(basedir):
     if basedir is None:
         basedir = default_basedir
-    if not Path(basedir):
+    if not Path(basedir).exists():
         resp = input(
             f"""LHC optics base directory does not exists in '{basedir}'.
                Shall I Create it? [y/n]"""
@@ -38,7 +61,7 @@ def check_repobasedir(basedir):
             basedir.mkdir(parents=True)
         else:
             raise ValueError(f"Repository {basedir} does not exists.")
-        raise ValueError("create ")
+        raise ValueError(f"Error creating {basedir}")
     return basedir
 
 
@@ -81,9 +104,9 @@ class LHC:
 
     def __getitem__(self, name):
         if name in self.branches:
-            return LHCRepo(name, self.basedir/name)
+            return LHCRepo(name, self.basedir / name)
         elif name in self.tags:
-            return LHCRepo(name, self.basedir/name)
+            return LHCRepo(name, self.basedir / name)
         else:
             raise KeyError(f"No branch or tag named {name}")
 
@@ -115,9 +138,7 @@ class LHC:
         cache_file_good = cache_file.exists() and file_one_day_old(cache_file)
         if (method == "auto" and cache_file_good) or (method == "local"):
             cache = read_yaml(cache_file)
-        elif (method == "update") or (
-            method == "auto" and not cache_file_good
-        ):
+        elif (method == "update") or (method == "auto" and not cache_file_good):
             print("Getting branches and tags from gitlab")
             cache = gitlab_get_branches_and_tags(
                 project_id=76507,
@@ -126,7 +147,7 @@ class LHC:
             )
             if cache is None:
                 raise ValueError("Error getting branches and tags from gitlab")
-            write_yaml(cache, cache_file)
+            write_yaml(cache_file, cache)
         else:
             raise ValueError("Error getting branches and tags")
 
@@ -149,15 +170,15 @@ class LHCRepo:
     def __init__(
         self,
         name,
-        basedir=None,
-        collections=None,
+        basedir,
     ):
-        name = str(name)
-        self.name = name
+        self.name = str(name)
         self.basedir = Path(basedir)
-        if not self.basedir.exists():
-            print(f"Cloning {self.basedir}")
-            git_clone_repo( git_url, self.basedir, name)
+
+        data = read_yaml(self.basedir / "scenarios" / "data.yaml")
+
+        self.knobs = self.get_knobs()
+        self.cycles = data.get("cycles", {})
 
         # self.set_beam_processes()
         # self.set_cycles()
@@ -169,61 +190,25 @@ class LHCRepo:
     def __repr__(self):
         return f"<LHC Repo '{self.basedir}'>"
 
-    def __getattr__(self, name):
-        if name in self.cycle:
-            return self.cycle[name]
-        elif name in self.beam_processes:
-            return self.beam_processes[name]
-        elif name in self.collections:
-            return self.collections[name]
-        try:
-            return self.cycle[name]
-        except KeyError:
-            raise AttributeError(f"{name!r} not found in {self}.")
-
-    def set_cycles(self):
-        listfile = self.basedir / "scenarios/cycle/list.yaml"
-        if listfile.exists():
-            cycle_list = read_yaml(listfile)
-            cycle = {
-                name: LHCCycle(name, basedir=self.basedir)
-                for name in cycle_list
-            }
+    def get_knobs(self):
+        fn = self.basedir / "operation" / "knobs.txt"
+        if fn.exists():
+            return LHCKnobDefs.from_file(fn)
         else:
-            cycle = {}
-            cycle_list = []
-        self.cycle = cycle
-        self.cycle_list = cycle_list
+            return []
 
-    def new_cycle(self, name):
-        cycle = LHCCycle(name, self)
-        self.insert_cycle(cycle)
-        return cycle
-
-    def insert_cycle(self, cycle, idx=None):
-        self.cycle[cycle.name] = cycle
-        cycle.parent = self
-        if idx is not None:
-            self.cycle_list.insert(idx, cycle.name)
-        else:
-            self.cycle_list.append(cycle.name)
-
-    def set_beam_processes(self):
-        bpfile = self.basedir / "scenarios/bp/list.yaml"
-        if bpfile.exists():
-            beam_processes = {
-                name: LHCProcess(name, bp, basedir=self.basedir)
-                for name, bp in read_yaml(bpfile)
-            }
-        else:
-            beam_processes = {}
-        self.beam_processes = beam_processes
+    def get_cycles(self):
+        fn = self.basedir / "operation" / "cycles.yaml"
+        cycles = {}
+        if fn.exists():
+            data = read_yaml(fn)
+            for name, cycle in data.items():
+                cycles[name] = LHCCycle.from_basedir(name=name, parent=self)
+        return cycles
 
 
 class LHCCycle:
-    def __init__(
-        self, name, parent, processes=None, label=None, description=None
-    ):
+    def __init__(self, name, parent, label=None, description=None):
         self.name = name
         self.parent = parent
         self.label = label
@@ -245,8 +230,7 @@ class LHCCycle:
 
     def save_to_repo(self):
         self.cycledir.mkdir(parents=True, exist_ok=True)
-        with open(self.cycledir / "beam_processes.yaml", "w") as f:
-            dump(self.processes, f, Dumper=Dumper)
+        write_yaml(self.cycledir / "beam_processes.yaml", self.processes)
 
     def __repr__(self):
         return f"<Cycle {self.name!r}>"
@@ -259,17 +243,10 @@ class LHCCycle:
         self.process = {}
         if processes is None:
             self.processes = {}
-        bpfile = (
-            self.basedir
-            / "scenarios/cycle"
-            / self.name
-            / "beam_processes.yaml"
-        )
+        bpfile = self.basedir / "scenarios/cycle" / self.name / "beam_processes.yaml"
         for bp in read_yaml(self.cycledir / "beam_processes.yaml"):
             ((name, beamprocess),) = bp.items()
-            dct[name] = LHCProcess(
-                name=name, beamprocess=beamprocess, parent=self
-            )
+            dct[name] = LHCProcess(name=name, beamprocess=beamprocess, parent=self)
         self.processes = dct
 
     def get_fills(self, lhcrun):
@@ -288,9 +265,7 @@ class LHCProcess:
         self.basedir = basedir
         self.beamprocess = beamprocess
         self.beamprocessdir = self.basedir / "bp" / self.beamprocess
-        self.optics_table = (
-            self.get_optics_table() if optics is None else optics
-        )
+        self.optics_table = self.get_optics_table() if optics is None else optics
 
     def __repr__(self):
         return f"<Process {self.name!r}:{self.beamprocess}>"
@@ -340,10 +315,11 @@ class LHCKnobDefs:
     def from_file(cls, fn):
         lst = []
         for ln in open(fn):
-            try:
-                lst.append(LHCKnobDef(*ln.strip().split(", ")))
-            except:
-                pass
+            if ln.startswith("#"):
+                continue
+            if ln.strip() == "":
+                continue
+            lst.append(LHCKnobDef(*ln.strip().split(", ")))
         return cls(lst)
 
     def __init__(self, knob_list):
@@ -354,12 +330,15 @@ class LHCKnobDefs:
             self.lsa[knob.lsa] = knob
 
     def mad_value(self, lsa_name, lsa_value):
+        """Return the MAD value for a given LSA name and LSA value"""
         return self.lsa[lsa_name].mad_value(lsa_value)
 
     def lsa_value(self, mad_name, mad_value):
+        """Return the LSA value for a given MAD name and value"""
         return self.mad[mad_name].lsa_value(mad_value)
 
     def to_mad(self, lsa_name, lsa_value):
+        """Return the MAD string for a given LSA name and LSA value"""
         return self.lsa[lsa_name].to_mad(lsa_value)
 
     def add(self, knob):
@@ -375,7 +354,7 @@ class LHCKnobDefs:
         del self.lsa[knob.lsa]
 
     def add_knob(self, mad, lsa, scaling, test):
-        self.add(LHCKnob(mad, lsa, scaling, test))
+        self.add(LHCKnobDef(mad, lsa, scaling, test))
 
     def get_settings(self):
         return list(self.lsa.keys())
