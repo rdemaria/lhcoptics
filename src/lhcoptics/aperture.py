@@ -434,7 +434,7 @@ class LHCAperture:
 
     def to_dict(self):
         return {
-            "apertures": [a.tolist() for a in self.apertures],
+            "apertures": [a.to_list() for a in self.apertures],
             "profiles": [p.to_dict() for p in self.profiles.values()],
         }
 
