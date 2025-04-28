@@ -1,9 +1,0 @@
-
-
-call,file="acc-models-lhc/scenarios/pp_vdm/PHYSICS-6.8TeV-2024RP-VdM_V1/160/model.madx";
-call,file="acc-models-lhc/aperture/aperture.b1.madx";
-call,file="acc-models-lhc/aperture/aperture.b2.madx";
-call,file="acc-models-lhc/aperture/aper_tol.b1.madx";
-call,file="acc-models-lhc/aperture/aper_tol.b2.madx";
-use,sequence=lhcb1;
-use,sequence=lhcb2;
