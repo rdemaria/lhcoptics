@@ -13,8 +13,10 @@ optics model:
     - params
     - strengths
     - knobs
-
 """
+
+
+
 
 from pathlib import Path
 import re
