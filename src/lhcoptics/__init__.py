@@ -24,7 +24,7 @@ from .model_xsuite import LHCXsuiteModel
 from .optics import LHCOptics
 from .opttable import LHCOpticsTable, LHCIRTable, LHCArcTable
 from .rdmsignal import poly_fit, poly_val
-from .repo import LHC
+from .repo import LHC, LHCRepo, LHCCycle
 from .aperture import LHCAperture
 
 __all__ = [
@@ -33,6 +33,8 @@ __all__ = [
     get_nxcals,
     Knob,
     LHC,
+    LHCRepo,
+    LHCCycle,
     LHCAperture,
     LHCArc,
     LHCCircuits,

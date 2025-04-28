@@ -16,13 +16,11 @@ optics model:
 
 """
 
-
-
-
 from pathlib import Path
 import re
 import os
 import site
+import numpy as np
 
 
 from .lsa_util import get_lsa
@@ -33,6 +31,8 @@ from .utils import (
     read_yaml,
     git_get_current_commit,
     git_pull,
+    unixtime_to_string,
+    string_to_unixtime,
 )
 
 
@@ -42,11 +42,12 @@ default_basedir = os.getenv(
 default_basedir = Path(default_basedir)
 
 
-#gitlab projectt_id for API
+# gitlab projectt_id for API
 projectt_id = 76507
 git_url = os.getenv(
     "LHCOPTICS_GIT_URL", "https://gitlab.cern.ch/acc-models/acc-models-lhc.git"
 )
+
 
 
 def check_repobasedir(basedir):
@@ -147,7 +148,7 @@ class LHC:
             )
             if cache is None:
                 raise ValueError("Error getting branches and tags from gitlab")
-            write_yaml(cache_file, cache)
+            write_yaml(cache, cache_file)
         else:
             raise ValueError("Error getting branches and tags")
 
@@ -175,79 +176,87 @@ class LHCRepo:
         self.name = str(name)
         self.basedir = Path(basedir)
 
-        data = read_yaml(self.basedir / "scenarios" / "data.yaml")
+        self.data = read_yaml(self.basedir / "scenarios" / "readme.yaml")
 
         self.knobs = self.get_knobs()
-        self.cycles = data.get("cycles", {})
-
-        # self.set_beam_processes()
-        # self.set_cycles()
-        # self.collections = collections if collections is not None else {}
-        # self.knobs = LHCKnobDefs.from_file(
-        #    self.basedir / "operation" / "knobs.txt"
-        # )
+        self.cycles = self.get_cycles()
+        self.start = self.data.get("start", None)
+        self.end = self.data.get("end", None)
 
     def __repr__(self):
-        return f"<LHC Repo '{self.basedir}'>"
+        return f"<LHC {self.name} '{self.basedir}'>"
 
     def get_knobs(self):
         fn = self.basedir / "operation" / "knobs.txt"
         if fn.exists():
-            return LHCKnobDefs.from_file(fn)
+            knobs = LHCKnobDefs.from_file(fn)
         else:
-            return []
+            knobs = LHCKnobDefs([])
+        knobs.add_knob("nrj", "LHCBEAM/MOMENTUM", 1.0, 1)
+        knobs.add_knob("vrf400", "RFBEAM1/TOTAL_VOLTAGE", 1.0, 1)
+        return knobs
 
     def get_cycles(self):
-        fn = self.basedir / "operation" / "cycles.yaml"
         cycles = {}
-        if fn.exists():
-            data = read_yaml(fn)
-            for name, cycle in data.items():
-                cycles[name] = LHCCycle.from_basedir(name=name, parent=self)
+        for cycle_name in self.data.get("cycles", []):
+            cycles[cycle_name] = LHCCycle.from_dir(
+                name=cycle_name,
+                basedir=self.basedir / "scenarios" / "cycle" / cycle_name,
+                parent=self,
+            )
         return cycles
+
+    def __getattr__(self, name):
+        if name in self.cycles:
+            return self.cycles[name]
+        else:
+            raise AttributeError(f"No cycle named {name}")
+
+    def __dir__(self):
+        return super().__dir__() + list(self.cycles.keys())
 
 
 class LHCCycle:
-    def __init__(self, name, parent, label=None, description=None):
+    @classmethod
+    def from_dir(cls, name, basedir, parent=None):
+        basedir = Path(basedir)
+        if not basedir.exists():
+            print(f"Cycle directory {basedir} does not exist")
+        return cls(name, basedir=basedir, parent=parent)
+
+    def __init__(self, name, basedir, parent):
         self.name = name
+        self.basedir = Path(basedir)
         self.parent = parent
-        self.label = label
-        self.description = description
-        self.cycledir = self.basedir / "scenarios" / "cycle" / self.name
-        self.descfile = self.cycledir / "desc.yaml"
-        self.read_data(self)
+        self.yaml = self.basedir / "readme.yaml"
+        self.data = self.read_data(self.yaml)
+        self.beam_processes = {}
+        for process in self.data.get("beam_processes", []):
+            self.beam_processes[process] = LHCProcess(
+                name=process,
+                basedir=self.basedir / process,
+                parent=self,
+            )
+        self.start = self.data.get("start")
+        self.end = self.data.get("end")
 
-    def read_data(self):
-        if self.descfile.exists():
-            data = read_yaml(self.descfile)
-            self.label = data.get("label", self.label)
-            self.description = data.get("description", self.description)
-            self.processes = {}
-            for bp in data.get("beam_processes", []):
-                ((name, beamprocess),) = bp.items()
-                self.processes[name] = self.parent.bp[beamprocess]
-            self._set_processes(data.get("processes", None))
+    def __getattr__(self, name):
+        if name in self.beam_processes:
+            return self.beam_processes[name]
+        else:
+            raise AttributeError(f"No process named {name}")
 
-    def save_to_repo(self):
-        self.cycledir.mkdir(parents=True, exist_ok=True)
-        write_yaml(self.cycledir / "beam_processes.yaml", self.processes)
+    def __dir__(self):
+        return super().__dir__() + list(self.beam_processes.keys())
+
+    def read_data(self, yaml):
+        if not yaml.exists():
+            print(f"Cycle data file {yaml} does not exist")
+            return {}
+        return read_yaml(yaml)
 
     def __repr__(self):
         return f"<Cycle {self.name!r}>"
-
-    def __getattr__(self, name):
-        return self.processes[name]
-
-    def _set_processes(self, processes):
-        self.process_list = []
-        self.process = {}
-        if processes is None:
-            self.processes = {}
-        bpfile = self.basedir / "scenarios/cycle" / self.name / "beam_processes.yaml"
-        for bp in read_yaml(self.cycledir / "beam_processes.yaml"):
-            ((name, beamprocess),) = bp.items()
-            dct[name] = LHCProcess(name=name, beamprocess=beamprocess, parent=self)
-        self.processes = dct
 
     def get_fills(self, lhcrun):
         bp_to_match = [bp.name for bp in self.beam_processes]
@@ -260,54 +269,150 @@ class LHCCycle:
 
 
 class LHCProcess:
-    def __init__(self, name, beamprocess, basedir=None, optics=None):
+    knob_blacklist = set(
+        [
+            "LHCBEAM1/CMINUS_IM.IP7",
+            "LHCBEAM1/CMINUS_RE.IP7",
+            "LHCBEAM1/DP_TRIM_PERMIL",
+            "LHCBEAM1/QH_TRIM",
+            "LHCBEAM1/QH_TRIM_FIDEL",
+            "LHCBEAM1/QH_TRIM_INT",
+            "LHCBEAM1/QV_TRIM",
+            "LHCBEAM1/QV_TRIM_FIDEL",
+            "LHCBEAM1/QV_TRIM_INT",
+            "LHCBEAM2/CMINUS_IM.IP7",
+            "LHCBEAM2/CMINUS_RE.IP7",
+            "LHCBEAM2/DP_TRIM_PERMIL",
+            "LHCBEAM2/QH_TRIM",
+            "LHCBEAM2/QH_TRIM_FIDEL",
+            "LHCBEAM2/QH_TRIM_INT",
+            "LHCBEAM2/QV_TRIM",
+            "LHCBEAM2/QV_TRIM_FIDEL",
+            "LHCBEAM2/QV_TRIM_INT",
+            "LHCBEAM1/IP1_SEPSCAN_X_MM",
+            "LHCBEAM1/IP1_SEPSCAN_Y_MM",
+            "LHCBEAM1/IP2_SEPSCAN_X_MM",
+            "LHCBEAM1/IP2_SEPSCAN_Y_MM",
+            "LHCBEAM1/IP5_SEPSCAN_X_MM",
+            "LHCBEAM1/IP5_SEPSCAN_Y_MM",
+            "LHCBEAM1/IP8_SEPSCAN_X_MM",
+            "LHCBEAM1/IP8_SEPSCAN_Y_MM",
+            "LHCBEAM2/IP1_SEPSCAN_X_MM",
+            "LHCBEAM2/IP1_SEPSCAN_Y_MM",
+            "LHCBEAM2/IP2_SEPSCAN_X_MM",
+            "LHCBEAM2/IP2_SEPSCAN_Y_MM",
+            "LHCBEAM2/IP5_SEPSCAN_X_MM",
+            "LHCBEAM2/IP5_SEPSCAN_Y_MM",
+            "LHCBEAM2/IP8_SEPSCAN_X_MM",
+            "LHCBEAM2/IP8_SEPSCAN_Y_MM",
+        ]
+    )
+
+    def __init__(self, name, basedir, parent=None):
         self.name = name
         self.basedir = basedir
-        self.beamprocess = beamprocess
-        self.beamprocessdir = self.basedir / "bp" / self.beamprocess
-        self.optics_table = self.get_optics_table() if optics is None else optics
+        self.parent = parent
+        self.yaml = self.basedir / "readme.yaml"
+        self.data = self.read_data(self.yaml)
+        self.beamprocess = self.data.get("beamprocess", None)
+        self.optics = []
+
+    def read_data(self, yaml):
+        if not yaml.exists():
+            print(f"Process data file {yaml} does not exist")
+            return {}
+        else:
+            return read_yaml(yaml)
 
     def __repr__(self):
-        return f"<Process {self.name!r}:{self.beamprocess}>"
+        return f"<Process {self.name}:{self.beamprocess!r} {len(self.optics)} optics>"
 
     def set_optics_from_lsa(self):
-        get_lsa().lsa.getOpticTable(self.beamprocess)
-        self.optics_table = {tt.time: tt.name for tt in tbl}
+        tbl = get_lsa().getOpticTable(self.beamprocess)
+        self.optics = {int(tt.time): str(tt.name) for tt in tbl}
         return self
 
-    def get_optics_table(self):
-        return read_yaml(self.beamprocessdir / "optics.yaml")
-
-    def save_to_repo(self):
-        self.beamprocessdir.mkdir(parents=True, exist_ok=True)
-        with open(self.beamprocessdir / "optics.yaml", "w") as f:
-            dump(self.optics_table, f, Dumper=Dumper)
-
-    def get_settings(self, params, lhcrun=None):
-        import jpype
-
-        if lhcrun is None:
-            t1 = None
-            t2 = None
-        else:
-            t1 = lhcrun.t1
-            t2 = lhcrun.t2
+    def get_last_setting(self, params=None, part="target"):
+        """Get the last setting for the given parameters"""
+        if params is None:
+            params = set(self.parent.parent.knobs.lsa) - self.knob_blacklist
 
         out = []
         for param in params:
             try:
                 print(f"getting {param}")
-                trims = get_lsa().getTrims(
-                    param, beamprocess=self.name, start=t1, end=t2
-                )[param]
-                for ts, trim in zip(*trims):
-                    out.append([ts, param, trim])
-            except jpype.JException as ex:
-                print("Error extracting parameter '%s': %s" % (param, ex))
-            except KeyError as ex:
+                trims = get_lsa().getLastTrim(
+                    param, beamprocess=self.beamprocess, part=part
+                )
+                out.append(trims)
+            except Exception as ex:
                 print("Empty response for '%s': %s" % (param, ex))
-        out.sort()
         return out
+
+    def get_settings(self, params=None, start=None, end=None, part="target"):
+        """Get settings for the given parameters"""
+        if start is None:
+            t1 = (
+                self.parent.start
+                if self.parent.start is not None
+                else self.parent.parent.start
+            )
+
+        if end is None:
+            t2 = (
+                self.parent.end
+                if self.parent.end is not None
+                else self.parent.parent.end
+            )
+
+        if params is None:
+            params = list(self.parent.parent.knobs.lsa)
+
+        out = {}
+        for param in params:
+            try:
+                print(f"getting {param}")
+                trims = get_lsa().getTrims(
+                    param, beamprocess=self.beamprocess, start=t1, end=t2, part=part
+                )
+                out.update(trims)
+            except Exception as ex:
+                print("Empty response for '%s': %s" % (param, ex))
+        return out
+
+    def clear_dir(self):
+        """Clear the optitcs directory"""
+        for ll in self.basedir.iterdir():
+            if ll.is_dir():
+                print(f"Removing {ll}")
+                for ff in ll.iterdir():
+                    if ff.is_file():
+                        print(f"Removing {ff}")
+                        os.remove(ff)
+                os.rmdir(ll)
+
+    def gen_optics_dir(self, lsa_settings=None):
+        """Generate optics directory structure"""
+        self.clear_dir()
+        if lsa_settings is None:
+            lsa_settings = self.get_settings()
+        knobs = self.parent.parent.knobs
+        for ts, name in self.optics.items():
+            optics_dir = self.basedir / str(ts)
+            optics_dir.mkdir(parents=True, exist_ok=True)
+            yaml = optics_dir / "readme.yaml"
+            data = {"name": name, "settings": {}, "ts": ts}
+            for knobname, setting in sorted(lsa_settings.items()):
+                if knobname not in self.knob_blacklist:
+                    tdata, vdata = setting.data[-1]
+                    value = float(np.interp(ts, tdata, vdata))
+                    knob = knobs.lsa[knobname]
+                    # trimtime = unixtime_to_string(setting.time[-1])
+                    # print(f"Knob {knobname} value {value} at {trimtime}")
+
+                    data["settings"][knob.mad] = knob.mad_value(value)
+            print(f"Writing {yaml}")
+            write_yaml(data, yaml)
 
 
 class LHCKnobDefs:
@@ -365,10 +470,13 @@ class LHCKnobDefs:
 
 class LHCKnobDef:
     def __init__(self, mad, lsa, scaling, test):
-        self.mad = str(mad)
+        self.mad = str(mad).lower()
         self.lsa = str(lsa)
         self.scaling = float(scaling)
         self.test = float(test)
+
+    def interpolate(self, ts, tdata, vdata):
+        return np.interp(ts, tdata, vdata)
 
     def mad_value(self, lsa_value):
         return lsa_value * self.scaling
@@ -405,7 +513,7 @@ class LHCRun:
 
     def set_fills(self):
         self.fills = {}
-        fills = lsa.findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
+        fills = get_lsa().findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
         for filln, bp_list in fills.items():
             # beam_processes=[(ts,bp.split('@')[0]) for ts,bp in bp_list]
             beam_processes = [(ts, bp) for ts, bp in bp_list]
@@ -434,3 +542,10 @@ class LHCRun:
 
     def __repr__(self):
         return f"LHCRun({self.year})"
+    
+class LHCFill:
+    def __init__(self, filln, beam_processes):
+        self.filln = filln
+        self.beam_processes = beam_processes
+        self.start = min([ts for ts, bp in beam_processes])
+        self.end = max([ts for ts, bp in beam_processes])

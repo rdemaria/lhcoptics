@@ -5,6 +5,7 @@ import subprocess
 import requests
 import json
 import time
+from datetime import datetime, timezone
 
 from yaml import dump, load
 try:
@@ -13,6 +14,28 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
 
+def string_to_unixtime(timestr: str, utc: bool = False) -> int:
+    """
+    Convert a time string "%Y-%m-%d %H:%M:%S" to Unix time.
+    If utc=True, interpret the string as UTC else local time;
+    """
+    dt = datetime.strptime(timestr, "%Y-%m-%d %H:%M:%S")
+    if utc:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone()
+    return int(dt.timestamp())
+
+def unixtime_to_string(unixtime: int, utc: bool = False) -> str:
+    """
+    Convert Unix time to a time string "%Y-%m-%d %H:%M:%S".
+    If utc=True, interpret the string as UTC else local time;
+    """
+    if utc:
+        dt = datetime.fromtimestamp(unixtime, tz=timezone.utc)
+    else:
+        dt = datetime.fromtimestamp(unixtime)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 def deliver_list_str(out, output=None):
     if output is str:
@@ -165,7 +188,7 @@ def read_yaml(filename):
     with open(filename) as f:
         return load(f, Loader=Loader)
 
-def write_yaml(filename, data):
+def write_yaml(data, filename):
     with open(filename, "w") as f:
         dump(data, f, Dumper=Dumper)
 
