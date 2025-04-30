@@ -78,6 +78,7 @@ class LHC:
         self.basedir = check_repobasedir(basedir)
         self.branches, self.tags = self.get_branches_and_tags()
         self.check_local_branches()
+        self._repo_cache={}
 
     def __repr__(self):
         return f"<LHC Repo at '{self.basedir}'>"
@@ -103,17 +104,24 @@ class LHC:
         return list(self.branches.keys()) + list(self.tags.keys())
 
     def __getitem__(self, name):
+        if name in self._repo_cache:
+            return self._repo_cache[name]
         if name in self.branches or name in self.tags:
            repo_dir = self.basedir / name
            if not repo_dir.exists():
               print(f"Repository {repo_dir} does not exist")
               self.clone_repo(name)
-           if name in self.branches:
-               return LHCRepo(name, repo_dir)
-           elif name in self.tags:
-               return LHCRepo(name, repo_dir)
+           self._repo_cache[name] = LHCRepo(name, repo_dir)
+           return self._repo_cache[name]
         else:
             raise KeyError(f"No branch or tag named {name}")
+
+    def force_update(self):
+        self._repo_cache.clear()
+        cache_file = self.basedir / "cache.yaml"
+        cache_file.unlink(missing_ok=True)
+        self.branches, self.tags = self.get_branches_and_tags(method="update")
+        self.check_local_branches(dry_run=True)
 
     def check_local_branches(self, dry_run=False):
         """
@@ -127,6 +135,7 @@ class LHC:
                     print(f"Branch {branch} is not up to date")
                     print(f"Local commit: {dir_commit}")
                     print(f"Remote commit: {commit}")
+                    self.branches[branch] = commit
                     if not dry_run:
                         print(git_pull(branch_dir))
 
