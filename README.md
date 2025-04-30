@@ -4,7 +4,7 @@ Python package to build LHC optics.
 
 Usage:
 ```
-git clone githttps://github.com/rdemaria/lhcoptics.git
+git clone https://github.com/rdemaria/lhcoptics.git
 cd lhcoptics
 pip install -e .
 ```

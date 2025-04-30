@@ -15,13 +15,11 @@ twopi = 2 * np.pi
 fourpi = 4 * np.pi
 
 class Particle:
-"""
-    Particle class representing a particle with properties such as kind, mass, momentum, energy, gamma, betagamma, and beta.
-    
-    The class provides methods to calculate various particle properties based on the provided parameters. It also includes a dictionary of known particle masses.
     """
-        """
-    Particle defined by kind, mass and momemtum
+        Particle class representing a particle with properties such as kind, mass, momentum, energy, gamma, betagamma, and beta.
+        
+        The class provides methods to calculate various particle properties based on the provided parameters. It also includes a dictionary of known particle masses.
+        Particle defined by kind, mass and momemtum
     """
     _masses = {"proton": 938.27208816e6, "electron": 510998.95}
     clight = clight
@@ -960,13 +958,13 @@ class BetaStarLeveling:
                     nc[ip] += bb.nb
         return nc
 
-        ips = (ip1, ip2, ip5, ip8)
-        if verbose:
-            print(f"{ip1.name:6} beta {ip1.betx:5.2f},{ip1.bety:5.2f} m")
-            print(f"{ip5.name:6} beta {ip5.betx:5.2f},{ip5.bety:5.2f} m")
-            print(f"{ip2.name:6} sep  {ip2.sepx*1e3:5.2f} mm")
-            print(f"{ip8.name:6} sep  {ip2.sepy*1e3:5.2f} mm")
-        return ips
+        #ips = (ip1, ip2, ip5, ip8)
+        #if verbose:
+        #    print(f"{ip1.name:6} beta {ip1.betx:5.2f},{ip1.bety:5.2f} m")
+        #    print(f"{ip5.name:6} beta {ip5.betx:5.2f},{ip5.bety:5.2f} m")
+        #    print(f"{ip2.name:6} sep  {ip2.sepx*1e3:5.2f} mm")
+        #    print(f"{ip8.name:6} sep  {ip2.sepy*1e3:5.2f} mm")
+        #return ips
 
     def level_betasep(self, ips, lumis, bunch, verbose=True):
         ip1, ip5, ip2, ip8 = ips

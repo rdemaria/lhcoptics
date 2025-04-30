@@ -15,9 +15,6 @@ optics model:
     - knobs
 """
 
-
-
-
 from pathlib import Path
 import re
 import os
@@ -33,6 +30,7 @@ from .utils import (
     read_yaml,
     git_get_current_commit,
     git_pull,
+    git_clone_repo,
     unixtime_to_string,
     string_to_unixtime,
 )
@@ -49,7 +47,6 @@ projectt_id = 76507
 git_url = os.getenv(
     "LHCOPTICS_GIT_URL", "https://gitlab.cern.ch/acc-models/acc-models-lhc.git"
 )
-
 
 
 def check_repobasedir(basedir):
@@ -106,10 +103,15 @@ class LHC:
         return list(self.branches.keys()) + list(self.tags.keys())
 
     def __getitem__(self, name):
-        if name in self.branches:
-            return LHCRepo(name, self.basedir / name)
-        elif name in self.tags:
-            return LHCRepo(name, self.basedir / name)
+        if name in self.branches or name in self.tags:
+           repo_dir = self.basedir / name
+           if not repo_dir.exists():
+              print(f"Repository {repo_dir} does not exist")
+              self.clone_repo(name)
+           if name in self.branches:
+               return LHCRepo(name, repo_dir)
+           elif name in self.tags:
+               return LHCRepo(name, repo_dir)
         else:
             raise KeyError(f"No branch or tag named {name}")
 
@@ -141,7 +143,9 @@ class LHC:
         cache_file_good = cache_file.exists() and file_one_day_old(cache_file)
         if (method == "auto" and cache_file_good) or (method == "local"):
             cache = read_yaml(cache_file)
-        elif (method == "update") or (method == "auto" and not cache_file_good):
+        elif (method == "update") or (
+            method == "auto" and not cache_file_good
+        ):
             print("Getting branches and tags from gitlab")
             cache = gitlab_get_branches_and_tags(
                 project_id=76507,
@@ -166,6 +170,19 @@ class LHC:
 
         return branches, tags
 
+    def clone_repo(self, branch_or_tag):
+        """
+        Clone the repository
+        """
+        repo_dir = self.basedir / branch_or_tag
+        if repo_dir.exists():
+            print(f"Repository {repo_dir} already exists")
+            return
+        print(f"Cloning repository {repo_dir}")
+        git_clone_repo(git_url, repo_dir, branch_or_tag)
+
+
+
 
 class LHCRepo:
     """LHC optics for a specific branch or tag"""
@@ -177,13 +194,15 @@ class LHCRepo:
     ):
         self.name = str(name)
         self.basedir = Path(basedir)
-
-        self.data = read_yaml(self.basedir / "scenarios" / "readme.yaml")
-
-        self.knobs = self.get_knobs()
-        self.cycles = self.get_cycles()
-        self.start = self.data.get("start", None)
-        self.end = self.data.get("end", None)
+        self.yaml = self.basedir / "scenarios" / "readme.yaml"
+        if not self.yaml.exists():
+            print(f"Metadata {self.yaml} does not exist")
+        else:
+           self.data = read_yaml(self.basedir / "scenarios" / "readme.yaml")
+           self.knobs = self.get_knobs()
+           self.cycles = self.get_cycles()
+           self.start = self.data.get("start", None)
+           self.end = self.data.get("end", None)
 
     def __repr__(self):
         return f"<LHC {self.name} '{self.basedir}'>"
@@ -316,15 +335,31 @@ class LHCProcess:
         self.parent = parent
         self.yaml = self.basedir / "readme.yaml"
         self.data = self.read_data(self.yaml)
+        self.label = self.data.get("label", None)
         self.beamprocess = self.data.get("beamprocess", None)
-        self.optics = []
+        self.optics = {}
+        self.energy = self.data.get("energy", None)
+        self.charge = self.data.get("charge", None)
 
-    def read_data(self, yaml):
+    def read_data(self, yaml=None):
+        if yaml is None:
+            yaml = self.yaml
         if not yaml.exists():
             print(f"Process data file {yaml} does not exist")
             return {}
         else:
             return read_yaml(yaml)
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "beamprocess": self.beamprocess,
+        }
+
+    def save_data(self):
+        self.data = self.to_dict()
+        write_yaml(self.data, self.yaml)
 
     def __repr__(self):
         return f"<Process {self.name}:{self.beamprocess!r} {len(self.optics)} optics>"
@@ -375,7 +410,11 @@ class LHCProcess:
             try:
                 print(f"getting {param}")
                 trims = get_lsa().getTrims(
-                    param, beamprocess=self.beamprocess, start=t1, end=t2, part=part
+                    param,
+                    beamprocess=self.beamprocess,
+                    start=t1,
+                    end=t2,
+                    part=part,
                 )
                 out.update(trims)
             except Exception as ex:
@@ -403,7 +442,13 @@ class LHCProcess:
             optics_dir = self.basedir / str(ts)
             optics_dir.mkdir(parents=True, exist_ok=True)
             yaml = optics_dir / "readme.yaml"
-            data = {"name": name, "settings": {}, "ts": ts}
+            data = {
+                "name": name,
+                "settings": {},
+                "ts": ts,
+                "particle": self.parent.particle,
+                "charge": self.parent.charge,
+            }
             for knobname, setting in sorted(lsa_settings.items()):
                 if knobname not in self.knob_blacklist:
                     tdata, vdata = setting.data[-1]
@@ -413,8 +458,48 @@ class LHCProcess:
                     # print(f"Knob {knobname} value {value} at {trimtime}")
 
                     data["settings"][knob.mad] = knob.mad_value(value)
+
             print(f"Writing {yaml}")
             write_yaml(data, yaml)
+            data["energy"] = data["settings"]["nrj"]
+            data["optics_path"] = (
+                f"acc-models-lhc/operation/optics/{name}.madx"
+            )
+            data["settings_path"] = optics_dir / "settings.madx"
+            self.gen_madx_model(data, output=optics_dir / "model.madx")
+            self.gen_madx_settings(data, output=optics_dir / "settings.madx")
+
+    def gen_madx_model(self, data, output=None):
+        """Generate MADX files for the optics"""
+        madx = """
+        call, file="acc-models-lhc/lhc.seq";
+        beam,  sequence=lhcb1, particle={particle}, energy={energy}, charge={charge}, bv=1;
+        beam,  sequence=lhcb2, particle={particle}, energy={energy}, charge={charge}, bv=-1;
+        call, file="acc-models-lhc/{optics_path}";
+        call, file="acc-models-lhc/{settings_path}";
+        """.format(
+            **data
+        )
+        if output is None:
+            return madx
+        else:
+            with open(output, "w") as f:
+                f.write(madx)
+            print(f"Writing {output}")
+            return madx
+
+    def gen_madx_settings(self, data, output=None):
+        """Generate MADX settings file"""
+        madx = []
+        for knobname, setting in sorted(data["settings"].items()):
+            madx.append(f"{knobname}={setting};")
+        if output is None:
+            return madx
+        else:
+            with open(output, "w") as f:
+                f.write(madx)
+            print(f"Writing {output}")
+            return madx
 
 
 class LHCKnobDefs:
@@ -515,7 +600,9 @@ class LHCRun:
 
     def set_fills(self):
         self.fills = {}
-        fills = get_lsa().findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
+        fills = get_lsa().findBeamProcessHistory(
+            self.t1, self.t2, accelerator="lhc"
+        )
         for filln, bp_list in fills.items():
             # beam_processes=[(ts,bp.split('@')[0]) for ts,bp in bp_list]
             beam_processes = [(ts, bp) for ts, bp in bp_list]
@@ -544,7 +631,8 @@ class LHCRun:
 
     def __repr__(self):
         return f"LHCRun({self.year})"
-    
+
+
 class LHCFill:
     def __init__(self, filln, beam_processes):
         self.filln = filln

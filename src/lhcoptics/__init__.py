@@ -31,6 +31,7 @@ __all__ = [
     "get_lsa",
     "get_spark",
     "get_nxcals",
+    "NXCals",
     "Knob",
     "LHC",
     "LHCRepo",
