@@ -259,6 +259,24 @@ class LHCRepo:
             )
         return cycles
 
+    def add_cycle(self, name, label=None, particles=None, charges=None):
+        """Add a new cycle to the repository"""
+        if name in self.cycles:
+            raise ValueError(f"Cycle {name} already exists")
+        (self.basedir / "scenarios" / "cycle" / name).mkdir(parents=True, exist_ok=True)
+        cycle = LHCCycle(
+            name=name,
+            basedir=self.basedir / "scenarios" / "cycle" / name,
+            parent=self,
+        )
+        cycle.label = label
+        cycle.particles = particles
+        cycle.charges = charges
+        cycle.save_data()
+        self.cycles[name] = cycle
+        self.save_data()
+        return cycle
+
 
 class LHCCycle:
     @classmethod
@@ -351,6 +369,7 @@ class LHCCycle:
         bp.save_data()
         self.beam_processes[name] = bp
         self.save_data()
+        return bp
 
     def gen_data_from_lsa(self):
         """Generate the data from LSA"""
