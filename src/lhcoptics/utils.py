@@ -7,12 +7,13 @@ import json
 import time
 from datetime import datetime, timezone
 
-from yaml import dump, load
-try:
-    from yaml import CDumper as Dumper
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Loader, Dumper
+import ruamel.yaml
+
+yaml=ruamel.yaml.YAML()
+yaml.indent(mapping=4, sequence=2, offset=2)
+
+def get_yaml():
+    return yaml
 
 def string_to_unixtime(timestr: str, utc: bool = False) -> int:
     """
@@ -183,14 +184,18 @@ def file_one_day_old(path):
     """
     return path.stat().st_mtime > time.time() - 24 * 3600
 
+def file_expired(path, max_age):
+    """
+    Check if a file is older than max_age seconds.
+    """
+    return path.stat().st_mtime > time.time() - max_age
+
 
 def read_yaml(filename):
-    with open(filename) as f:
-        return load(f, Loader=Loader)
+    return yaml.load(open(filename, "r"))
 
 def write_yaml(data, filename):
-    with open(filename, "w") as f:
-        dump(data, f, Dumper=Dumper)
+    yaml.dump(data, open(filename, "w"))
 
 def git_get_current_commit(directory):
     result = subprocess.run(

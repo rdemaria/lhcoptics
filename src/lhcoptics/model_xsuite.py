@@ -132,6 +132,7 @@ class LHCXsuiteModel:
     @classmethod
     def from_json(cls, jsonfile):
         import xtrack as xt
+        jsonfile=str(jsonfile)
 
         lhc = xt.Environment.from_json(jsonfile)
         return cls(lhc, jsonfile=jsonfile)

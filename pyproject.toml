@@ -15,7 +15,7 @@ dependencies = [
     "matplotlib",
     "xsuite",
     "cpymad",
-    "pyyaml",
+    "ruaml",
     "scipy",
     "pandas",
 ]

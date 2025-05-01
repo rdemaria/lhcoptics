@@ -804,7 +804,7 @@ class LHCOptics:
         return self
 
     def set_xsuite_model(self, model, verbose=False):
-        if isinstance(model, str):
+        if isinstance(model, str) or isinstance(model, Path):
             model = LHCXsuiteModel.from_json(model)
         self.model = model
         self.update_model(verbose=verbose)
