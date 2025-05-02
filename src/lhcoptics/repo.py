@@ -470,6 +470,10 @@ class LHCProcess:
     def __repr__(self):
         return f"<Process {self.name}:{self.beam_process!r} {len(self.optics)} optics>"
 
+    @property
+    def ts(self):
+        return list(self.optics.keys())
+
     def set_optics_from_lsa(self):
         tbl = get_lsa().getOpticTable(self.beam_process)
         self.optics = {int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl}
@@ -628,8 +632,10 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         else:
             raise ValueError(f"Optics {ts} not found in {self.name}")
 
-    def get_madx_twiss(self, ts, madx=None):
+    def get_madx_twiss(self, idx=None, ts=None, madx=None):
         """Get the MADX twiss for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
         madx = self.get_madx_model(ts, madx=madx)
         madx.use("lhcb1")
         tw1 = madx.twiss()
@@ -638,8 +644,10 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         from xdeps import Table
         return Table(tw1), Table(tw2)
 
-    def check_madx(self, ts, madx=None):
+    def check_madx(self, idx=None, ts=None, madx=None):
         """Check the MADX model for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
         tw1, tw2 = self.get_madx_twiss(ts, madx=madx)
         tw1.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
         tw2.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
