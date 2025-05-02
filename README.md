@@ -2,17 +2,30 @@
 
 Python package to build LHC optics.
 
-Usage:
+Installation:
 ```
 git clone https://github.com/rdemaria/lhcoptics.git
 cd lhcoptics
 pip install -e .
 ```
 
+Usage:
 ```
 from lhcoptics import LHC
-inj=LHC().y2025.pp.inj.plot()
+inj=LHC().y2025.pp.ramp[0].plot()
 ```
+
+## Architecture
+
+The package consists of the following main components:
+- `LHC`: Manages the acc-models-lhc LHC optics repository, allowing access to different LHC optics configurations.
+- `LHCRepo`: Manages a branch or tag of the LHC optics repository.
+- `LHCCycle`: Manages a LHC cycle, including the LHC optics and the LHC beam.
+- `LHCProcess`: Manages a LHC beam process: a list of LHC optics and a settings parametrized by time.
+- `LHCOptics`: An optics configuration consisting of strengths, knobs and parameters.
+- `LHCSection`: A section of the LHC, including the strengths, knobs and parameters.
+- `LHCCircuit`: A model of the LHC, including transfer functions and limits
+- `LHCAperture`: A model of the LHC apertures.
 
 ## LHC
 The `LHC` class is responsible for managing the LHC optics repository. It provides functionality to extract branches or tags from the repository and store local copies of the optics. The class also includes mechanisms to regularly check branches for updates.
@@ -37,10 +50,7 @@ lhc.y2025
 ```
 
 
-## LHCRepo
-
-
-
+## LHCOptics
 
 An `LHCOptics` contains data for specifying a full LHC Optics. It contains global params and knobs and a list of LHC sections (`ir1`, `ir2`, ... , `ir8`, `a12`, `a23`, ..., `a78`) that contains strengths, local params and local knobs. The optics can contain a `model` that allows to compute twiss, plot and rematch the optics.
 
@@ -92,7 +102,6 @@ Methods:
 - `twiss_cell(beam)`: get periodic solution of cell
 
 
-
 ## Code style
 
 Class definitions, camel case alphabetically sorted:
@@ -101,4 +110,15 @@ Class definitions, camel case alphabetically sorted:
 - class methods
 - init
 - other special double underscore methods
-- methods starting with verb lower snake case alphabetically sorteddsf
+- methods starting with verb lower snake case alphabetically sorted
+
+
+## TODO
+
+- ion cycle
+- collection
+- hllhc
+- generate compiled files in EOS
+- gerarate twiss table in EOS
+- make website
+- make documentation

@@ -72,7 +72,6 @@ class LHC:
     The structure is as follows:
     branch_or_tag.cycle_or_collection.process_or_stage -> optics model
 
-
     """
 
     def __init__(self, basedir=None):
@@ -314,27 +313,12 @@ class LHCCycle:
 
         return sorted([ff.filln for ff in lhcrun.fills.values() if match(ff)])
 
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "label": self.label,
-            "start": self.start,
-            "end": self.end,
-            "particles": self.particles,
-            "charges": self.charges,
-            "beam_processes": list(self.beam_processes),
-            "optics": self.optics,
-        }
-
     def read_data(self):
         if self.yaml.exists():
             return read_yaml(self.yaml)
         else:
             print(f"Cycle data file {self.yaml} does not exist")
             return {}
-
-    def save_data(self):
-        write_yaml(self.to_dict(), self.yaml)
 
     def refresh(self, data=None):
         if data is None:
@@ -350,9 +334,31 @@ class LHCCycle:
         self.start = self.data.get("start")
         self.end = self.data.get("end")
         self.particles = self.data.get("particles", (None, None))
-        self.charges = self.data.get("charges", (None, None))
+        self.charges = self.data.get("charges", (1, 1))
+        self.masses = self.data.get("masses", (0.938272046, 0.938272046))
         self.label = self.data.get("label", None)
         self.optics = self.data.get("optics", {})
+
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "start": self.start,
+            "end": self.end,
+            "particles": self.particles,
+            "charges": self.charges,
+            "masses": self.masses,
+            "beam_processes": list(self.beam_processes),
+            "optics": self.optics,
+        }
+
+    def save_data(self):
+        data= self.to_dict()
+        for kk in data:
+            if isinstance(data[kk], tuple):
+                data[kk] = list(data[kk])
+        write_yaml(self.to_dict(), self.yaml)
 
     def add_process(self, name, beam_process, label=None):
         """Add a new process to the cycle"""
@@ -431,18 +437,6 @@ class LHCProcess:
             print(f"Process data file {self.yaml} does not exist")
             return {}
 
-    def save_data(self):
-        data = self.to_dict()
-        from ruamel.yaml import CommentedMap, CommentedSeq
-
-        data["optics"] = CommentedMap(data["optics"])
-        data["settings"] = CommentedMap(data["settings"])
-        data["settings"].fa.set_block_style()
-        for knobname, setting in sorted(data["settings"].items()):
-            data["settings"][knobname] = CommentedSeq(setting)
-            data["settings"][knobname].fa.set_flow_style()
-        write_yaml(data, self.yaml)
-
     def refresh(self, data=None):
         if data is None:
             data = self.read_data()
@@ -460,6 +454,18 @@ class LHCProcess:
             "optics": self.optics,
             "settings": self.settings,
         }
+
+    def save_data(self):
+        data = self.to_dict()
+        from ruamel.yaml import CommentedMap, CommentedSeq
+
+        data["optics"] = CommentedMap(data["optics"])
+        data["settings"] = CommentedMap(data["settings"])
+        data["settings"].fa.set_block_style()
+        for knobname, setting in sorted(data["settings"].items()):
+            data["settings"][knobname] = CommentedSeq(setting)
+            data["settings"][knobname].fa.set_flow_style()
+        write_yaml(data, self.yaml)
 
     def __repr__(self):
         return f"<Process {self.name}:{self.beam_process!r} {len(self.optics)} optics>"
@@ -551,12 +557,14 @@ class LHCProcess:
             optics_dir = self.basedir / str(ts)
             optics_dir.mkdir(parents=True, exist_ok=True)
             yaml = optics_dir / "readme.yaml"
+            charges = self.parent.charges
             data = {
                 "name": name,
                 "settings": {},
                 "ts": ts,
                 "particles": self.parent.particles,
-                "charges": self.parent.charges,
+                "charges": charges,
+                "masses": self.parent.masses,
             }
             for knobname, (tdata, vdata) in self.settings.items():
                 value = float(np.interp(ts, tdata, vdata))
@@ -564,7 +572,8 @@ class LHCProcess:
 
             print(f"Writing {yaml}")
             write_yaml(data, yaml)
-            data["energy"] = data["settings"]["nrj"]
+            data["energies"] = (data["settings"]["nrj"]*charges[0],
+                                data["settings"]["nrj"]*charges[1],)
             data["optics_path"] = f"{name}"
             reldir = optics_dir.relative_to(self.parent.parent.basedir)
             data["settings_path"] = reldir / "settings.madx"
@@ -578,8 +587,8 @@ class LHCProcess:
         """Generate MADX files for the optics"""
         madx = """\
 call, file="acc-models-lhc/lhc.seq";
-beam,  sequence=lhcb1, particle={particles[0]}, energy={energy}, charge={charges[0]}, bv=1;
-beam,  sequence=lhcb2, particle={particles[1]}, energy={energy}, charge={charges[1]}, bv=-1;
+beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
+beam,  sequence=lhcb2, particle={particles[1]}, energy={energies[1]}, charge={charges[1]}, mass={masses[1]}, bv=-1;
 call, file="acc-models-lhc/{optics_path}";
 call, file="acc-models-lhc/{settings_path}";""".format(**data)
         if output is None:
@@ -627,13 +636,13 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         madx.use("lhcb2")
         tw2 = madx.twiss()
         from xdeps import Table
-
         return Table(tw1), Table(tw2)
 
     def check_madx(self, ts, madx=None):
         """Check the MADX model for the given time step"""
         tw1, tw2 = self.get_madx_twiss(ts, madx=madx)
         tw1.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
+        tw2.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
 
     def gen_data_from_lsa(self):
         """Generate the data from LSA"""
@@ -655,6 +664,92 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
     def __getitem__(self, idx):
         ts = list(self.optics.keys())[idx]
         return self.get_lhcoptics(ts)
+
+
+class LHCOpticsSet:
+    """LHC optics set"""
+
+    def __init__(self, name, basedir, parent=None):
+        self.name = name
+        self.basedir = basedir
+        self.parent = parent
+        self.yaml = self.basedir / "readme.yaml"
+        self.refresh()
+
+    def read_data(self):
+        if self.yaml.exists():
+            return read_yaml(self.yaml)
+        else:
+            print(f"Optics set data file {self.yaml} does not exist")
+            return {}
+
+    def refresh(self, data=None):
+        if data is None:
+            data = self.read_data()
+        self.data = data
+        self.label = self.data.get("label", None)
+        self.optics = self.data.get("optics", {})
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "optics": self.optics,
+        }
+ 
+    def save_data(self):
+        data = self.to_dict()
+        from ruamel.yaml import CommentedMap
+
+        data["optics"] = CommentedMap(data["optics"])
+        data["optics"].fa.set_block_style()
+        write_yaml(data, self.yaml)
+
+    def __repr__(self):
+        return f"<OpticsSet {self.name!r} {len(self.optics)} optics>"
+
+
+
+class LHCOpticsDef:
+    """LHC optics definition
+
+    It is defined by an optics file and a set of settings
+    """
+
+    def __init__(self, name, basedir, parent=None):
+        self.name = name
+        self.basedir = basedir
+        self.parent = parent
+        self.yaml = self.basedir / "readme.yaml"
+        self.refresh()
+
+    def read_data(self):
+        if self.yaml.exists():
+            return read_yaml(self.yaml)
+        else:
+            print(f"Optics definition data file {self.yaml} does not exist")
+            return {}
+
+    def refresh(self, data=None):
+        if data is None:
+            data = self.read_data()
+        self.data = data
+        self.name = self.data.get("name", None)
+        self.label = self.data.get("label", None)
+        self.optics = self.data.get("optics", None)
+        self.settings = self.data.get("settings", {})
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "optics": self.optics,
+            "settings": self.settings,
+        }
+
+    def save_data(self):
+        data = self.to_dict()
+        write_yaml(data, self.yaml)
 
 
 class LHCKnobDefs:
