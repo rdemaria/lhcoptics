@@ -1,6 +1,6 @@
 # lhcoptics
 
-Python package to build LHC optics.
+Python package to query and build LHC optics.
 
 Installation:
 ```
@@ -15,7 +15,7 @@ from lhcoptics import LHC
 inj=LHC().y2025.pp.ramp[0].plot()
 ```
 
-## Architecture
+## Documentation
 
 The package consists of the following main components:
 - `LHC`: Manages the acc-models-lhc LHC optics repository, allowing access to different LHC optics configurations.
@@ -23,9 +23,15 @@ The package consists of the following main components:
 - `LHCCycle`: Manages a LHC cycle, including the LHC optics and the LHC beam.
 - `LHCProcess`: Manages a LHC beam process: a list of LHC optics and a settings parametrized by time.
 - `LHCOptics`: An optics configuration consisting of strengths, knobs and parameters.
-- `LHCSection`: A section of the LHC, including the strengths, knobs and parameters.
-- `LHCCircuit`: A model of the LHC, including transfer functions and limits
-- `LHCAperture`: A model of the LHC apertures.
+
+Example: plot the IR1 optics in the first step the ramp process of the 2055 proton-proton cycle
+
+```
+from lhcoptics import LHC
+LHC().y2025.pp.ramp[0].ir1.plot()
+```
+
+
 
 ## LHC
 The `LHC` class is responsible for managing the LHC optics repository. It provides functionality to extract branches or tags from the repository and store local copies of the optics. The class also includes mechanisms to regularly check branches for updates.
