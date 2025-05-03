@@ -23,4 +23,4 @@ call,file="acc-models-lhc/aperture/aperture.b2.madx";
 call,file="acc-models-lhc/aperture/aper_tol.b1.madx";
 call,file="acc-models-lhc/aperture/aper_tol.b2.madx";
 use,sequence=lhcb1;
-use,sequence=lhc
+use,sequence=lhcb2;
