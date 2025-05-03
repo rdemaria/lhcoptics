@@ -225,6 +225,7 @@ class LHCRepo:
         self.data = data
         self.knobs = self.get_knobs()
         self.cycles = self.get_cycles()
+        self.sets = self.get_sets()
         self.start = self.data.get("start", None)
         self.end = self.data.get("end", None)
         self.label = self.data.get("label", None)
@@ -251,14 +252,24 @@ class LHCRepo:
     def get_cycles(self):
         cycles = {}
         for cycle_name in self.data.get("cycles", []):
-            cycles[cycle_name] = LHCCycle.from_dir(
+            cycles[cycle_name] = LHCCycle(
                 name=cycle_name,
                 basedir=self.basedir / "scenarios" / "cycle" / cycle_name,
                 parent=self,
             )
         return cycles
+    
+    def get_sets(self):
+        sets= {}
+        for set_name in self.data.get("sets", []):
+            sets[set_name] = LHCOpticsSet(
+                name=set_name,
+                basedir=self.basedir / "scenarios" / "optics" / set_name,
+                parent=self,
+            )
+        return sets
 
-    def add_cycle(self, name, label=None, particles=None, charges=None):
+    def add_cycle(self, name, label=None, particles=None, charges=None, masses=None):
         """Add a new cycle to the repository"""
         if name in self.cycles:
             raise ValueError(f"Cycle {name} already exists")
@@ -271,23 +282,36 @@ class LHCRepo:
         cycle.label = label
         cycle.particles = particles
         cycle.charges = charges
+        cycle.masses = masses
         cycle.save_data()
         self.cycles[name] = cycle
         self.save_data()
         return cycle
 
 
-class LHCCycle:
-    @classmethod
-    def from_dir(cls, name, basedir, parent=None):
-        basedir = Path(basedir)
-        if not basedir.exists():
-            print(f"Cycle directory {basedir} does not exist")
-        return cls(name, basedir=basedir, parent=parent)
+    def add_set(self, name, label=None):
+        """Add a new optics set to the repository"""
+        if name in self.cycles:
+            raise ValueError(f"Optics set {name} already exists")
+        (self.basedir / "scenarios" / "optics" / name).mkdir(parents=True, exist_ok=True)
+        optics_set = LHCOpticsSet(
+            name=name,
+            basedir=self.basedir / "scenarios" / "optics" / name,
+            parent=self,
+        )
+        optics_set.label = label
+        optics_set.save_data()
+        self.cycles[name] = optics_set
+        self.save_data()
+        return optics_set
 
-    def __init__(self, name, basedir, parent):
+
+class LHCCycle:
+    def __init__(self, name, basedir, parent=None):
         self.name = name
         self.basedir = Path(basedir)
+        if not basedir.exists():
+            print(f"Cycle directory {basedir} does not exist")
         self.parent = parent
         self.yaml = self.basedir / "readme.yaml"
         self.refresh()
@@ -381,6 +405,7 @@ class LHCCycle:
         """Generate the data from LSA"""
         for process in self.beam_processes.values():
             process.gen_data_from_lsa()
+        self.save_data()
 
 
 class LHCProcess:
@@ -746,6 +771,9 @@ class LHCOpticsDef:
         self.label = self.data.get("label", None)
         self.optics = self.data.get("optics", None)
         self.settings = self.data.get("settings", {})
+        self.particles = self.data.get("particles", ("proton", "proton"))
+        self.charges = self.data.get("charges", (1, 1))
+        self.masses = self.data.get("masses", (0.938272046, 0.938272046))
 
     def to_dict(self):
         return {

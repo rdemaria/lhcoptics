@@ -121,10 +121,9 @@ Class definitions, camel case alphabetically sorted:
 
 ## TODO
 
-- ion cycle
 - collection
 - hllhc
-- generate compiled files in EOS
-- gerarate twiss table in EOS
-- make website
-- make documentation
+- compiled optics files in EOS
+- twiss table in EOS
+- website
+- documentation
