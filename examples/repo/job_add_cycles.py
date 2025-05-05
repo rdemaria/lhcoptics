@@ -69,4 +69,19 @@ lhc.y2024.ions.add_process("squeeze","SQUEEZE-6.8TeV-IONS-1m-50cm-2024_V1")
 lhc.y2024.ions.add_process("physics","PHYSICS-6.8TeV-IONS-2024_V1")
 lhc.y2024.ions.gen_data_from_lsa()
 
-lhc.hl16
+lhc.hl16.add_set(
+    name="round",
+    label="End of levelling round optics",
+)
+
+lhc.hl16.round.add_optics(
+    name="hv150_l1500",
+    label="Round optics 15cm in IP1 and IP5 and 1.5m in IP8",
+    optics="strengths/round/opt_round_150_1500_optphases.madx",
+    settings={
+        "on_x1": 250, "on_x5":250,
+        "on_x2": 200, "on_x8": 200,
+        "phi_ir1": 0, "phi_ir5": 90,
+        "phi_ir2": 90, "phi_ir8": 90,
+    }
+)

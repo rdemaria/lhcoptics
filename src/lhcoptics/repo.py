@@ -203,11 +203,13 @@ class LHCRepo:
     def __getattr__(self, name):
         if name in self.cycles:
             return self.cycles[name]
+        elif name in self.sets:
+            return self.sets[name]
         else:
-            raise AttributeError(f"No cycle named {name}")
+            raise AttributeError(f"No cycle or set named {name}")
 
     def __dir__(self):
-        return super().__dir__() + list(self.cycles.keys())
+        return super().__dir__() + list(self.cycles.keys()) + list(self.sets.keys())
 
     def read_data(self):
         if self.yaml.exists():
@@ -237,6 +239,7 @@ class LHCRepo:
             "start": self.start,
             "end": self.end,
             "cycles": list(self.cycles),
+            "sets": list(self.sets),
         }
 
     def get_knobs(self):
@@ -258,13 +261,13 @@ class LHCRepo:
                 parent=self,
             )
         return cycles
-    
+
     def get_sets(self):
-        sets= {}
+        sets = {}
         for set_name in self.data.get("sets", []):
             sets[set_name] = LHCOpticsSet(
                 name=set_name,
-                basedir=self.basedir / "scenarios" / "optics" / set_name,
+                basedir=self.basedir / "scenarios" / "set" / set_name,
                 parent=self,
             )
         return sets
@@ -288,20 +291,19 @@ class LHCRepo:
         self.save_data()
         return cycle
 
-
     def add_set(self, name, label=None):
         """Add a new optics set to the repository"""
         if name in self.cycles:
             raise ValueError(f"Optics set {name} already exists")
-        (self.basedir / "scenarios" / "optics" / name).mkdir(parents=True, exist_ok=True)
+        (self.basedir / "scenarios" / "set" / name).mkdir(parents=True, exist_ok=True)
         optics_set = LHCOpticsSet(
             name=name,
-            basedir=self.basedir / "scenarios" / "optics" / name,
+            basedir=self.basedir / "scenarios" / "set" / name,
             parent=self,
         )
         optics_set.label = label
         optics_set.save_data()
-        self.cycles[name] = optics_set
+        self.sets[name] = optics_set
         self.save_data()
         return optics_set
 
@@ -363,7 +365,6 @@ class LHCCycle:
         self.label = self.data.get("label", None)
         self.optics = self.data.get("optics", {})
 
-
     def to_dict(self):
         return {
             "name": self.name,
@@ -378,11 +379,8 @@ class LHCCycle:
         }
 
     def save_data(self):
-        data= self.to_dict()
-        for kk in data:
-            if isinstance(data[kk], tuple):
-                data[kk] = list(data[kk])
-        write_yaml(self.to_dict(), self.yaml)
+        data = self.to_dict()
+        write_yaml(data, self.yaml)
 
     def add_process(self, name, beam_process, label=None):
         """Add a new process to the cycle"""
@@ -601,8 +599,10 @@ class LHCProcess:
 
             print(f"Writing {yaml}")
             write_yaml(data, yaml)
-            data["energies"] = (data["settings"]["nrj"]*charges[0],
-                                data["settings"]["nrj"]*charges[1],)
+            data["energies"] = (
+                data["settings"]["nrj"] * charges[0],
+                data["settings"]["nrj"] * charges[1],
+            )
             data["optics_path"] = f"{name}"
             reldir = optics_dir.relative_to(self.parent.parent.basedir)
             data["settings_path"] = reldir / "settings.madx"
@@ -667,6 +667,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         madx.use("lhcb2")
         tw2 = madx.twiss()
         from xdeps import Table
+
         return Table(tw1), Table(tw2)
 
     def check_madx(self, idx=None, ts=None, madx=None):
@@ -705,9 +706,23 @@ class LHCOpticsSet:
     def __init__(self, name, basedir, parent=None):
         self.name = name
         self.basedir = basedir
+        if not basedir.exists():
+            print(f"Optics set directory {basedir} does not exist")
         self.parent = parent
         self.yaml = self.basedir / "readme.yaml"
         self.refresh()
+
+    def __getattr__(self, name):
+        if name in self.optics:
+            return self.optics[name]
+        else:
+            raise AttributeError(f"No optics named {name}")
+
+    def __dir__(self):
+        return super().__dir__() + list(self.optics.keys())
+
+    def __repr__(self):
+        return f"<OpticsSet {self.name!r} {len(self.optics)} optics>"
 
     def read_data(self):
         if self.yaml.exists():
@@ -721,26 +736,63 @@ class LHCOpticsSet:
             data = self.read_data()
         self.data = data
         self.label = self.data.get("label", None)
-        self.optics = self.data.get("optics", {})
+        self.optics = {}
+        for opt in self.data.get("optics", []):
+            self.optics[opt] = LHCOpticsDef(
+                name=opt,
+                basedir=self.basedir / opt,
+                parent=self,
+            )
 
     def to_dict(self):
         return {
             "name": self.name,
             "label": self.label,
-            "optics": self.optics,
+            "optics": list(self.optics),
         }
- 
+
     def save_data(self):
         data = self.to_dict()
-        from ruamel.yaml import CommentedMap
+        from ruamel.yaml import CommentedSeq
 
-        data["optics"] = CommentedMap(data["optics"])
+        data["optics"] = CommentedSeq(data["optics"])
         data["optics"].fa.set_block_style()
         write_yaml(data, self.yaml)
 
-    def __repr__(self):
-        return f"<OpticsSet {self.name!r} {len(self.optics)} optics>"
-
+    def add_optics(
+        self,
+        name,
+        label=None,
+        optics=None,
+        settings=None,
+        particles=None,
+        charges=None,
+        masses=None,
+    ):
+        """Add a new optics to the set"""
+        if name in self.optics:
+            raise ValueError(f"Optics {name} already exists")
+        (self.basedir / name).mkdir(parents=True, exist_ok=True)
+        optics_def = LHCOpticsDef(
+            name=name,
+            basedir=self.basedir / name,
+            parent=self,
+        )
+        optics_def.refresh(
+            data=dict(
+                name=name,
+                label=label,
+                optics=optics,
+                settings=settings,
+                particles=particles,
+                charges=charges,
+                masses=masses,
+            )
+        )
+        optics_def.save_data()
+        self.optics[name] = optics_def
+        self.save_data()
+        return optics
 
 
 class LHCOpticsDef:
@@ -749,12 +801,20 @@ class LHCOpticsDef:
     It is defined by an optics file and a set of settings
     """
 
-    def __init__(self, name, basedir, parent=None):
+    def __init__(
+        self,
+        name,
+        basedir,
+        parent=None,
+    ):
         self.name = name
         self.basedir = basedir
         self.parent = parent
         self.yaml = self.basedir / "readme.yaml"
         self.refresh()
+
+    def __repr__(self):
+        return f"<OpticsDef {self.name}: {self.optics!r}>"
 
     def read_data(self):
         if self.yaml.exists():
@@ -765,8 +825,9 @@ class LHCOpticsDef:
 
     def refresh(self, data=None):
         if data is None:
-            data = self.read_data()
-        self.data = data
+            self.data = self.read_data()
+        else:
+            self.data.update(data)
         self.name = self.data.get("name", None)
         self.label = self.data.get("label", None)
         self.optics = self.data.get("optics", None)
@@ -781,11 +842,19 @@ class LHCOpticsDef:
             "label": self.label,
             "optics": self.optics,
             "settings": self.settings,
+            "particles": self.particles,
+            "charges": self.charges,
+            "masses": self.masses,
         }
 
     def save_data(self):
         data = self.to_dict()
+        for k, v in data.items():
+            if k in set("particles charges masses") and v is None:
+                del data[k]
         write_yaml(data, self.yaml)
+
+    
 
 
 class LHCKnobDefs:

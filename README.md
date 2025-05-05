@@ -119,10 +119,25 @@ Class definitions, camel case alphabetically sorted:
 - methods starting with verb lower snake case alphabetically sorted
 
 
+
+
+## General convetions
+
+Repository objects have the following methods
+- `__init__`: create object from path, read data from file, populate attributes
+- `refresh`: re-read data from the file or from dict()
+- `read_data`: read the from file
+- `to_dict`: return a dictionary of data to be saved from attributures
+- `save_data`: save data from attributes to file
+
+
 ## TODO
 
 - collection
-- hllhc
+   - refactor OpticsDef
+   - add madx files and settings
+- LHCOptics for hl optics
+    - custom knobs
 - compiled optics files in EOS
 - twiss table in EOS
 - website
