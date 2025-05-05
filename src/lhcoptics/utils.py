@@ -255,3 +255,60 @@ def git_clone_repo(repo_url, target_directory, branch=None):
     return result.stdout.strip()
 
 
+def git_status(directory,*args):
+    result = subprocess.run(
+        ["git", "status"]+list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to get git status: {result.stderr.strip()}"
+        )
+    return result.stdout.strip()
+
+def git_commit(directory, message,*args):
+    result = subprocess.run(
+        ["git", "commit", "-m", message]+list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to commit changes: {result.stderr.strip()}"
+        )
+    return result.stdout.strip()
+
+def git_push(directory,*args):
+    """
+    Push changes to the remote repository.
+    """
+    result = subprocess.run(
+        ["git", "push"]+list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to push changes: {result.stderr.strip()}"
+        )
+    return result.stdout.strip()
+
+def git_add(directory, *args):
+    """
+    Add files to the staging area.
+    """
+    result = subprocess.run(
+        ["git", "add"]+list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to add files: {result.stderr.strip()}"
+        )
+    return result.stdout.strip()

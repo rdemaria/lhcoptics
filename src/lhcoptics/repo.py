@@ -31,6 +31,10 @@ from .utils import (
     git_get_current_commit,
     git_pull,
     git_clone_repo,
+    git_status,
+    git_add,
+    git_commit,
+    git_push,
     unixtime_to_string,
     string_to_unixtime,
 )
@@ -306,6 +310,21 @@ class LHCRepo:
         self.sets[name] = optics_set
         self.save_data()
         return optics_set
+
+    def git_status(self):
+        """Get the git status of the repository"""
+        print(git_status(self.basedir))
+
+    def git_add(self, *args):
+        """Add the changes to the repository"""
+        print(git_add(self.basedir, *args))
+
+    def git_commit(self, message, *args):
+        """Commit the changes to the repository"""
+        print(git_commit(self.basedir, message, *args))
+
+    def git_push(self, *args):
+        print(git_push(self.basedir, *args))
 
 
 class LHCCycle:
@@ -853,8 +872,6 @@ class LHCOpticsDef:
             if k in set("particles charges masses") and v is None:
                 del data[k]
         write_yaml(data, self.yaml)
-
-    
 
 
 class LHCKnobDefs:
