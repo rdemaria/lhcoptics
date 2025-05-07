@@ -327,6 +327,10 @@ class LHCRepo:
         print(git_push(self.basedir, *args))
 
 
+    def get_xsuite_json(self):
+        return self.basedir / "xsuite" / "lhc.json"
+
+
 class LHCCycle:
     def __init__(self, name, basedir, parent=None):
         self.name = name
