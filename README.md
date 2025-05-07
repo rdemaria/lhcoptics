@@ -1,25 +1,63 @@
 # lhcoptics
 
-Python package to build LHC optics.
+Python package to query and build LHC optics.
+
+Installation:
+```
+git clone https://github.com/rdemaria/lhcoptics.git
+cd lhcoptics
+pip install -e .
+```
 
 Usage:
 ```
-git clone githttps://github.com/rdemaria/lhcoptics.git
-cd lhcoptics
-pip install -e .
-python examples/data/make.py
+from lhcoptics import LHC
+inj=LHC().y2025.pp.ramp[0].plot()
 ```
 
+## Documentation
+
+The package consists of the following main components:
+- `LHC`: Manages the acc-models-lhc LHC optics repository, allowing access to different LHC optics configurations.
+- `LHCRepo`: Manages a branch or tag of the LHC optics repository.
+- `LHCCycle`: Manages a LHC cycle, including the LHC optics and the LHC beam.
+- `LHCProcess`: Manages a LHC beam process: a list of LHC optics and a settings parametrized by time.
+- `LHCOptics`: An optics configuration consisting of strengths, knobs and parameters.
+
+Example: plot the IR1 optics in the first step the ramp process of the 2055 proton-proton cycle
+
 ```
-from lhcoptics import LHCOptics
-inj=LHCOptics.from_json("examples/data/opt_inj.json")
-inj.set_xsuite_model("examples/data/lhc.json") # set an xsuite model
-inj.ir5.plot()
+from lhcoptics import LHC
+LHC().y2025.pp.ramp[0].ir1.plot()
 ```
 
-NB: Currently needs `github.com/rdemaria/xdeps` branch `upstream/feature/check_limits`.
+
+
+## LHC
+The `LHC` class is responsible for managing the LHC optics repository. It provides functionality to extract branches or tags from the repository and store local copies of the optics. The class also includes mechanisms to regularly check branches for updates.
+
+The class stores data locally, by default in Python user site, or using the environment variable `LHCOPTICS_BASEDIR`. The Git repository URL can also be customized by `LHCOPTICS_GIT_URL`.
+
+Usage:
+```
+from lhcoptics import LHC
+# initialize LHC instance repository
+# create a directory if it doesn't exist
+# check gitlab for newer versions
+lhc = LHC()
+# for a check gitlab for updates
+lhc.check_local_branches()
+# list of branches
+lhc.branches
+# list of tags
+lhc.tags
+# extract 2025 branch
+lhc.y2025
+```
+
 
 ## LHCOptics
+
 An `LHCOptics` contains data for specifying a full LHC Optics. It contains global params and knobs and a list of LHC sections (`ir1`, `ir2`, ... , `ir8`, `a12`, `a23`, ..., `a78`) that contains strengths, local params and local knobs. The optics can contain a `model` that allows to compute twiss, plot and rematch the optics.
 
 Methods:
@@ -70,7 +108,6 @@ Methods:
 - `twiss_cell(beam)`: get periodic solution of cell
 
 
-
 ## Code style
 
 Class definitions, camel case alphabetically sorted:
@@ -79,4 +116,29 @@ Class definitions, camel case alphabetically sorted:
 - class methods
 - init
 - other special double underscore methods
-- methods starting with verb lower snake case alphabetically sorteddsf
+- methods starting with verb lower snake case alphabetically sorted
+
+
+
+
+## General convetions
+
+Repository objects have the following methods
+- `__init__`: create object from path, read data from file, populate attributes
+- `refresh`: re-read data from the file or from dict()
+- `read_data`: read the from file
+- `to_dict`: return a dictionary of data to be saved from attributures
+- `save_data`: save data from attributes to file
+
+
+## TODO
+
+- collection
+   - refactor OpticsDef
+   - add madx files and settings
+- LHCOptics for hl optics
+    - custom knobs
+- compiled optics files in EOS
+- twiss table in EOS
+- website
+- documentation

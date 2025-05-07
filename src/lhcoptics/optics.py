@@ -138,22 +138,31 @@ class LHCOptics:
         madx,
         name=None,
         sliced=False,
-        gen_model=None,
+        make_model=None,
         xsuite_model=None,
         circuits=None,
         verbose=False,
+        knob_names=None,
     ):
         madmodel = LHCMadxModel(madx)
-        knobs = madmodel.make_and_set0_knobs(cls.knob_names)
+        if knob_names is None:
+            knob_names = cls.knob_names
+        knobs = madmodel.make_and_set0_knobs(knob_names)
         irs = [ir.from_madx(madx) for ir in cls._irs]
         arcs = [LHCArc.from_madx(madx, arc) for arc in cls._arcs]
         for k, knob in knobs.items():
             madx.globals[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs)
-        if gen_model == "xsuite":
+        if make_model == "xsuite":
             xsuite_model = LHCXsuiteModel.from_madx(madx, sliced=sliced)
-        elif gen_model == "madx":
+        elif make_model == "madx":
             self.model = madmodel
+        elif make_model is None:
+            pass
+        else:
+            raise ValueError(
+                f"Unknown make_model {make_model}, use 'xsuite' or 'madx' or None"
+            )
         if xsuite_model is not None:
             self.set_xsuite_model(xsuite_model, verbose=verbose)
         if circuits is not None:
@@ -191,7 +200,35 @@ class LHCOptics:
         xsuite_model=None,
         stdout=False,
         verbose=False,
+        knob_names=None,
     ):
+        """
+        Create an LHCOptics object from a MADX file.
+        
+        Parameters
+        ----------
+        filename : str
+            The name of the MADX file.
+        name : str
+            The name of the optics object.
+        sliced : bool
+            If True, the optics will be sliced.
+        make_model : bool
+            If True, a MADX model will be created.
+        xsuite_model : bool
+            If True, an Xsuite model will be created.
+        stdout : bool
+            If True, the MADX output will be printed to stdout.
+        verbose : bool
+            If True, the MADX output will be printed to stdout.
+        knob_names : list
+            A list of knob names to be used.
+        
+        Returns 
+        -------
+        LHCOptics
+            The LHCOptics object.
+        """
         madx = Madx(stdout=stdout)
         madx.call(filename)
         if name is None:
@@ -200,38 +237,12 @@ class LHCOptics:
             madx,
             name=name,
             sliced=sliced,
-            gen_model=make_model,
+            make_model=make_model,
             xsuite_model=xsuite_model,
             verbose=verbose,
+            knob_names=knob_names,
         )
 
-    @staticmethod
-    def set_repository(version="2024"):
-        import subprocess
-
-        version = str(version)
-
-        accmodels = Path("acc-models-lhc")
-        if accmodels.exists():
-            if not (accmodels / "lhc.seq").exists():
-                raise FileNotFoundError("acc-models-lhc/lhc.seq not found")
-            else:
-                if (accmodels / ".git").exists():
-                    if git_get_current_branch(accmodels) != version:
-                        git_set_branch(accmodels, version)
-        elif (
-            lcl := (Path.home() / "local" / "acc-models-lhc" / version)
-        ).exists():
-            accmodels.symlink_to(lcl)
-        else:
-            subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "https://gitlab.cern.ch/acc-models/lhc.git",
-                    f"-b {version}" "acc-models-lhc",
-                ]
-            )
 
     def __init__(
         self,
@@ -291,13 +302,16 @@ class LHCOptics:
 
     @property
     def arcs(self):
+        """List of arcs"""
         return [getattr(self, arc) for arc in self._arcs]
 
     @property
     def irs(self):
+        """List of IRs"""
         return [getattr(self, ir.name) for ir in self._irs]
 
     def twissip(self):
+        """Compute twiss and print orbit at IPs, tunes and chromaticity"""
         tw1, tw2 = self.twiss(chrom=True, strengths=False)
         header = True
         cols = "betx bety dx dpx px*1e6 py*1e6 x*1e3 y*1e3"
@@ -316,6 +330,7 @@ class LHCOptics:
         return self
 
     def check(self, verbose=False):
+        """Compute twiss and print orbit at IPs, tunes and chromaticity"""
         self.twissip()
 
     def check_knobs(self):
@@ -348,6 +363,9 @@ class LHCOptics:
             print(f"{ss.name} {opt.within_tol}")
 
     def copy(self, name=None):
+        """
+        Copy the optics object, including all sections and knobs.
+        """
         if name is None:
             name = self.name
         other = self.__class__(
@@ -362,6 +380,9 @@ class LHCOptics:
         return other
 
     def diff(self, other, full=True):
+        """
+        Compare the optics with another optics object or a json file.
+        """
         if isinstance(other, str) or isinstance(other, Path):
             other = self.__class__.from_json(other)
         self.diff_knobs(other)
@@ -389,6 +410,7 @@ class LHCOptics:
         return strengths
 
     def find_knobs(self, regexp=None):
+        """Find all knobs in the optics and its sections."""
         knobs = {}
         for ss in self.irs + self.arcs:
             knobs.update(ss.knobs)
@@ -398,6 +420,7 @@ class LHCOptics:
         return knobs.values()
 
     def find_knobs_null(self):
+        """Find all knobs in the optics and its sections that are empty."""
         knobs = self.find_knobs()
         return {
             knob
@@ -406,6 +429,10 @@ class LHCOptics:
         }
 
     def get(self, k, default=None, full=True):
+        """
+        Get a parameter, strengths or knobs from the optics or its sections.
+        If full is True, search in all sections.
+        """
         if k in self:
             return self[k]
         if full:
@@ -415,6 +442,7 @@ class LHCOptics:
         return default
 
     def get_cmin(self, beam=None, pos="ip1"):
+        """Compute the c-minus at a given position."""
         if beam is None:
             return [
                 self.get_cmin(beam=1, pos=pos),
@@ -442,6 +470,8 @@ class LHCOptics:
 
     def get_mkdtct(self, tw1=None, tw2=None):
         """
+        Compute the TCT and MKD phase advances at IP1, IP5 and IP8
+
         B1: IP1 TCT IP5       MKD IP6      TCP IP7        TCT IP1
         B2: IP1     IP5 TCT       IP6 MKD      IP7 TCP        IP1 TCT
         """
@@ -503,6 +533,9 @@ class LHCOptics:
         return out
 
     def get_params(self):
+        """
+        Get the parameters from the optics and its sections.
+        """
         tw1 = self.model.b1.twiss(
             compute_chromatic_properties=True, strengths=False
         )
@@ -512,6 +545,9 @@ class LHCOptics:
         return self.get_params_from_twiss(tw1, tw2)
 
     def get_params_from_twiss(self, tw1, tw2):
+        """
+        Get the parameters from the twiss object.
+        """
         params = {
             "p0c": tw1.p0c,
             "qxb1": tw1.qx,
@@ -528,12 +564,18 @@ class LHCOptics:
         return params
 
     def get_phase_arcs(self):
+        """
+        Get the phase advances from the arcs.
+        """
         phases = {}
         for arc in self.arcs:
             phases.update(arc.get_phase())
         return phases
 
     def get_quad_max_ratio(self, verbose=False, ratio=1.5):
+        """
+        Get the maximum ratio of the quadrupole strengths in the IRs.
+        """
         ratios = np.array(
             [
                 ir.get_quad_max_ratio(verbose=verbose, ratio=ratio)
@@ -543,6 +585,9 @@ class LHCOptics:
         return ratios.max()
 
     def get_quad_margin(self, name, verbose=False, p0c=None, absvalue=False):
+        """
+        Get the margin of the quadrupole strengths in the IRs.
+        """
         if p0c is None:
             p0c = self.params["p0c"]
         v = self.model[name]
@@ -560,6 +605,9 @@ class LHCOptics:
         return (margin0, margin1)
 
     def is_ats(self):
+        """
+        Check if the optics has ATS factors different from 1.
+        """
         return (
             self.params.get("rx_ip1", 1) != 1
             or self.params.get("ry_ip1", 1) != 1
@@ -569,6 +617,8 @@ class LHCOptics:
 
     def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="all", solve=True):
         """
+        Match the chromaticity of the optics.
+
         NB: breaks knobs and restore them
         """
         if beam is None:
@@ -754,7 +804,7 @@ class LHCOptics:
         return self
 
     def set_xsuite_model(self, model, verbose=False):
-        if isinstance(model, str):
+        if isinstance(model, str) or isinstance(model, Path):
             model = LHCXsuiteModel.from_json(model)
         self.model = model
         self.update_model(verbose=verbose)

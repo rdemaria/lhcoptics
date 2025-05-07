@@ -1,7 +1,9 @@
 *.pyc
 __pycache__
 *.egg-info
-docs/_build
+build
+doc/build
 dist
 *.json
 acc-models-lhc
+.ipynb_checkpoints
