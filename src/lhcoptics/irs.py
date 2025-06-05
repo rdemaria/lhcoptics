@@ -602,7 +602,7 @@ class LHCIR(LHCSection):
             return plot
 
     def set_bumps_off(self):
-        for k, knob in self.knob_names.items():
+        for k, knob in self.knobs.items():
             if re.match(r"on_[xsao]", k):
                 knob.value = 0
                 self.parent.model[k] = 0

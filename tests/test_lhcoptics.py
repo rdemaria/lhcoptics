@@ -1,10 +1,12 @@
-from lhcoptics import LHCOptics
+import pytest
+from lhcoptics import LHC
 
-def test_open_lhcoptics():
-    LHCOptics.set_repository("2024")
+@pytest.fixture
+def lhc_optics(request):
+    lhc = LHC()
+    opt= lhc.y2025.pp.ramp[0]
+    return opt
 
-    inj = LHCOptics.from_madxfile("examples/data/model.madx", make_model="xsuite")
-
-    assert inj.model is not None
-
-
+def test_lhcoptics(lhc_optics):
+    opt = lhc_optics
+    assert opt is not None

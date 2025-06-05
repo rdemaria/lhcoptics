@@ -149,7 +149,9 @@ class LHC:
         """
         Get the list of branches in the repository
         """
-        cache_file_good = self.cache_file.exists() and file_one_day_old(self.cache_file)
+        cache_file_good = self.cache_file.exists() and file_one_day_old(
+            self.cache_file
+        )
         if force_update or not cache_file_good:
             print("Getting branches and tags from gitlab")
             cache = gitlab_get_branches_and_tags(
@@ -202,7 +204,7 @@ class LHCRepo:
         self.refresh()
 
     def __repr__(self):
-        return f"<LHC {self.name} '{self.basedir}'>"
+        return f"<LHC {self.name} '{self.basedir}', {len(self.cycles)} cycles, {len(self.sets)} sets>"
 
     def __getattr__(self, name):
         if name in self.cycles:
@@ -213,7 +215,11 @@ class LHCRepo:
             raise AttributeError(f"No cycle or set named {name}")
 
     def __dir__(self):
-        return super().__dir__() + list(self.cycles.keys()) + list(self.sets.keys())
+        return (
+            super().__dir__()
+            + list(self.cycles.keys())
+            + list(self.sets.keys())
+        )
 
     def read_data(self):
         if self.yaml.exists():
@@ -276,11 +282,15 @@ class LHCRepo:
             )
         return sets
 
-    def add_cycle(self, name, label=None, particles=None, charges=None, masses=None):
+    def add_cycle(
+        self, name, label=None, particles=None, charges=None, masses=None
+    ):
         """Add a new cycle to the repository"""
         if name in self.cycles:
             raise ValueError(f"Cycle {name} already exists")
-        (self.basedir / "scenarios" / "cycle" / name).mkdir(parents=True, exist_ok=True)
+        (self.basedir / "scenarios" / "cycle" / name).mkdir(
+            parents=True, exist_ok=True
+        )
         cycle = LHCCycle(
             name=name,
             basedir=self.basedir / "scenarios" / "cycle" / name,
@@ -299,7 +309,9 @@ class LHCRepo:
         """Add a new optics set to the repository"""
         if name in self.cycles:
             raise ValueError(f"Optics set {name} already exists")
-        (self.basedir / "scenarios" / "set" / name).mkdir(parents=True, exist_ok=True)
+        (self.basedir / "scenarios" / "set" / name).mkdir(
+            parents=True, exist_ok=True
+        )
         optics_set = LHCOpticsSet(
             name=name,
             basedir=self.basedir / "scenarios" / "set" / name,
@@ -326,7 +338,6 @@ class LHCRepo:
     def git_push(self, *args):
         print(git_push(self.basedir, *args))
 
-
     def get_xsuite_json(self):
         return self.basedir / "xsuite" / "lhc.json"
 
@@ -351,7 +362,9 @@ class LHCCycle:
         return super().__dir__() + list(self.beam_processes.keys())
 
     def __repr__(self):
-        return f"<Cycle {self.name!r} {len(self.beam_processes)} beam_processes>"
+        return (
+            f"<Cycle {self.name!r} {len(self.beam_processes)} beam_processes>"
+        )
 
     def get_fills(self, lhcrun):
         bp_to_match = [bp.name for bp in self.beam_processes]
@@ -522,7 +535,9 @@ class LHCProcess:
 
     def set_optics_from_lsa(self):
         tbl = get_lsa().getOpticTable(self.beam_process)
-        self.optics = {int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl}
+        self.optics = {
+            int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl
+        }
         return self
 
     def set_settings_from_lsa(self):
@@ -554,7 +569,9 @@ class LHCProcess:
                 print("Empty response for '%s': %s" % (param, ex))
         return out
 
-    def get_settings_from_lsa(self, params=None, start=None, end=None, part="target"):
+    def get_settings_from_lsa(
+        self, params=None, start=None, end=None, part="target"
+    ):
         """Get settings for the given parameters"""
         if start is None:
             t1 = (
@@ -642,7 +659,9 @@ call, file="acc-models-lhc/lhc.seq";
 beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
 beam,  sequence=lhcb2, particle={particles[1]}, energy={energies[1]}, charge={charges[1]}, mass={masses[1]}, bv=-1;
 call, file="acc-models-lhc/{optics_path}";
-call, file="acc-models-lhc/{settings_path}";""".format(**data)
+call, file="acc-models-lhc/{settings_path}";""".format(
+            **data
+        )
         if output is None:
             return madx
         else:
@@ -665,8 +684,13 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             print(f"Writing {output}")
             return madx
 
-    def get_madx_model(self, ts, madx=None, stdout=False):
-        """Get the MADX model for the given time step"""
+    def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
+        """Get the MADX model for the given time step
+        If idx is provided, it will use the corresponding time step from self.ts.
+
+        """
+        if idx is not None:
+            ts = self.ts[idx]
         if ts in self.optics:
             optics_dir = self.basedir / str(ts)
             madxfile = optics_dir / "model.madx"
@@ -684,7 +708,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         """Get the MADX twiss for the given time step"""
         if idx is not None:
             ts = self.ts[idx]
-        madx = self.get_madx_model(ts, madx=madx)
+        madx = self.get_madx_model(ts=ts, madx=madx)
         madx.use("lhcb1")
         tw1 = madx.twiss()
         madx.use("lhcb2")
@@ -697,7 +721,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         """Check the MADX model for the given time step"""
         if idx is not None:
             ts = self.ts[idx]
-        tw1, tw2 = self.get_madx_twiss(ts, madx=madx)
+        tw1, tw2 = self.get_madx_twiss(ts=ts, madx=madx)
         tw1.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
         tw2.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
 
@@ -710,13 +734,19 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
 
     def get_lhcoptics(self, ts, xsuite=True):
         """Get the LHC optics for the given time step"""
-        madx = self.get_madx_model(ts)
+        madx = self.get_madx_model(ts=ts)
         name = f"{self.parent.name}_{self.name}_{ts}"
         if xsuite is True:
             xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
         else:
             xsuite_model = None
-        return LHCOptics.from_madx(madx=madx, name=name, xsuite_model=xsuite_model)
+        knob_names = list(self.parent.parent.knobs.mad)
+        return LHCOptics.from_madx(
+            madx=madx,
+            name=name,
+            xsuite_model=xsuite_model,
+            # knob_names=knob_names, not ready yet needs structure for global and local knobs
+        )
 
     def __getitem__(self, idx):
         ts = list(self.optics.keys())[idx]
@@ -934,7 +964,7 @@ class LHCKnobDefs:
 class LHCKnobDef:
     def __init__(self, mad, lsa, scaling, test):
         self.mad = str(mad).lower()
-        self.lsa = str(lsa)
+        self.lsa = lsa  # string or None
         self.scaling = float(scaling)
         self.test = float(test)
 
@@ -976,7 +1006,9 @@ class LHCRun:
 
     def set_fills(self):
         self.fills = {}
-        fills = get_lsa().findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
+        fills = get_lsa().findBeamProcessHistory(
+            self.t1, self.t2, accelerator="lhc"
+        )
         for filln, bp_list in fills.items():
             # beam_processes=[(ts,bp.split('@')[0]) for ts,bp in bp_list]
             beam_processes = [(ts, bp) for ts, bp in bp_list]

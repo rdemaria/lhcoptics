@@ -25,8 +25,6 @@ from .utils import (
     deliver_list_str,
     print_diff_dict_float,
     print_diff_dict_objs,
-    git_get_current_branch,
-    git_set_branch,
 )
 
 _opl = ["_op", "_sq", ""]
