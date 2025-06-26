@@ -22,7 +22,7 @@ class LHCIR(LHCSection):
     default_twiss_method = "init"
 
     @classmethod
-    def from_madx(cls, madx, name=None):
+    def from_madx(cls, madx, name=None, knob_names=None):
         madmodel = LHCMadxModel(madx)
         if name is None:
             name = cls.name
@@ -41,7 +41,9 @@ class LHCIR(LHCSection):
         acb = madmodel.filter(f"acbx.*[lr]{irn}$")
         acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)
-        knobs = madmodel.make_and_set0_knobs(cls.knob_names)
+        if knob_names is None:
+            knob_names = cls.knob_names
+        knobs = madmodel.make_and_set0_knobs(knob_names)
         strengths = {st: madx.globals[st] for st in strength_names}
         for knob in knobs:
             madx.globals[knob] = knobs[knob].value

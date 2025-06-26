@@ -343,6 +343,25 @@ class LHCRepo:
 
 
 class LHCCycle:
+    """
+    Represents an optics cycle in the LHC (Large Hadron Collider).
+
+    This class manages the configuration and metadata for a specific optics cycle,
+    including beam processes, particles, charges, masses, and associated optics.
+    Attributes:
+        name (str): Unique identifier for the cycle
+        basedir (Path): Base directory for the cycle's files
+        parent (object, optional): Parent object in the hierarchy
+        beam_processes (dict): Dictionary of beam processes associated with the cycle
+        start (str, optional): Start time or identifier of the cycle
+        end (str, optional): End time or identifier of the cycle
+        particles (tuple): Types of particles in the cycle
+        charges (tuple): Charges of the particles
+        masses (tuple): Masses of the particles
+        label (str, optional): Human-readable label for the cycle
+        optics (dict): Specific optics configuration details
+    """
+
     def __init__(self, name, basedir, parent=None):
         self.name = name
         self.basedir = Path(basedir)
@@ -489,6 +508,24 @@ class LHCProcess:
         self.yaml = self.basedir / "readme.yaml"
         self.refresh()
 
+    def __repr__(self):
+        return f"<Process {self.name}:{self.beam_process!r} {len(self.optics)} optics>"
+
+    @property
+    def ts(self):
+        return list(self.optics.keys())
+
+    def clear_dir(self):
+        """Clear the optitcs directory"""
+        for ll in self.basedir.iterdir():
+            if ll.is_dir():
+                print(f"Removing {ll}")
+                for ff in ll.iterdir():
+                    if ff.is_file() or ff.is_symlink():
+                        print(f"Removing {ff}")
+                        os.remove(ff)
+                os.rmdir(ll)
+
     def read_data(self):
         if self.yaml.exists():
             return read_yaml(self.yaml)
@@ -525,13 +562,6 @@ class LHCProcess:
             data["settings"][knobname] = CommentedSeq(setting)
             data["settings"][knobname].fa.set_flow_style()
         write_yaml(data, self.yaml)
-
-    def __repr__(self):
-        return f"<Process {self.name}:{self.beam_process!r} {len(self.optics)} optics>"
-
-    @property
-    def ts(self):
-        return list(self.optics.keys())
 
     def set_optics_from_lsa(self):
         tbl = get_lsa().getOpticTable(self.beam_process)
@@ -605,17 +635,6 @@ class LHCProcess:
             except Exception as ex:
                 print("Empty response for '%s': %s" % (param, ex))
         return out
-
-    def clear_dir(self):
-        """Clear the optitcs directory"""
-        for ll in self.basedir.iterdir():
-            if ll.is_dir():
-                print(f"Removing {ll}")
-                for ff in ll.iterdir():
-                    if ff.is_file() or ff.is_symlink():
-                        print(f"Removing {ff}")
-                        os.remove(ff)
-                os.rmdir(ll)
 
     def gen_optics_dir(self, lsa_settings=None):
         """Generate optics directory structure"""
@@ -740,13 +759,13 @@ call, file="acc-models-lhc/{settings_path}";""".format(
             xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
         else:
             xsuite_model = None
-        knob_names = list(self.parent.parent.knobs.mad)
-        return LHCOptics.from_madx(
+        opt = LHCOptics.from_madx(
             madx=madx,
             name=name,
             xsuite_model=xsuite_model,
-            # knob_names=knob_names, not ready yet needs structure for global and local knobs
         )
+        opt.set_params()
+        return opt
 
     def __getitem__(self, idx):
         ts = list(self.optics.keys())[idx]

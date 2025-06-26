@@ -54,7 +54,6 @@ class Knob:
         out = CouplingKnob.specialize(out)
         # octupole knobs
         # dpp knmob
-        # disp knob
         return out
 
     def from_madx(self, madx, redefine_weights=False):
@@ -1041,4 +1040,4 @@ class DispKnob(Knob):
             self.weights[k] = vright / len(right)
 
     def __repr__(self):
-        return f"<IPKnob {self.name!r} = {self.value}>"
+        return f"<DispKnob {self.name!r} = {self.value}>"

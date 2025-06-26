@@ -131,14 +131,19 @@ Repository objects have the following methods
 - `save_data`: save data from attributes to file
 
 
+## Generating scenario directory
+
+See `examples/repo/job_add_cycles.py`
+
+
 ## TODO
 
-- collection
-   - refactor OpticsDef
-   - add madx files and settings
-- LHCOptics for hl optics
-    - custom knobs
+- remove dependency on operation/knobs.txt
 - compiled optics files in EOS
 - twiss table in EOS
-- website
+- LHCOptics for hl optics
+- missing knobs specialization
+    - octupole knobs
+    - dpp knmob
 - documentation
+- website
