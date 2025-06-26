@@ -138,10 +138,12 @@ See `examples/repo/job_add_cycles.py`
 
 ## TODO
 
-- remove dependency on operation/knobs.txt
-- compiled optics files in EOS
-- twiss table in EOS
+- compile optics files in EOS
+    - madx files for madx/ native xsuits
+    - LHCOptics json for the phytho library
+- add twiss tables in EOS
 - LHCOptics for hl optics
+    - for the knobs use class approach based on some euristic in from_madx
 - missing knobs specialization
     - octupole knobs
     - dpp knmob
