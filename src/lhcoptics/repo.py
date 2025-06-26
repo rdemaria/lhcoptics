@@ -66,7 +66,6 @@ def check_repobasedir(basedir):
             basedir.mkdir(parents=True)
         else:
             raise ValueError(f"Repository {basedir} does not exists.")
-        raise ValueError(f"Error creating {basedir}")
     return basedir
 
 
