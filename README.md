@@ -138,6 +138,8 @@ See `examples/repo/job_add_cycles.py`
 
 ## TODO
 
+- add check and comparisons with LSA
+- add extra 2025 MD cycles
 - compile optics files in EOS
     - madx files for madx/ native xsuits
     - LHCOptics json for the phytho library
