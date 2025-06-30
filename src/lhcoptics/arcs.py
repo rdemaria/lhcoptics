@@ -24,7 +24,7 @@ class LHCArc(LHCSection):
     default_twiss_method = "periodic"
 
     @classmethod
-    def from_madx(cls, madx, name="a12"):
+    def from_madx(cls, madx, name, knob_names=None):
         madmodel = LHCMadxModel(madx)
         i1, i2 = int(name[1]), int(name[2])
         strength_names = []
@@ -35,7 +35,10 @@ class LHCArc(LHCSection):
         strength_names += madmodel.filter(f"ksq\\.*l{i2}b[12]$")
         strength_names += madmodel.filter(f"ks[fd][12]\\.*{name}b[12]$")
         strength_names += madmodel.filter(f"ko[fd]\\.*{name}b[12]$")
-        knobs = {}
+        if knob_names is not None:
+            knobs = madmodel.make_and_set0_knobs(knob_names)
+        else:
+            knobs = {}
         params = {}
         strengths = {st: madx.globals[st] for st in strength_names}
         return cls(name, strengths, params, knobs)
@@ -282,6 +285,7 @@ class LHCArc(LHCSection):
 
     def to_table(self, *rows):
         from .opttable import LHCArcTable
+
         return LHCArcTable([self] + list(rows))
 
     def twiss_cell(self, beam=None, strengths=True):

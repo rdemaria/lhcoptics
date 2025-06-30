@@ -391,7 +391,7 @@ use, sequence=lhcb2;
                 dvalue = madx.globals[s] - base[s]
                 weights[s] = dvalue
             madx.globals[knob] = 0
-            knobs[knob] = Knob(knob, value, weights)
+            knobs[knob] = Knob(knob, value, weights).specialize()
         return knobs
 
     def make_and_set0_knobs(self, knob_names):
@@ -413,7 +413,7 @@ use, sequence=lhcb2;
                 dvalue = madx.globals[s] - base[s]
                 weights[s] = dvalue
             madx.globals[knob] = 0
-            knobs[knob] = Knob(knob, value, weights)
+            knobs[knob] = Knob(knob, value, weights).specialize()
         return knobs
 
     def diff(self, other):

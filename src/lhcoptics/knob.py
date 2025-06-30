@@ -7,6 +7,16 @@ from .utils import print_diff_dict_float
 
 
 class Knob:
+    """
+    Generic knob class for LHC optics.
+    This class serves also as a base for all specific knob types, such as IPKnob, TuneKnob, etc.
+
+    Attributes:
+    name (str): The name of the knob.
+    value (float): The current value of the knob.
+    weights (dict): A dictionary of weights associated with the knob.
+    parent (object): The parent object, typically the optics model or line.
+    """
 
     def __init__(self, name, value=0, weights=None, parent=None):
         self.name = name
@@ -18,17 +28,8 @@ class Knob:
     def from_dict(cls, data):
         if "class" in data:
             return globals()[data["class"]].from_dict(data)
-        out = cls(data["name"], data["value"], data["weights"])
-        # specializations
-        out = IPKnob.specialize(out)
-        out = DispKnob.specialize(out)
-        out = TuneKnob.specialize(out)
-        out = ChromaKnob.specialize(out)
-        out = CouplingKnob.specialize(out)
-        # octupole knobs
-        # dpp knmob
-        # disp knob
-        return out
+        else:
+            return cls(data["name"], data["value"], data["weights"]).specialize()
 
     @classmethod
     def from_src(cls, src):
@@ -40,6 +41,20 @@ class Knob:
             return cls.from_dict(src.__dict__)
         else:
             return cls.from_dict(src)
+
+    def specialize(self):
+        """
+        Return a specialized knob based on the current knob.
+        """
+        out =self
+        out = IPKnob.specialize(out)
+        out = DispKnob.specialize(out)
+        out = TuneKnob.specialize(out)
+        out = ChromaKnob.specialize(out)
+        out = CouplingKnob.specialize(out)
+        # octupole knobs
+        # dpp knmob
+        return out
 
     def from_madx(self, madx, redefine_weights=False):
         raise NotImplementedError
@@ -73,11 +88,6 @@ class Knob:
 
     def get_weight_knob_names(self):
         return [f"{key}_from_{self.name}" for key in self.weights.keys()]
-
-    def specialize(self, knob):
-        """Specialize the knob to a specific type."""
-        knob = IPKnob.specialize(self)
-        return knob
 
     def __repr__(self):
         return f"<Knob {self.name!r} = {self.value}>"
@@ -1030,4 +1040,4 @@ class DispKnob(Knob):
             self.weights[k] = vright / len(right)
 
     def __repr__(self):
-        return f"<IPKnob {self.name!r} = {self.value}>"
+        return f"<DispKnob {self.name!r} = {self.value}>"

@@ -25,8 +25,6 @@ from .utils import (
     deliver_list_str,
     print_diff_dict_float,
     print_diff_dict_objs,
-    git_get_current_branch,
-    git_set_branch,
 )
 
 _opl = ["_op", "_sq", ""]
@@ -142,14 +140,15 @@ class LHCOptics:
         xsuite_model=None,
         circuits=None,
         verbose=False,
-        knob_names=None,
+        knob_structure=None,
     ):
         madmodel = LHCMadxModel(madx)
-        if knob_names is None:
-            knob_names = cls.knob_names
+        if knob_structure is None:
+            knob_structure = {}
+        knob_names = knob_structure.get("global", cls.knob_names)
         knobs = madmodel.make_and_set0_knobs(knob_names)
-        irs = [ir.from_madx(madx) for ir in cls._irs]
-        arcs = [LHCArc.from_madx(madx, arc) for arc in cls._arcs]
+        irs = [ir.from_madx(madx, knob_names=knob_structure.get(ir.name)) for ir in cls._irs]
+        arcs = [LHCArc.from_madx(madx, arc, knob_names=knob_structure.get(arc)) for arc in cls._arcs]
         for k, knob in knobs.items():
             madx.globals[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs)
@@ -467,6 +466,14 @@ class LHCOptics:
         if line.element_names[0] != "ip1":
             line.cycle("ip1", inplace=True)
         return cmin.real, cmin.imag
+
+    def get_knob_structure(self):
+        """Return the names and locations of the knobs in the optics."""
+        out = {}
+        out["global"] = list(self.knobs.keys())
+        for ss in self.irs + self.arcs:
+            out[ss.name] = list(ss.knobs.keys())
+        return out
 
     def get_mkdtct(self, tw1=None, tw2=None):
         """

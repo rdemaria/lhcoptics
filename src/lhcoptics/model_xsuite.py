@@ -269,7 +269,7 @@ class LHCXsuiteModel:
         weights = {}
         for wname in knob.weights:
             weights[wname] = self._var_values[f"{wname}_from_{knob.name}"]
-        return Knob(knob.name, value, weights)
+        return Knob(knob.name, value, weights).specialize()
 
     def show_knob(self, knobname):
         print(f"Knob: {knobname} = {self[knobname]:15.6g}")
@@ -287,7 +287,7 @@ class LHCXsuiteModel:
         for k in self._var_values:
             if k.endswith(wname):
                 weights[k] = self._var_values[k]
-        return Knob(name, value, weights)
+        return Knob(name, value, weights).specialize()
 
     def get_knob_by_probing(self, name):
         weights = {}
@@ -301,7 +301,7 @@ class LHCXsuiteModel:
                 if dvar != 0:
                     weights[k] = dvar
         self._var_values[name] = oldvalue
-        return Knob(name, oldvalue, weights)
+        return Knob(name, oldvalue, weights).specialize()
 
     def update(self, src):
         if hasattr(src, "strengths"):
