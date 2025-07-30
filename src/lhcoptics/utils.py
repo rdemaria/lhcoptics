@@ -312,3 +312,15 @@ def git_add(directory, *args):
             f"Failed to add files: {result.stderr.strip()}"
         )
     return result.stdout.strip()
+
+
+def read_url(url, timeout=0.1):
+    """
+    Read content from a URL.
+    """
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()  # Raise an error for bad responses
+        return response.text
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Failed to read from URL {url}: {e}")

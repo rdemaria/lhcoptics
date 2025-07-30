@@ -3,6 +3,25 @@ lhc=LHC()
 
 lsa=get_lsa()
 
+
+# 2025 - Proton Physics
+lhc.y2025.add_cycle(
+    name="pp",
+    label="Proton Physics 2025",
+    particles=["proton","proton"],
+    charges=[1,1]
+)
+lhc.y2025.pp.refresh()
+lhc.y2025.pp.add_process("ramp","RAMP-SQUEEZE-6.8TeV-ATS-2m-2025_V1")
+lhc.y2025.pp.add_process("squeeze","SQUEEZE-6.8TeV-2m-1.2m-2025_V1")
+lhc.y2025.pp.add_process("rotation","IP1-5-8-ROTATION-2025_V1")
+lhc.y2025.pp.add_process("qchange","QCHANGE-6.8TeV-2025_V1")
+lhc.y2025.pp.add_process("physics","PHYSICS-6.8TeV-1.2m-2025_V1")
+lhc.y2025.pp.add_process("levelling","SQUEEZE-6.8TeV-1.2m-18cm-2025_V1")
+lhc.y2025.pp.gen_data_from_lsa()
+lhc.y2025.pp.gen_eos_data()
+
+
 # 2025 - VDM
 lsa.findBeamProcesses(".*vdm.*2025.*")
 lhc.y2025.vdm.refresh()

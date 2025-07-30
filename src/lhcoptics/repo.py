@@ -35,8 +35,6 @@ from .utils import (
     git_add,
     git_commit,
     git_push,
-    unixtime_to_string,
-    string_to_unixtime,
 )
 from .optics import LHCOptics
 
@@ -84,9 +82,6 @@ class LHC:
         self.check_local_branches()
         self._repo_cache = {}
 
-    def __repr__(self):
-        return f"<LHC Repo at '{self.basedir}'>"
-
     def __dir__(self):
         othernames = []
         for name in self.branches:
@@ -104,9 +99,6 @@ class LHC:
         except KeyError:
             raise AttributeError(f"No branch or tag named {name}")
 
-    def _ipython_key_completions_(self):
-        return list(self.branches.keys()) + list(self.tags.keys())
-
     def __getitem__(self, name):
         """Get the repository for a given branch or tag"""
         if name in self._repo_cache:
@@ -116,15 +108,16 @@ class LHC:
             if not repo_dir.exists():
                 print(f"Repository {repo_dir} does not exist")
                 self.clone_repo(name)
-            self._repo_cache[name] = LHCRepo(name, repo_dir)
+            self._repo_cache[name] = LHCRepo(name, repo_dir, parent=self)
             return self._repo_cache[name]
         else:
             raise KeyError(f"No branch or tag named {name}")
 
-    def refresh(self):
-        """Refresh the repository"""
-        self._repo_cache.clear()
-        self.check_local_branches(force_update=True)
+    def _ipython_key_completions_(self):
+        return list(self.branches.keys()) + list(self.tags.keys())
+
+    def __repr__(self):
+        return f"<LHC Repo at '{self.basedir}'>"
 
     def check_local_branches(self, dry_run=False, force_update=False):
         """
@@ -148,9 +141,7 @@ class LHC:
         """
         Get the list of branches in the repository
         """
-        cache_file_good = self.cache_file.exists() and file_one_day_old(
-            self.cache_file
-        )
+        cache_file_good = self.cache_file.exists() and file_one_day_old(self.cache_file)
         if force_update or not cache_file_good:
             print("Getting branches and tags from gitlab")
             cache = gitlab_get_branches_and_tags(
@@ -188,18 +179,20 @@ class LHC:
             print(f"Cloning repository {repo_dir}")
             git_clone_repo(git_url, repo_dir, branch_or_tag)
 
+    def refresh(self):
+        """Refresh the repository"""
+        self._repo_cache.clear()
+        self.check_local_branches(force_update=True)
+
 
 class LHCRepo:
     """LHC optics for a specific branch or tag"""
 
-    def __init__(
-        self,
-        name,
-        basedir,
-    ):
+    def __init__(self, name, basedir, parent=None):
         self.name = str(name)
         self.basedir = Path(basedir)
         self.yaml = self.basedir / "scenarios" / "readme.yaml"
+        self.parent = parent
         self.refresh()
 
     def __repr__(self):
@@ -214,11 +207,7 @@ class LHCRepo:
             raise AttributeError(f"No cycle or set named {name}")
 
     def __dir__(self):
-        return (
-            super().__dir__()
-            + list(self.cycles.keys())
-            + list(self.sets.keys())
-        )
+        return super().__dir__() + list(self.cycles.keys()) + list(self.sets.keys())
 
     def read_data(self):
         if self.yaml.exists():
@@ -281,15 +270,11 @@ class LHCRepo:
             )
         return sets
 
-    def add_cycle(
-        self, name, label=None, particles=None, charges=None, masses=None
-    ):
+    def add_cycle(self, name, label=None, particles=None, charges=None, masses=None):
         """Add a new cycle to the repository"""
         if name in self.cycles:
             raise ValueError(f"Cycle {name} already exists")
-        (self.basedir / "scenarios" / "cycle" / name).mkdir(
-            parents=True, exist_ok=True
-        )
+        (self.basedir / "scenarios" / "cycle" / name).mkdir(parents=True, exist_ok=True)
         cycle = LHCCycle(
             name=name,
             basedir=self.basedir / "scenarios" / "cycle" / name,
@@ -308,9 +293,7 @@ class LHCRepo:
         """Add a new optics set to the repository"""
         if name in self.cycles:
             raise ValueError(f"Optics set {name} already exists")
-        (self.basedir / "scenarios" / "set" / name).mkdir(
-            parents=True, exist_ok=True
-        )
+        (self.basedir / "scenarios" / "set" / name).mkdir(parents=True, exist_ok=True)
         optics_set = LHCOpticsSet(
             name=name,
             basedir=self.basedir / "scenarios" / "set" / name,
@@ -339,6 +322,10 @@ class LHCRepo:
 
     def get_xsuite_json(self):
         return self.basedir / "xsuite" / "lhc.json"
+
+    def get_xsuite_env(self):
+        import xtrack as xt
+        return xt.Environment.from_json(self.get_xsuite_json())
 
 
 class LHCCycle:
@@ -380,9 +367,7 @@ class LHCCycle:
         return super().__dir__() + list(self.beam_processes.keys())
 
     def __repr__(self):
-        return (
-            f"<Cycle {self.name!r} {len(self.beam_processes)} beam_processes>"
-        )
+        return f"<Cycle {self.name!r} {len(self.beam_processes)} beam_processes>"
 
     def get_fills(self, lhcrun):
         bp_to_match = [bp.name for bp in self.beam_processes]
@@ -459,6 +444,10 @@ class LHCCycle:
             process.gen_data_from_lsa()
         self.save_data()
 
+    def gen_eos_data(self):
+        for process in self.beam_processes.values():
+            process.gen_eos_data()
+
 
 class LHCProcess:
     knob_blacklist = set(
@@ -507,12 +496,42 @@ class LHCProcess:
         self.yaml = self.basedir / "readme.yaml"
         self.refresh()
 
+    def __getitem__(self, idx):
+        return self.get_lhcoptics(idx=idx)
+
     def __repr__(self):
         return f"<Process {self.name}:{self.beam_process!r} {len(self.optics)} optics>"
 
     @property
     def ts(self):
         return list(self.optics.keys())
+
+    def _lsa_settings_to_dict(self, lsa_settings):
+        """Convert LSA settings to a dictionary"""
+        knobs = self.parent.parent.knobs
+        settings = {}
+        for knobname, setting in sorted(lsa_settings.items()):
+            if knobname not in self.knob_blacklist:
+                tdata, vdata = setting.data
+                madname = knobs.lsa[knobname].mad
+                settings[madname] = [tdata.tolist(), vdata.tolist()]
+        return settings
+
+    def check_settings_with_lsa(self, lsa_settings=None):
+        if lsa_settings is None:
+            lsa_settings = self.get_last_settings_from_lsa(verbose=False)
+        lsa = self._lsa_settings_to_dict(lsa_settings)
+        for kk in {*lsa.keys(), *self.settings.keys()}:
+            if kk not in lsa:
+                print(f"LSA setting {kk!r} not found\n")
+            elif kk not in self.settings:
+                print(f"Setting {kk!r} not found in optics settings\n")
+            else:
+                if lsa[kk] != self.settings[kk]:
+                    print(f"Setting {kk!r} does not match LSA settings")
+                    print(f"LSA: {lsa[kk]}")
+                    print(f"Optics: {self.settings[kk]}\n")
+        return lsa == self.settings
 
     def clear_dir(self):
         """Clear the optitcs directory"""
@@ -524,6 +543,195 @@ class LHCProcess:
                         print(f"Removing {ff}")
                         os.remove(ff)
                 os.rmdir(ll)
+
+    def gen_optics_dir(self, lsa_settings=None):
+        """Generate optics directory structure"""
+        self.clear_dir()
+        for ts, name in self.optics.items():
+            optics_dir = self.basedir / str(ts)
+            optics_dir.mkdir(parents=True, exist_ok=True)
+            yaml = optics_dir / "readme.yaml"
+            charges = self.parent.charges
+            data = {
+                "name": name,
+                "settings": {},
+                "ts": ts,
+                "particles": self.parent.particles,
+                "charges": charges,
+                "masses": self.parent.masses,
+            }
+            for knobname, (tdata, vdata) in self.settings.items():
+                value = float(np.interp(ts, tdata, vdata))
+                data["settings"][knobname] = value
+
+            print(f"Writing {yaml}")
+            write_yaml(data, yaml)
+            data["energies"] = (
+                data["settings"]["nrj"] * charges[0],
+                data["settings"]["nrj"] * charges[1],
+            )
+            data["optics_path"] = f"{name}"
+            reldir = optics_dir.relative_to(self.parent.parent.basedir)
+            data["settings_path"] = reldir / "settings.madx"
+            self.gen_madx_model(data, output=optics_dir / "model.madx")
+            self.gen_madx_settings(data, output=optics_dir / "settings.madx")
+            (optics_dir / "acc-models-lhc").symlink_to(
+                "../../../../..", target_is_directory=True
+            )
+
+    def gen_eos_data(self):
+        eos_path = self.get_eos_path()
+
+        for idx, ts in enumerate(self.optics):
+            eos_ts_path = eos_path / str(ts)
+            eos_ts_path.mkdir(parents=True, exist_ok=True)
+            eos_madx_optics_path = eos_ts_path / "optics.madx"
+            eos_lhcoptics_path = eos_ts_path / "optics.json"
+            print(f"Generating optics at {eos_ts_path}")
+            opt = self.get_lhcoptics(idx=idx)
+            opt.to_json(eos_lhcoptics_path)
+            opt.to_madx(eos_madx_optics_path)
+
+            madx = self.get_madx_model(idx=idx)
+            madx.use("lhcb1")
+            madx.twiss(file=str(eos_ts_path / "twiss_lhcb1.tfs"))
+            madx.use("lhcb2")
+            madx.twiss(file=str(eos_ts_path / "twiss_lhcb2.tfs"))
+
+            # Copy the model and settings files to EOS
+            # opt = self.get_lhcoptics(idx=idx)
+            # opt.to_madx(
+
+        return eos_path
+
+    def gen_madx_model(self, data, output=None):
+        """Generate MADX files for the optics"""
+        madx = """\
+call, file="acc-models-lhc/lhc.seq";
+beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
+beam,  sequence=lhcb2, particle={particles[1]}, energy={energies[1]}, charge={charges[1]}, mass={masses[1]}, bv=-1;
+call, file="acc-models-lhc/{optics_path}";
+call, file="acc-models-lhc/{settings_path}";""".format(**data)
+        if output is None:
+            return madx
+        else:
+            with open(output, "w") as f:
+                f.write(madx)
+            print(f"Writing {output}")
+            return madx
+
+    def gen_madx_settings(self, data, output=None):
+        """Generate MADX settings file"""
+        madx = []
+        for knobname, setting in sorted(data["settings"].items()):
+            madx.append(f"{knobname}={setting};")
+        madx = "\n".join(madx)
+        if output is None:
+            return madx
+        else:
+            with open(output, "w") as f:
+                f.write(madx)
+            print(f"Writing {output}")
+            return madx
+
+    def get_eos_path(self):
+        """Get the EOS path for the given time step
+        If idx is provided, it will use the corresponding time step from self.ts.
+        """
+        relative_path = self.basedir.relative_to(self.parent.parent.parent.basedir)
+        eos_path = Path("/eos/project-a/acc-models/public/lhc/") / relative_path
+        return eos_path
+
+    def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
+        """Get the MADX model for the given time step
+        If idx is provided, it will use the corresponding time step from self.ts.
+
+        """
+        if idx is not None:
+            ts = self.ts[idx]
+        if ts in self.optics:
+            optics_dir = self.basedir / str(ts)
+            madxfile = optics_dir / "model.madx"
+            if madx is None:
+                from cpymad.madx import Madx
+
+                madx = Madx(stdout=stdout)
+                madx.chdir(str(optics_dir))
+            madx.call(str(madxfile))
+            return madx
+        else:
+            raise ValueError(f"Optics {ts} not found in {self.name}")
+
+    def get_madx_twiss(self, idx=None, ts=None, madx=None):
+        """Get the MADX twiss for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
+        madx = self.get_madx_model(ts=ts, madx=madx)
+        madx.use("lhcb1")
+        tw1 = madx.twiss()
+        madx.use("lhcb2")
+        tw2 = madx.twiss()
+        from xdeps import Table
+
+        return Table(tw1), Table(tw2)
+
+    def get_last_settings_from_lsa(self, params=None, part="target", verbose=False):
+        """Get the last setting for the given parameters"""
+        if params is None:
+            params = set(self.parent.parent.knobs.lsa) - self.knob_blacklist
+
+        out = {}
+        for param in params:
+            try:
+                if verbose:
+                    print(f"getting {param}")
+                trims = get_lsa().getLastTrim(
+                    param, beamprocess=self.beam_process, part=part
+                )
+                out[param] = trims
+            except Exception as ex:
+                if verbose:
+                    print("Empty response for '%s': %s" % (param, ex))
+        return out
+
+    def get_settings_from_lsa(
+        self, params=None, start=None, end=None, part="target", verbose=False
+    ):
+        """Get settings for the given parameters"""
+        if start is None:
+            t1 = (
+                self.parent.start
+                if self.parent.start is not None
+                else self.parent.parent.start
+            )
+
+        if end is None:
+            t2 = (
+                self.parent.end
+                if self.parent.end is not None
+                else self.parent.parent.end
+            )
+
+        if params is None:
+            params = set(self.parent.parent.knobs.lsa) - self.knob_blacklist
+
+        out = {}
+        for param in params:
+            try:
+                if verbose:
+                    print(f"getting {param}")
+                trims = get_lsa().getTrims(
+                    param,
+                    beamprocess=self.beam_process,
+                    start=t1,
+                    end=t2,
+                    part=part,
+                )
+                out.update(trims)
+            except Exception as ex:
+                if verbose:
+                    print("Empty response for '%s': %s" % (param, ex))
+        return out
 
     def read_data(self):
         if self.yaml.exists():
@@ -564,9 +772,7 @@ class LHCProcess:
 
     def set_optics_from_lsa(self):
         tbl = get_lsa().getOpticTable(self.beam_process)
-        self.optics = {
-            int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl
-        }
+        self.optics = {int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl}
         return self
 
     def set_settings_from_lsa(self):
@@ -580,160 +786,6 @@ class LHCProcess:
                 knob = knobs.lsa[knobname]
                 vdata = knob.mad_value(vdata)
                 self.settings[knob.mad] = tdata.tolist(), vdata.tolist()
-
-    def get_last_setting(self, params=None, part="target"):
-        """Get the last setting for the given parameters"""
-        if params is None:
-            params = set(self.parent.parent.knobs.lsa) - self.knob_blacklist
-
-        out = []
-        for param in params:
-            try:
-                print(f"getting {param}")
-                trims = get_lsa().getLastTrim(
-                    param, beamprocess=self.beam_process, part=part
-                )
-                out.append(trims)
-            except Exception as ex:
-                print("Empty response for '%s': %s" % (param, ex))
-        return out
-
-    def get_settings_from_lsa(
-        self, params=None, start=None, end=None, part="target"
-    ):
-        """Get settings for the given parameters"""
-        if start is None:
-            t1 = (
-                self.parent.start
-                if self.parent.start is not None
-                else self.parent.parent.start
-            )
-
-        if end is None:
-            t2 = (
-                self.parent.end
-                if self.parent.end is not None
-                else self.parent.parent.end
-            )
-
-        if params is None:
-            params = set(self.parent.parent.knobs.lsa) - self.knob_blacklist
-
-        out = {}
-        for param in params:
-            try:
-                print(f"getting {param}")
-                trims = get_lsa().getTrims(
-                    param,
-                    beamprocess=self.beam_process,
-                    start=t1,
-                    end=t2,
-                    part=part,
-                )
-                out.update(trims)
-            except Exception as ex:
-                print("Empty response for '%s': %s" % (param, ex))
-        return out
-
-    def gen_optics_dir(self, lsa_settings=None):
-        """Generate optics directory structure"""
-        self.clear_dir()
-        for ts, name in self.optics.items():
-            optics_dir = self.basedir / str(ts)
-            optics_dir.mkdir(parents=True, exist_ok=True)
-            yaml = optics_dir / "readme.yaml"
-            charges = self.parent.charges
-            data = {
-                "name": name,
-                "settings": {},
-                "ts": ts,
-                "particles": self.parent.particles,
-                "charges": charges,
-                "masses": self.parent.masses,
-            }
-            for knobname, (tdata, vdata) in self.settings.items():
-                value = float(np.interp(ts, tdata, vdata))
-                data["settings"][knobname] = value
-
-            print(f"Writing {yaml}")
-            write_yaml(data, yaml)
-            data["energies"] = (
-                data["settings"]["nrj"] * charges[0],
-                data["settings"]["nrj"] * charges[1],
-            )
-            data["optics_path"] = f"{name}"
-            reldir = optics_dir.relative_to(self.parent.parent.basedir)
-            data["settings_path"] = reldir / "settings.madx"
-            self.gen_madx_model(data, output=optics_dir / "model.madx")
-            self.gen_madx_settings(data, output=optics_dir / "settings.madx")
-            (optics_dir / "acc-models-lhc").symlink_to(
-                "../../../../..", target_is_directory=True
-            )
-
-    def gen_madx_model(self, data, output=None):
-        """Generate MADX files for the optics"""
-        madx = """\
-call, file="acc-models-lhc/lhc.seq";
-beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
-beam,  sequence=lhcb2, particle={particles[1]}, energy={energies[1]}, charge={charges[1]}, mass={masses[1]}, bv=-1;
-call, file="acc-models-lhc/{optics_path}";
-call, file="acc-models-lhc/{settings_path}";""".format(
-            **data
-        )
-        if output is None:
-            return madx
-        else:
-            with open(output, "w") as f:
-                f.write(madx)
-            print(f"Writing {output}")
-            return madx
-
-    def gen_madx_settings(self, data, output=None):
-        """Generate MADX settings file"""
-        madx = []
-        for knobname, setting in sorted(data["settings"].items()):
-            madx.append(f"{knobname}={setting};")
-        madx = "\n".join(madx)
-        if output is None:
-            return madx
-        else:
-            with open(output, "w") as f:
-                f.write(madx)
-            print(f"Writing {output}")
-            return madx
-
-    def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
-        """Get the MADX model for the given time step
-        If idx is provided, it will use the corresponding time step from self.ts.
-
-        """
-        if idx is not None:
-            ts = self.ts[idx]
-        if ts in self.optics:
-            optics_dir = self.basedir / str(ts)
-            madxfile = optics_dir / "model.madx"
-            if madx is None:
-                from cpymad.madx import Madx
-
-                madx = Madx(stdout=stdout)
-                madx.chdir(str(optics_dir))
-            madx.call(str(madxfile))
-            return madx
-        else:
-            raise ValueError(f"Optics {ts} not found in {self.name}")
-
-    def get_madx_twiss(self, idx=None, ts=None, madx=None):
-        """Get the MADX twiss for the given time step"""
-        if idx is not None:
-            ts = self.ts[idx]
-        madx = self.get_madx_model(ts=ts, madx=madx)
-        madx.use("lhcb1")
-        tw1 = madx.twiss()
-        madx.use("lhcb2")
-        tw2 = madx.twiss()
-        from xdeps import Table
-
-        return Table(tw1), Table(tw2)
 
     def check_madx(self, idx=None, ts=None, madx=None):
         """Check the MADX model for the given time step"""
@@ -750,8 +802,10 @@ call, file="acc-models-lhc/{settings_path}";""".format(
         self.save_data()
         self.gen_optics_dir()
 
-    def get_lhcoptics(self, ts, xsuite=True):
+    def get_lhcoptics(self, idx=None, ts=None, xsuite=True):
         """Get the LHC optics for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
         madx = self.get_madx_model(ts=ts)
         name = f"{self.parent.name}_{self.name}_{ts}"
         if xsuite is True:
@@ -766,9 +820,23 @@ call, file="acc-models-lhc/{settings_path}";""".format(
         opt.set_params()
         return opt
 
-    def __getitem__(self, idx):
-        ts = list(self.optics.keys())[idx]
-        return self.get_lhcoptics(ts)
+    def get_lhcoptics_from_eos(self, idx=None, ts=None, xsuite=True):
+        """Get the LHC optics for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
+        eos_path = self.get_eos_path()
+        if eos_path.exists():
+            eos_optics = eos_path / str(ts) / "optics.json"
+            if eos_optics.exists():
+                opt=LHCOptics.from_json(eos_optics)
+                if xsuite is True:
+                    xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
+                    opt.set_xsuite_model(xsuite_model)
+            else:
+                raise FileNotFoundError(
+                    f"Optics file {eos_optics} does not exist"
+                )
+        return opt
 
 
 class LHCOpticsSet:
@@ -1024,9 +1092,7 @@ class LHCRun:
 
     def set_fills(self):
         self.fills = {}
-        fills = get_lsa().findBeamProcessHistory(
-            self.t1, self.t2, accelerator="lhc"
-        )
+        fills = get_lsa().findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
         for filln, bp_list in fills.items():
             # beam_processes=[(ts,bp.split('@')[0]) for ts,bp in bp_list]
             beam_processes = [(ts, bp) for ts, bp in bp_list]

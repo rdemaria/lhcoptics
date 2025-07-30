@@ -22,3 +22,10 @@ dependencies = [
 
 [tool.black]
 line-length = 79
+
+[tool.ruff.lint]
+select = ["RUF100"]
+
+
+[tool.flake8]
+use_class_attributes_order_strict_mode = true

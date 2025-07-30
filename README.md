@@ -133,16 +133,15 @@ Repository objects have the following methods
 
 ## Generating scenario directory
 
-See `examples/repo/job_add_cycles.py`
+See `examples/repo/job_add_cycles.py`.
 
 
 ## TODO
 
-- add check and comparisons with LSA
 - add extra 2025 MD cycles
 - compile optics files in EOS
-    - madx files for madx/ native xsuits
-    - LHCOptics json for the phytho library
+    - madx files for madx/native xsuite
+    - LHCOptics json for the python library
 - add twiss tables in EOS
 - LHCOptics for hl optics
     - for the knobs use class approach based on some euristic in from_madx
