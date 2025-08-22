@@ -521,7 +521,7 @@ class LHCIR(LHCSection):
                 match.disable(vary_name=kl)
                 match.disable(vary_name=kr)
 
-        if self.parent.params["match_inj"]:
+        if self.parent.params.get("match_inj"):
             if self.name == "ir2" or self.name == "ir8":
                 match.disable(vary_name="kt?qx.*")
                 self.parent.model[f"kqx.l{self.irn}"] = 0.950981581300e-02
