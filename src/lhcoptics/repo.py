@@ -445,10 +445,9 @@ class LHCCycle:
             process.gen_data_from_lsa()
         self.save_data()
 
-    def gen_eos_data(self, eos_path=None):
+    def gen_eos_data(self, eos_repo_path=None):
         for process in self.beam_processes.values():
-            process.gen_eos_data(eos_path=eos_path)
-
+            process.gen_eos_data(eos_repo_path=eos_repo_path)
 
 class LHCProcess:
     knob_blacklist = set(
@@ -560,11 +559,13 @@ class LHCProcess:
         self.save_data()
         self.gen_optics_dir()
 
-    def gen_eos_data(self, eos_path=None):
-        if eos_path is None:
-            eos_path = self.get_eos_path()
-        else:
-            eos_path = Path(eos_path)
+    def gen_eos_data(self, eos_repo_path=None):
+        """
+        Generate EOS data for the given time step
+
+        - eos_repo_path: is the root of the repository in EOS
+        """
+        eos_path = self.get_eos_path(eos_repo_path=eos_repo_path)
 
         for idx, ts in enumerate(self.optics):
             eos_ts_path = eos_path / str(ts)
@@ -653,16 +654,17 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
                 "../../../../..", target_is_directory=True
             )
 
-    def get_eos_path(self):
+    def get_eos_path(self, eos_repo_path=None):
         """Get the EOS path for the given time step
         If idx is provided, it will use the corresponding time step from self.ts.
         """
         repo = self.parent.parent
-        relative_path = self.basedir.relative_to(repo.basedir)
-        eos_path = (
-            Path("/eos/project-a/acc-models/public/lhc/") / repo.name / relative_path
-        )
-        return eos_path
+        time_step_relative_path = self.basedir.relative_to(repo.basedir)
+        if eos_repo_path is None:
+            eos_repo_path = Path("/eos/project-a/acc-models/public/lhc/") / repo.name
+        else:
+            eos_repo_path = Path(eos_repo_path)
+        return eos_repo_path/time_step_relative_path
 
     def get_lhcoptics(self, idx=None, ts=None, xsuite=True):
         """Get the LHC optics for the given time step"""
@@ -709,11 +711,8 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             optics_dir = self.basedir / str(ts)
             # madxfile = optics_dir / "model.madx"
             madxfile = "model.madx"
-            print(optics_dir)
-            print(madxfile)
             if madx is None:
                 from cpymad.madx import Madx
-
                 madx = Madx(stdout=stdout)
             madx.chdir(str(optics_dir))
             madx.call(str(madxfile))
