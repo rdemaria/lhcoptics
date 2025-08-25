@@ -652,12 +652,14 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             ts = self.ts[idx]
         if ts in self.optics:
             optics_dir = self.basedir / str(ts)
-            madxfile = optics_dir / "model.madx"
+            #madxfile = optics_dir / "model.madx"
+            madxfile = "model.madx"
+            print(optics_dir)
+            print(madxfile)
             if madx is None:
                 from cpymad.madx import Madx
-
                 madx = Madx(stdout=stdout)
-                madx.chdir(str(optics_dir))
+            madx.chdir(str(optics_dir))
             madx.call(str(madxfile))
             return madx
         else:
