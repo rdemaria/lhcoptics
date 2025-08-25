@@ -37,6 +37,7 @@ from .utils import (
     git_push,
 )
 from .optics import LHCOptics
+from .model_xsuite import LHCXsuiteModel
 
 
 default_basedir = os.getenv(
@@ -239,6 +240,11 @@ class LHCRepo:
             "cycles": list(self.cycles),
             "sets": list(self.sets),
         }
+
+    def gen_eos_data(self, eos_repo_path=None):
+        for cycle in self.cycles.values():
+            for process in cycle.beam_processes.values():
+                process.gen_eos_data(eos_repo_path=eos_repo_path)
 
     def get_knobs(self):
         fn = self.basedir / "operation" / "knobs.txt"
@@ -567,25 +573,29 @@ class LHCProcess:
         """
         eos_path = self.get_eos_path(eos_repo_path=eos_repo_path)
 
+        xsuite_model=LHCXsuiteModel.from_json(self.parent.parent.get_xsuite_json())
+
+
         for idx, ts in enumerate(self.optics):
             eos_ts_path = eos_path / str(ts)
             eos_ts_path.mkdir(parents=True, exist_ok=True)
             eos_madx_optics_path = eos_ts_path / "optics.madx"
             eos_lhcoptics_path = eos_ts_path / "optics.json"
-            print(f"Generating optics at {eos_ts_path}")
-            opt = self.get_lhcoptics(idx=idx)
-            opt.to_json(eos_lhcoptics_path)
-            opt.to_madx(eos_madx_optics_path)
-
-            madx = self.get_madx_model(idx=idx)
+            
+            madx=self.get_madx_model(idx=idx)
+            print(f"Generating {eos_ts_path}/twiss_lhcb1.tfs")
             madx.use("lhcb1")
-            madx.twiss(file=str(eos_ts_path / "twiss_lhcb1.tfs"))
+            madx.twiss(file=str("twiss_lhcb1.tfs"))
+            print(f"Generating {eos_ts_path}/twiss_lhcb2.tfs")
             madx.use("lhcb2")
-            madx.twiss(file=str(eos_ts_path / "twiss_lhcb2.tfs"))
+            madx.twiss(file=str("twiss_lhcb2.tfs"))
 
-            # Copy the model and settings files to EOS
-            # opt = self.get_lhcoptics(idx=idx)
-            # opt.to_madx(
+            name=f"{self.parent.name}_{self.name}_{ts}"
+            opt=LHCOptics.from_madx(madx=madx,name=name,xsuite_model=xsuite_model)
+            print(f"Generating {eos_lhcoptics_path}")
+            opt.to_json(eos_lhcoptics_path)
+            print(f"Generating {eos_madx_optics_path}")
+            opt.to_madx(eos_madx_optics_path)
 
         return eos_path
 
@@ -673,7 +683,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         madx = self.get_madx_model(ts=ts)
         name = f"{self.parent.name}_{self.name}_{ts}"
         if xsuite is True:
-            xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
+            xsuite_model = self.parent.parent.get_xsuite_json()
         else:
             xsuite_model = None
         opt = LHCOptics.from_madx(
@@ -694,7 +704,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             if eos_optics.exists():
                 opt = LHCOptics.from_json(eos_optics)
                 if xsuite is True:
-                    xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
+                    xsuite_model = self.parent.parent.get_xsuite_json()
                     opt.set_xsuite_model(xsuite_model)
             else:
                 raise FileNotFoundError(f"Optics file {eos_optics} does not exist")
@@ -709,7 +719,6 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             ts = self.ts[idx]
         if ts in self.optics:
             optics_dir = self.basedir / str(ts)
-            # madxfile = optics_dir / "model.madx"
             madxfile = "model.madx"
             if madx is None:
                 from cpymad.madx import Madx
