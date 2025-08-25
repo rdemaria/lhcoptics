@@ -638,8 +638,9 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         """Get the EOS path for the given time step
         If idx is provided, it will use the corresponding time step from self.ts.
         """
-        relative_path = self.basedir.relative_to(self.parent.parent.parent.basedir)
-        eos_path = Path("/eos/project-a/acc-models/public/lhc/") / relative_path
+        repo=self.parent.parent
+        relative_path = self.basedir.relative_to(repo.basedir)
+        eos_path = Path("/eos/project-a/acc-models/public/lhc/") / repo.name /relative_path
         return eos_path
 
     def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
