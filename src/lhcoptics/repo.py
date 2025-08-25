@@ -325,6 +325,7 @@ class LHCRepo:
 
     def get_xsuite_env(self):
         import xtrack as xt
+
         return xt.Environment.from_json(self.get_xsuite_json())
 
 
@@ -444,9 +445,9 @@ class LHCCycle:
             process.gen_data_from_lsa()
         self.save_data()
 
-    def gen_eos_data(self):
+    def gen_eos_data(self, eos_path=None):
         for process in self.beam_processes.values():
-            process.gen_eos_data()
+            process.gen_eos_data(eos_path=eos_path)
 
 
 class LHCProcess:
@@ -517,6 +518,14 @@ class LHCProcess:
                 settings[madname] = [tdata.tolist(), vdata.tolist()]
         return settings
 
+    def check_madx(self, idx=None, ts=None, madx=None):
+        """Check the MADX model for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
+        tw1, tw2 = self.get_madx_twiss(ts=ts, madx=madx)
+        tw1.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
+        tw2.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
+
     def check_settings_with_lsa(self, lsa_settings=None):
         if lsa_settings is None:
             lsa_settings = self.get_last_settings_from_lsa(verbose=False)
@@ -544,43 +553,18 @@ class LHCProcess:
                         os.remove(ff)
                 os.rmdir(ll)
 
-    def gen_optics_dir(self, lsa_settings=None):
-        """Generate optics directory structure"""
-        self.clear_dir()
-        for ts, name in self.optics.items():
-            optics_dir = self.basedir / str(ts)
-            optics_dir.mkdir(parents=True, exist_ok=True)
-            yaml = optics_dir / "readme.yaml"
-            charges = self.parent.charges
-            data = {
-                "name": name,
-                "settings": {},
-                "ts": ts,
-                "particles": self.parent.particles,
-                "charges": charges,
-                "masses": self.parent.masses,
-            }
-            for knobname, (tdata, vdata) in self.settings.items():
-                value = float(np.interp(ts, tdata, vdata))
-                data["settings"][knobname] = value
+    def gen_data_from_lsa(self):
+        """Generate the data from LSA"""
+        self.set_optics_from_lsa()
+        self.set_settings_from_lsa()
+        self.save_data()
+        self.gen_optics_dir()
 
-            print(f"Writing {yaml}")
-            write_yaml(data, yaml)
-            data["energies"] = (
-                data["settings"]["nrj"] * charges[0],
-                data["settings"]["nrj"] * charges[1],
-            )
-            data["optics_path"] = f"{name}"
-            reldir = optics_dir.relative_to(self.parent.parent.basedir)
-            data["settings_path"] = reldir / "settings.madx"
-            self.gen_madx_model(data, output=optics_dir / "model.madx")
-            self.gen_madx_settings(data, output=optics_dir / "settings.madx")
-            (optics_dir / "acc-models-lhc").symlink_to(
-                "../../../../..", target_is_directory=True
-            )
-
-    def gen_eos_data(self):
-        eos_path = self.get_eos_path()
+    def gen_eos_data(self, eos_path=None):
+        if eos_path is None:
+            eos_path = self.get_eos_path()
+        else:
+            eos_path = Path(eos_path)
 
         for idx, ts in enumerate(self.optics):
             eos_ts_path = eos_path / str(ts)
@@ -634,14 +618,85 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             print(f"Writing {output}")
             return madx
 
+    def gen_optics_dir(self, lsa_settings=None):
+        """Generate optics directory structure"""
+        self.clear_dir()
+        for ts, name in self.optics.items():
+            optics_dir = self.basedir / str(ts)
+            optics_dir.mkdir(parents=True, exist_ok=True)
+            yaml = optics_dir / "readme.yaml"
+            charges = self.parent.charges
+            data = {
+                "name": name,
+                "settings": {},
+                "ts": ts,
+                "particles": self.parent.particles,
+                "charges": charges,
+                "masses": self.parent.masses,
+            }
+            for knobname, (tdata, vdata) in self.settings.items():
+                value = float(np.interp(ts, tdata, vdata))
+                data["settings"][knobname] = value
+
+            print(f"Writing {yaml}")
+            write_yaml(data, yaml)
+            data["energies"] = (
+                data["settings"]["nrj"] * charges[0],
+                data["settings"]["nrj"] * charges[1],
+            )
+            data["optics_path"] = f"{name}"
+            reldir = optics_dir.relative_to(self.parent.parent.basedir)
+            data["settings_path"] = reldir / "settings.madx"
+            self.gen_madx_model(data, output=optics_dir / "model.madx")
+            self.gen_madx_settings(data, output=optics_dir / "settings.madx")
+            (optics_dir / "acc-models-lhc").symlink_to(
+                "../../../../..", target_is_directory=True
+            )
+
     def get_eos_path(self):
         """Get the EOS path for the given time step
         If idx is provided, it will use the corresponding time step from self.ts.
         """
-        repo=self.parent.parent
+        repo = self.parent.parent
         relative_path = self.basedir.relative_to(repo.basedir)
-        eos_path = Path("/eos/project-a/acc-models/public/lhc/") / repo.name /relative_path
+        eos_path = (
+            Path("/eos/project-a/acc-models/public/lhc/") / repo.name / relative_path
+        )
         return eos_path
+
+    def get_lhcoptics(self, idx=None, ts=None, xsuite=True):
+        """Get the LHC optics for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
+        madx = self.get_madx_model(ts=ts)
+        name = f"{self.parent.name}_{self.name}_{ts}"
+        if xsuite is True:
+            xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
+        else:
+            xsuite_model = None
+        opt = LHCOptics.from_madx(
+            madx=madx,
+            name=name,
+            xsuite_model=xsuite_model,
+        )
+        opt.set_params()
+        return opt
+
+    def get_lhcoptics_from_eos(self, idx=None, ts=None, xsuite=True):
+        """Get the LHC optics for the given time step"""
+        if idx is not None:
+            ts = self.ts[idx]
+        eos_path = self.get_eos_path()
+        if eos_path.exists():
+            eos_optics = eos_path / str(ts) / "optics.json"
+            if eos_optics.exists():
+                opt = LHCOptics.from_json(eos_optics)
+                if xsuite is True:
+                    xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
+                    opt.set_xsuite_model(xsuite_model)
+            else:
+                raise FileNotFoundError(f"Optics file {eos_optics} does not exist")
+        return opt
 
     def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
         """Get the MADX model for the given time step
@@ -652,12 +707,13 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             ts = self.ts[idx]
         if ts in self.optics:
             optics_dir = self.basedir / str(ts)
-            #madxfile = optics_dir / "model.madx"
+            # madxfile = optics_dir / "model.madx"
             madxfile = "model.madx"
             print(optics_dir)
             print(madxfile)
             if madx is None:
                 from cpymad.madx import Madx
+
                 madx = Madx(stdout=stdout)
             madx.chdir(str(optics_dir))
             madx.call(str(madxfile))
@@ -789,57 +845,6 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
                 knob = knobs.lsa[knobname]
                 vdata = knob.mad_value(vdata)
                 self.settings[knob.mad] = tdata.tolist(), vdata.tolist()
-
-    def check_madx(self, idx=None, ts=None, madx=None):
-        """Check the MADX model for the given time step"""
-        if idx is not None:
-            ts = self.ts[idx]
-        tw1, tw2 = self.get_madx_twiss(ts=ts, madx=madx)
-        tw1.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
-        tw2.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
-
-    def gen_data_from_lsa(self):
-        """Generate the data from LSA"""
-        self.set_optics_from_lsa()
-        self.set_settings_from_lsa()
-        self.save_data()
-        self.gen_optics_dir()
-
-    def get_lhcoptics(self, idx=None, ts=None, xsuite=True):
-        """Get the LHC optics for the given time step"""
-        if idx is not None:
-            ts = self.ts[idx]
-        madx = self.get_madx_model(ts=ts)
-        name = f"{self.parent.name}_{self.name}_{ts}"
-        if xsuite is True:
-            xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
-        else:
-            xsuite_model = None
-        opt = LHCOptics.from_madx(
-            madx=madx,
-            name=name,
-            xsuite_model=xsuite_model,
-        )
-        opt.set_params()
-        return opt
-
-    def get_lhcoptics_from_eos(self, idx=None, ts=None, xsuite=True):
-        """Get the LHC optics for the given time step"""
-        if idx is not None:
-            ts = self.ts[idx]
-        eos_path = self.get_eos_path()
-        if eos_path.exists():
-            eos_optics = eos_path / str(ts) / "optics.json"
-            if eos_optics.exists():
-                opt=LHCOptics.from_json(eos_optics)
-                if xsuite is True:
-                    xsuite_model = self.parent.parent.basedir / "xsuite" / "lhc.json"
-                    opt.set_xsuite_model(xsuite_model)
-            else:
-                raise FileNotFoundError(
-                    f"Optics file {eos_optics} does not exist"
-                )
-        return opt
 
 
 class LHCOpticsSet:
