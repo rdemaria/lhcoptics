@@ -252,9 +252,11 @@ class LHCRepo:
         return optics_set
 
     def gen_eos_data(self, eos_repo_path=None):
+        out = []
         for cycle in self.cycles.values():
             for process in cycle.beam_processes.values():
-                process.gen_eos_data(eos_repo_path=eos_repo_path)
+                out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
+        return out
 
     def get_cycles(self):
         cycles = {}
@@ -305,6 +307,7 @@ class LHCRepo:
 
     def get_xsuite_env(self):
         import xtrack as xt
+
         return xt.Environment.from_json(self.get_xsuite_json())
 
     def get_xsuite_model(self):
@@ -474,8 +477,10 @@ class LHCCycle:
         self.save_data()
 
     def gen_eos_data(self, eos_repo_path=None):
+        out = []
         for process in self.beam_processes.values():
-            process.gen_eos_data(eos_repo_path=eos_repo_path)
+            out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
+        return out
 
 
 class LHCProcess:
@@ -598,12 +603,15 @@ class LHCProcess:
 
         xsuite_model = self.parent.parent.get_xsuite_model()
 
+        out = []
         for idx, _ in enumerate(self.optics):
-            self.gen_optics_eos_data(
-                idx, eos_repo_path=eos_repo_path, xsuite_model=xsuite_model
+            out.extend(
+                self.gen_optics_eos_data(
+                    idx, eos_repo_path=eos_repo_path, xsuite_model=xsuite_model
+                )
             )
 
-        return eos_path
+        return out
 
     def gen_optics_eos_data(
         self, idx=None, ts=None, eos_repo_path=None, xsuite_model=None
@@ -616,7 +624,6 @@ class LHCProcess:
 
         if ts is None:
             ts = self.ts[idx]
-
 
         eos_ts_path = eos_path / str(ts)
         eos_ts_path.mkdir(parents=True, exist_ok=True)
@@ -640,6 +647,13 @@ class LHCProcess:
         opt.to_json(eos_lhcoptics_path)
         print(f"Generating {eos_madx_optics_path}")
         opt.to_madx(eos_madx_optics_path)
+        out=[
+            str(eos_madx_optics_path),
+            str(eos_lhcoptics_path),
+            str(eos_ts_path / "twiss_lhcb1.tfs"),
+            str(eos_ts_path / "twiss_lhcb2.tfs"),
+        ]
+        return out
 
     def gen_madx_model(self, data, output=None):
         """Generate MADX files for the optics"""
