@@ -39,6 +39,8 @@ from .utils import (
 from .optics import LHCOptics
 from .model_xsuite import LHCXsuiteModel
 
+P_MASS=0.938272046e9  # proton mass in eV/c2
+
 
 default_basedir = os.getenv(
     "LHCOPTICS_BASEDIR", default=Path(site.getuserbase()) / "acc-models-lhc"
@@ -227,6 +229,12 @@ class LHCRepo:
             parent=self,
         )
         cycle.label = label
+        if particles is None:
+            particles = ["proton","proton"]
+        if charges is None:
+            charges = [1,1]
+        if masses is None and particles==("proton", "proton"):
+            masses = (P_MASS, P_MASS)
         cycle.particles = particles
         cycle.charges = charges
         cycle.masses = masses
@@ -657,6 +665,8 @@ class LHCProcess:
 
     def gen_madx_model(self, data, output=None):
         """Generate MADX files for the optics"""
+        if data["masses"] is None:
+            data["masses"] = (P_MASS, P_MASS)
         madx = """\
 call, file="acc-models-lhc/lhc.seq";
 beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
@@ -843,7 +853,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         for param in params:
             try:
                 if verbose:
-                    print(f"getting {param}")
+                    print(f"getting {param} from {t1} to {t2}")
                 trims = get_lsa().getTrims(
                     param,
                     beamprocess=self.beam_process,
@@ -899,10 +909,11 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         self.optics = {int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl}
         return self
 
-    def set_settings_from_lsa(self):
+    def set_settings_from_lsa(self,lsa_settings=None):
         """Get the settings from LSA"""
         self.settings = {}
-        lsa_settings = self.get_settings_from_lsa()
+        if lsa_settings is None:
+           lsa_settings = self.get_settings_from_lsa()
         knobs = self.parent.parent.knobs
         for knobname, setting in sorted(lsa_settings.items()):
             if knobname not in self.knob_blacklist:

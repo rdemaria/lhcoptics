@@ -109,3 +109,20 @@ lhc.hl16.round.add_optics(
         "phi_ir2": 90, "phi_ir8": 90,
     }
 )
+
+
+# 2018 - Proton Physics
+lhc.y2018.add_cycle(
+    name="pp_highbeta",
+    label="High Beta Proton Physics 2018",
+    particles=["proton","proton"],
+    charges=[1,1]
+)
+lhc.y2018.pp_highbeta.refresh()
+lhc.y2018.pp_highbeta.add_process("physics","PHYSICS-6.5TeV-90m-HighB-120s-2018_V1")
+lhc.y2018.pp_highbeta.gen_data_from_lsa()
+sett=lhc.y2018.pp_highbeta.physics.get_settings_from_lsa(part="value")
+lhc.y2018.pp_highbeta.physics.set_settings_from_lsa(sett)
+lhc.y2018.pp_highbeta.physics.gen_optics_dir()
+lhc.y2018.pp_highbeta.gen_eos_data()
+
