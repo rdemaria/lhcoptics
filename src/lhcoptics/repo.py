@@ -202,7 +202,8 @@ class LHCRepo:
         self.yaml = self.basedir / "scenarios" / "readme.yaml"
         self.parent = parent
         self.refresh()
-        self.name = self.data.get("name", name)
+        self.name = str(self.data.get("name", name))
+
 
     def __repr__(self):
         return f"<LHC {self.name} '{self.basedir}', {len(self.cycles)} cycles, {len(self.sets)} sets>"
@@ -259,12 +260,41 @@ class LHCRepo:
         self.save_data()
         return optics_set
 
+    def gen_html_homepage(self):
+        """Generate the HTML homepage for the repository"""
+        html = "<html><head><title>{self.label}</title></head><body>"
+        html += f"<h1>{self.label}</h1>"
+        html += f"<p>{self.description}</p>"
+        html += "<h2>Cycles</h2>"
+        html += "<ul>"
+        for cycle in self.cycles.values():
+            cycle_path=f"scenarios/cycle/{cycle.name}"
+            link = f"<a href='{cycle_path}'>{cycle.label}</a>"
+            html += f"<li>{link}</li>"
+        html += "</ul>"
+        html += "</body></html>"
+        return html
+
+    def gen_html_pages(self):
+        """Generate the HTML pages for the repository"""
+        files=[]
+        homepage=self.gen_html_homepage()
+        eos_path = self.get_eos_path()
+        homepage_path = eos_path / "index.html"
+        with open(homepage_path, "w") as f:
+            f.write(homepage)
+        files.append(homepage_path)
+        return files
+
     def gen_eos_data(self, eos_repo_path=None):
         out = []
         for cycle in self.cycles.values():
             for process in cycle.beam_processes.values():
                 out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
         return out
+
+    def get_afs_path(self):
+        return Path("/afs/cern.ch/eng/acc-models/lhc/") / self.name
 
     def get_cycles(self):
         cycles = {}
@@ -275,6 +305,9 @@ class LHCRepo:
                 parent=self,
             )
         return cycles
+
+    def get_eos_path(self):
+        return Path("/eos/project-a/acc-models/public/lhc/") / self.name
 
     def get_knobs(self):
         fn = self.basedir / "operation" / "knobs.txt"
@@ -353,6 +386,7 @@ class LHCRepo:
         self.start = self.data.get("start", None)
         self.end = self.data.get("end", None)
         self.label = self.data.get("label", None)
+        self.description = self.data.get("description", "")
 
     def save_data(self):
         write_yaml(self.to_dict(), self.yaml)
@@ -737,7 +771,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         repo = self.parent.parent
         time_step_relative_path = self.basedir.relative_to(repo.basedir)
         if eos_repo_path is None:
-            eos_repo_path = Path("/eos/project-a/acc-models/public/lhc/") / repo.name
+            eos_repo_path = repo.get_eos_path()
         else:
             eos_repo_path = Path(eos_repo_path)
         return eos_repo_path / time_step_relative_path

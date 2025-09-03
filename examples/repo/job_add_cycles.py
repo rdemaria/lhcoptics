@@ -93,6 +93,8 @@ lhc.y2024.ions.add_process("physics","PHYSICS-6.8TeV-IONS-2024_V1")
 lhc.y2024.ions.gen_data_from_lsa()
 lhc.y2024.ions.gen_eos_data()
 
+#HL-LHC 1.6 Optics sets
+
 lhc.hl16.add_set(
     name="round",
     label="End of levelling round optics",
@@ -126,3 +128,9 @@ lhc.y2018.pp_highbeta.physics.set_settings_from_lsa(sett)
 lhc.y2018.pp_highbeta.physics.gen_optics_dir()
 lhc.y2018.pp_highbeta.gen_eos_data()
 
+
+
+# Website
+
+repo=lhc.y2025
+repo.gen_html_pages()
