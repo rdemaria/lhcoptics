@@ -39,8 +39,7 @@ from .utils import (
 from .optics import LHCOptics
 from .model_xsuite import LHCXsuiteModel
 
-P_MASS=0.938272046e9  # proton mass in eV/c2
-
+P_MASS = 0.938272046e9  # proton mass in eV/c2
 
 default_basedir = os.getenv(
     "LHCOPTICS_BASEDIR", default=Path(site.getuserbase()) / "acc-models-lhc"
@@ -173,6 +172,11 @@ class LHC:
         else:
             raise ValueError("Error creating cache file")
 
+        return f"{self.parent.git_url.replace('.git', '')}/-/tree/{self.name}"
+
+    def get_web_url(self):
+        return "https://acc-models.web.cern.ch/acc-models/lhc"
+
     def clone_repo(self, branch_or_tag):
         """
         Manually the repository given a branch or tag
@@ -204,7 +208,6 @@ class LHCRepo:
         self.refresh()
         self.name = str(self.data.get("name", name))
 
-
     def __repr__(self):
         return f"<LHC {self.name} '{self.basedir}', {len(self.cycles)} cycles, {len(self.sets)} sets>"
 
@@ -231,10 +234,10 @@ class LHCRepo:
         )
         cycle.label = label
         if particles is None:
-            particles = ["proton","proton"]
+            particles = ["proton", "proton"]
         if charges is None:
-            charges = [1,1]
-        if masses is None and particles==("proton", "proton"):
+            charges = [1, 1]
+        if masses is None and particles == ("proton", "proton"):
             masses = (P_MASS, P_MASS)
         cycle.particles = particles
         cycle.charges = charges
@@ -262,28 +265,35 @@ class LHCRepo:
 
     def gen_html_homepage(self):
         """Generate the HTML homepage for the repository"""
-        html = "<html><head><title>{self.label}</title></head><body>"
+        html = f"<html><head><title>{self.label}</title></head><body>"
         html += f"<h1>{self.label}</h1>"
         html += f"<p>{self.description}</p>"
         html += "<h2>Cycles</h2>"
         html += "<ul>"
         for cycle in self.cycles.values():
-            cycle_path=f"scenarios/cycle/{cycle.name}"
+            cycle_path = f"scenarios/cycle/{cycle.name}"
             link = f"<a href='{cycle_path}'>{cycle.label}</a>"
             html += f"<li>{link}</li>"
         html += "</ul>"
         html += "</body></html>"
         return html
 
-    def gen_html_pages(self):
+    def gen_html_pages(self, eos_repo_path=None):
         """Generate the HTML pages for the repository"""
-        files=[]
-        homepage=self.gen_html_homepage()
-        eos_path = self.get_eos_path()
-        homepage_path = eos_path / "index.html"
+        files = []
+        if eos_repo_path is None:
+            eos_repo_path = self.get_eos_path()
+        else:
+            eos_repo_path = Path(eos_repo_path)
+        homepage = self.gen_html_homepage()
+        homepage_path = eos_repo_path / "index.html"
+        print(f"Writing {homepage_path}")
         with open(homepage_path, "w") as f:
             f.write(homepage)
         files.append(homepage_path)
+        for cycle in self.cycles.values():
+            process_files = cycle.gen_html_pages(eos_repo_path=eos_repo_path)
+            files.extend(process_files)
         return files
 
     def gen_eos_data(self, eos_repo_path=None):
@@ -343,8 +353,20 @@ class LHCRepo:
                     out.append((cycle.name, process.name, ts))
         return out
 
-    def get_xsuite_json(self):
-        return self.basedir / "xsuite" / "lhc.json"
+    def get_web_url(self):
+        """Get the web URL for the repository"""
+        url="https://acc-models.web.cern.ch/acc-models/lhc"
+        return f"{url}/{self.name}"
+
+    def get_web_lhc_json_url(self):
+        return f"{self.get_web_url()}/xsuite/lhc.json"
+
+    def get_xsuite_json(self, basedir=None):
+        if basedir is None:
+            basedir = self.basedir
+        else:
+            basedir = Path(basedir)
+        return basedir / "xsuite" / "lhc.json"
 
     def get_xsuite_env(self):
         import xtrack as xt
@@ -443,58 +465,6 @@ class LHCCycle:
     def __repr__(self):
         return f"<Cycle {self.name!r} {len(self.beam_processes)} beam_processes>"
 
-    def get_fills(self, lhcrun):
-        bp_to_match = [bp.name for bp in self.beam_processes]
-
-        def match(fill):
-            fillbp = set([bp.split("@")[0] for ts, bp in fill.beam_processes])
-            return all([bp in fillbp for bp in bp_to_match])
-
-        return sorted([ff.filln for ff in lhcrun.fills.values() if match(ff)])
-
-    def read_data(self):
-        if self.yaml.exists():
-            return read_yaml(self.yaml)
-        else:
-            print(f"Cycle data file {self.yaml} does not exist")
-            return {}
-
-    def refresh(self, data=None):
-        if data is None:
-            data = self.read_data()
-        self.data = data
-        self.beam_processes = {}
-        for process in self.data.get("beam_processes", []):
-            self.beam_processes[process] = LHCProcess(
-                name=process,
-                basedir=self.basedir / process,
-                parent=self,
-            )
-        self.start = self.data.get("start")
-        self.end = self.data.get("end")
-        self.particles = self.data.get("particles", (None, None))
-        self.charges = self.data.get("charges", (1, 1))
-        self.masses = self.data.get("masses", (0.938272046, 0.938272046))
-        self.label = self.data.get("label", None)
-        self.optics = self.data.get("optics", {})
-
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "label": self.label,
-            "start": self.start,
-            "end": self.end,
-            "particles": self.particles,
-            "charges": self.charges,
-            "masses": self.masses,
-            "beam_processes": list(self.beam_processes),
-            "optics": self.optics,
-        }
-
-    def save_data(self):
-        data = self.to_dict()
-        write_yaml(data, self.yaml)
-
     def add_process(self, name, beam_process, label=None):
         """Add a new process to the cycle"""
         if name in self.beam_processes:
@@ -523,6 +493,117 @@ class LHCCycle:
         for process in self.beam_processes.values():
             out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
         return out
+
+    def gen_html_homepage(self):
+        """Generate the HTML homepage for the cycle"""
+        linkrepo = f"<a href='../../../'>{self.parent.label}</a>"
+        html = (
+            f"<html><head><title>{self.parent.label}/{self.label}</title></head><body>"
+        )
+        html += f"<h1>{linkrepo}/{self.label}</h1>"
+        html += f"<p>{self.description}</p>"
+        html += f"<h2>Beams</h2>"
+        html += "<ul>"
+        for i in range(len(self.particles)):
+            html += f"<li>Beam {i + 1}:  {self.particles[i]}, charge {self.charges[i]} e, mass {self.masses[i]} GeV/c2</li>"
+        html += "</ul>"
+        html += "<h2>Beam Processes</h2>"
+        # make beam process table with links, duration, and beam process name
+        html += "<table>"
+        html += "<tr><th>Process</th><th>Duration</th><th>Beam Process</th></tr>"
+        for process in self.beam_processes.values():
+            process_path = f"{process.name}"
+            link = f"<a href='{process_path}'>{process.label}</a>"
+            html += f"<tr><td>{link}</td><td>{process.duration}</td><td>{process.beam_process}</td></tr>"
+        html += "</table>"
+        html += "</body></html>"
+        return html
+
+    def gen_html_pages(self, eos_repo_path=None):
+        """Generate the HTML pages for the cycle"""
+        files = []
+        homepage = self.gen_html_homepage()
+        eos_cycle_path = self.get_eos_path(eos_repo_path)
+        homepage_path = eos_cycle_path / "index.html"
+        print(f"Writing {homepage_path}")
+        with open(homepage_path, "w") as f:
+            f.write(homepage)
+        files.append(homepage_path)
+        for process in self.beam_processes.values():
+            process_files = process.gen_html_pages(eos_repo_path=eos_repo_path)
+            files.extend(process_files)
+        return files
+
+    def get_eos_path(self, eos_repo_path=None):
+        """Get the EOS path for the cycle"""
+        if eos_repo_path is None:
+            repo = self.parent
+            eos_repo_path = repo.get_eos_path()
+        else:
+            eos_repo_path = Path(eos_repo_path)
+        cycle_path = eos_repo_path / "scenarios" / "cycle" / self.name
+        return cycle_path
+
+    def get_fills(self, lhcrun):
+        bp_to_match = [bp.name for bp in self.beam_processes]
+
+        def match(fill):
+            fillbp = set([bp.split("@")[0] for ts, bp in fill.beam_processes])
+            return all([bp in fillbp for bp in bp_to_match])
+
+        return sorted([ff.filln for ff in lhcrun.fills.values() if match(ff)])
+
+    def get_web_url(self):
+        """Get the web URL for the cycle"""
+        repo = f"{self.parent.get_web_url()}/scenarios/cycle/{self.name}"
+        return repo
+
+    def read_data(self):
+        if self.yaml.exists():
+            return read_yaml(self.yaml)
+        else:
+            print(f"Cycle data file {self.yaml} does not exist")
+            return {}
+
+    def refresh(self, data=None):
+        if data is None:
+            data = self.read_data()
+        self.data = data
+        self.beam_processes = {}
+        for process in self.data.get("beam_processes", []):
+            self.beam_processes[process] = LHCProcess(
+                name=process,
+                basedir=self.basedir / process,
+                parent=self,
+            )
+        self.start = self.data.get("start")
+        self.end = self.data.get("end")
+        self.particles = self.data.get("particles", ("proton", "proton"))
+        self.charges = self.data.get("charges", (1, 1))
+        self.masses = self.data.get("masses", (0.938272046, 0.938272046))
+        self.label = self.data.get("label", "")
+        self.description = self.data.get("description", "")
+        self.optics = self.data.get("optics", {})
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "start": self.start,
+            "end": self.end,
+            "particles": self.particles,
+            "charges": self.charges,
+            "masses": self.masses,
+            "beam_processes": list(self.beam_processes),
+            "optics": self.optics,
+        }
+
+    def save_data(self, level=0):
+        data = self.to_dict()
+        write_yaml(data, self.yaml)
+        if level > 0:
+            for process in self.beam_processes.values():
+                process.save_data()
 
 
 class LHCProcess:
@@ -582,6 +663,10 @@ class LHCProcess:
     def ts(self):
         return list(self.optics.keys())
 
+    @property
+    def duration(self):
+        return max(self.optics.keys())
+
     def _lsa_settings_to_dict(self, lsa_settings):
         """Convert LSA settings to a dictionary"""
         knobs = self.parent.parent.knobs
@@ -635,14 +720,236 @@ class LHCProcess:
         self.save_data()
         self.gen_optics_dir()
 
+    def gen_html_homepage(self, plot="yaml_plotly"):
+        """Generate the HTML homepage for the process"""
+        linkrepo = f"<a href='../../..'>{self.parent.parent.label}</a>"
+        linkcycle = f"<a href='../'>{self.parent.label}</a>"
+        # Start page
+        html = "<html>\n"
+        # Start head
+        html += "  <head>\n"
+        html += f"    <title>{self.parent.parent.label}/{self.parent.label}/{self.label}</title>\n"
+        if plot == "yaml_plotly":
+            html += (
+                "    <script src=\"https://cdn.plot.ly/plotly-2.20.0.min.js\"></script>\n"
+                "    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js\"></script>\n"
+            )
+        # end head
+        html += "  </head>\n"
+        # Start body
+        html += "  <body>\n"
+        html += f"    <h1>{linkrepo}/{linkcycle}/{self.label}</h1>\n"
+        html += f"    <p>{self.description}</p>\n"
+        html += f"    <h2>Beam Process: {self.beam_process}</h2>\n"
+        html += f"    <h2>Duration: {self.duration} s</h2>\n"
+        html += "    <h2>Optics</h2>\n"
+        # make optics table with links and time step
+        html += "    <table>\n"
+        html += "      <tr>\n"
+        for head in [
+            "Time Step [s]",
+            "Optics definition",
+            "MadX Model",
+            "Settings",
+            "Full Model",
+            "Twiss Table",
+            "Xsuite Script",
+        ]:
+            html += f"        <th>{head}</th>\n"
+        html += "      </tr>\n"
+        for ts, optics in self.optics.items():
+            html += "      <tr>\n"
+            # TS
+            optics_path = f"{ts}"
+            link = f"<a href='{optics_path}'>{ts}</a>"
+            html += f"        <td>{link}</td>\n"
+            # Name
+            reporoot = Path("../../../../")
+            optics_def_path = reporoot / f"{optics}"
+            link = f"<a href='{optics_def_path}'>{optics_def_path.stem}</a>"
+            html += f"        <td>{link}</td>\n"
+            # Model
+            optics_model_path = optics_path + "/model.madx"
+            link = f"<a href='{optics_model_path}'>model</a>"
+            html += f"        <td>{link}</td>\n"
+            # Settings
+            optics_settings_path = optics_path + "/settings.madx"
+            link = f"<a href='{optics_settings_path}'>settings</a>"
+            html += f"        <td>{link}</td>\n"
+            # Full Model
+            optics_full_model_path = optics_path + "/optics.madx"
+            link = f"<a href='{optics_full_model_path}'>optics</a>"
+            html += f"        <td>{link}</td>\n"
+            # Twiss Table
+            optics_twiss_path1 = optics_path + "/twiss_lhcb1.tfs"
+            optics_twiss_path2 = optics_path + "/twiss_lhcb2.tfs"
+            link = f"<a href='{optics_twiss_path1}'>b1</a> <a href='{optics_twiss_path2}'>b2</a>"
+            html += f"        <td>{link}</td>\n"
+            # Xsuite Script
+            optics_xsuite_path = optics_path + "/xsuite.py"
+            link = f"<a href='{optics_xsuite_path}'>xsuite</a>"
+            html += f"        <td>{link}</td>\n"
+            # End Table
+            html += "      </tr>\n"
+        html += "    </table>\n"
+        # settings table with plots
+        html += "    <h2>Settings</h2>\n"
+        html += "    <table>\n"
+        html += "      <tr><th>Name</th><th>LSA Name</th><th>Plot</th></tr>\n"
+        for name in sorted(self.settings.keys()):
+            if plot == "inplace_svg":
+                htmlplot = self.gen_html_setting_inplace_svg_plot(name)
+            elif plot == "yaml_plotly":
+                htmlplot = (
+                    f'<img class="plotly-from-yaml" width="320" height="180" data-key="{name}" data-yaml="readme.yaml" alt="{name}"/>\n'
+                )
+            else:
+                raise ValueError(f"Unknown plot type {plot}")
+            lsa_name = self.parent.parent.knobs.mad[name].lsa
+            html += f"      <tr><td>{name}</td><td>{lsa_name}</td><td>{htmlplot}</td></tr>\n"
+        html += "    </table>\n"
+        if plot == "yaml_plotly":
+            html+="""
+<script>
+(async function () {
+  // Group all placeholders by YAML path so we fetch each file only once
+  const groups = new Map();
+  for (const img of document.querySelectorAll("img.plotly-from-yaml")) {
+    const yaml = img.dataset.yaml || "readme.yaml";
+    if (!groups.has(yaml)) groups.set(yaml, []);
+    groups.get(yaml).push(img);
+  }
+
+  for (const [yamlPath, imgs] of groups.entries()) {
+    try {
+      const resp = await fetch(yamlPath);
+      const yamlText = await resp.text();
+      const parsed = jsyaml.load(yamlText) || {};
+      const settings = parsed.settings || {};
+
+      for (const img of imgs) {
+        const key = img.dataset.key || img.alt || "";
+        const pair = settings[key]; // expected: [[t0,t1,...],[v0,v1,...]]
+        if (!Array.isArray(pair) || pair.length !== 2 ||
+            !Array.isArray(pair[0]) || !Array.isArray(pair[1])) {
+          console.warn(`No valid data for key "${key}" in ${yamlPath}`);
+          continue;
+        }
+
+        const x = pair[0];
+        const y = pair[1];
+
+        // Create a div with the same footprint as the image, then swap
+        const div = document.createElement("div");
+        const w = img.getAttribute("width")  || img.width  || 320;
+        const h = img.getAttribute("height") || img.height || 180;
+        div.style.width  = (typeof w === "number" ? w + "px" : w);
+        div.style.height = (typeof h === "number" ? h + "px" : h);
+        img.replaceWith(div);
+
+        // Plotly v3: axis titles use { text: ... }
+        const trace = { x, y, type: "scatter", mode: "lines+markers", name: key };
+        const layout = {
+          margin: { l: 60, r: 20, t: 10, b: 50 },
+          xaxis: { title: { text: "Time [s]" } },
+          showlegend: false
+        };
+
+        Plotly.newPlot(div, [trace], layout, { displayModeBar: false, responsive: true });
+      }
+    } catch (e) {
+      console.error("Failed to load YAML", yamlPath, e);
+    }
+  }
+})();
+</script>
+"""
+        # end page
+        html += "  </body>\n"
+        html += "</html>\n"
+        return html
+    
+    def gen_html_optics_page(self, ts, plot="yaml_plotly"):
+        """Generate the HTML page for a given optics time step"""
+        if ts not in self.optics:
+            raise ValueError(f"Time step {ts} not found in optics")
+        optics = self.optics[ts]
+        linkrepo = f"<a href='../../..'>{self.parent.parent.label}</a>"
+        linkcycle = f"<a href='../'>{self.parent.label}</a>"
+        linkprocess = f"<a href='../index.html'>{self.label}</a>"
+        # Start page
+        html = "<html>\n"
+        # Start head
+        html += "  <head>\n"
+        html += f"    <title>{self.parent.parent.label}/{self.parent.label}/{self.label}/{ts}</title>\n"
+        # end head
+        html += "  </head>\n"
+        # Start body
+        html += "  <body>\n"
+        html += f"    <h1>{linkrepo}/{linkcycle}/{linkprocess}/{ts}</h1>\n"
+        html += f"    <p>Optics definition: {optics}</p>\n"
+        html += f"    <p>Time step: {ts} s</p>\n"
+        html += f"    <h2>Xsuite Model</h2>\n"
+        html += f"    <pre><code>{self.gen_xsuite_src(ts=ts)}</code></pre>\n"
+        # end page
+        html += "  </body>\n"
+        html += "</html>\n"
+        return html
+
+    def gen_html_setting_inplace_svg_plot(self, name):
+        """Generate the HTML plot for a given setting"""
+        if name not in self.settings:
+            raise ValueError(f"Setting {name} not found in optics settings")
+        tdata, vdata = self.settings[name]
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from io import StringIO
+
+        fig, ax = plt.subplots()
+        ax.plot(tdata, vdata, marker="o")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel(name)
+        ax.grid(True)
+        svg_buffer = StringIO()
+        fig.savefig(svg_buffer, format="svg")
+        plt.close(fig)
+        svg_buffer.seek(0)
+        svg_data = svg_buffer.getvalue()
+        return svg_data
+
+    def gen_html_pages(self,eos_repo_path=None, plot="yaml_plotly"):
+        """Generate the HTML pages for the process"""
+        files = []
+        homepage = self.gen_html_homepage(plot=plot)
+        eos_process_path = self.get_eos_path(eos_repo_path=eos_repo_path)
+        homepage_path = eos_process_path / "index.html"
+        print(f"Writing {homepage_path}")
+        with open(homepage_path, "w") as f:
+            f.write(homepage)
+        files.append(homepage_path)
+        for ts in self.optics:
+            # xsuite src
+            fn = eos_process_path / str(ts) / "xsuite.py"
+            print(f"Writing {fn}")
+            with open(fn, "w") as f:
+                f.write(self.gen_xsuite_src(ts=ts))
+            files.append(fn)
+            # optics page
+            fn = eos_process_path / str(ts) / "index.html"
+            print(f"Writing {fn}")
+            with open(fn, "w") as f:
+                f.write(self.gen_html_optics_page(ts=ts, plot=plot))
+            files.append(fn)
+        return files
+
     def gen_eos_data(self, eos_repo_path=None):
         """
         Generate EOS data for the given time step
 
         - eos_repo_path: is the root of the repository in EOS
         """
-        eos_path = self.get_eos_path(eos_repo_path=eos_repo_path)
-
         xsuite_model = self.parent.parent.get_xsuite_model()
 
         out = []
@@ -654,6 +961,38 @@ class LHCProcess:
             )
 
         return out
+
+    def gen_madx_model(self, data, output=None):
+        """Generate MADX files for the optics"""
+        if data["masses"] is None:
+            data["masses"] = (P_MASS, P_MASS)
+        madx = """\
+call, file="acc-models-lhc/lhc.seq";
+beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
+beam,  sequence=lhcb2, particle={particles[1]}, energy={energies[1]}, charge={charges[1]}, mass={masses[1]}, bv=-1;
+call, file="acc-models-lhc/{optics_path}";
+call, file="acc-models-lhc/{settings_path}";""".format(**data)
+        if output is None:
+            return madx
+        else:
+            with open(output, "w") as f:
+                f.write(madx)
+            print(f"Writing {output}")
+            return madx
+
+    def gen_madx_settings(self, data, output=None):
+        """Generate MADX settings file"""
+        madx = []
+        for knobname, setting in sorted(data["settings"].items()):
+            madx.append(f"{knobname}={setting};")
+        madx = "\n".join(madx)
+        if output is None:
+            return madx
+        else:
+            with open(output, "w") as f:
+                f.write(madx)
+            print(f"Writing {output}")
+            return madx
 
     def gen_optics_eos_data(
         self, idx=None, ts=None, eos_repo_path=None, xsuite_model=None
@@ -689,45 +1028,13 @@ class LHCProcess:
         opt.to_json(eos_lhcoptics_path)
         print(f"Generating {eos_madx_optics_path}")
         opt.to_madx(eos_madx_optics_path)
-        out=[
+        out = [
             str(eos_madx_optics_path),
             str(eos_lhcoptics_path),
             str(eos_ts_path / "twiss_lhcb1.tfs"),
             str(eos_ts_path / "twiss_lhcb2.tfs"),
         ]
         return out
-
-    def gen_madx_model(self, data, output=None):
-        """Generate MADX files for the optics"""
-        if data["masses"] is None:
-            data["masses"] = (P_MASS, P_MASS)
-        madx = """\
-call, file="acc-models-lhc/lhc.seq";
-beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
-beam,  sequence=lhcb2, particle={particles[1]}, energy={energies[1]}, charge={charges[1]}, mass={masses[1]}, bv=-1;
-call, file="acc-models-lhc/{optics_path}";
-call, file="acc-models-lhc/{settings_path}";""".format(**data)
-        if output is None:
-            return madx
-        else:
-            with open(output, "w") as f:
-                f.write(madx)
-            print(f"Writing {output}")
-            return madx
-
-    def gen_madx_settings(self, data, output=None):
-        """Generate MADX settings file"""
-        madx = []
-        for knobname, setting in sorted(data["settings"].items()):
-            madx.append(f"{knobname}={setting};")
-        madx = "\n".join(madx)
-        if output is None:
-            return madx
-        else:
-            with open(output, "w") as f:
-                f.write(madx)
-            print(f"Writing {output}")
-            return madx
 
     def gen_optics_dir(self, lsa_settings=None):
         """Generate optics directory structure"""
@@ -763,6 +1070,27 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             (optics_dir / "acc-models-lhc").symlink_to(
                 "../../../../..", target_is_directory=True
             )
+
+    def gen_xsuite_src(self, idx=None, ts=None):
+        """Generate the XSuite source file for the given time step"""
+        out = []
+        if ts is None:
+            ts = self.ts[idx]
+        repo = self.parent.parent
+        out.append("import xtrack as xt")
+        out.append(f'lhc = xt.load("{repo.get_web_lhc_json_url()}")')
+        out.append(f'lhc.vars.load("{self.get_web_optics_path_url(idx=idx, ts=ts)}")')
+        data = self.get_optics_data(idx=idx, ts=ts)
+        masses = data["masses"]
+        charges = data["charges"]
+        energy = data["settings"]["nrj"]
+        out.append(
+            f"lhc.b1.particle_ref=xt.Particles(mass0={masses[0] * 1e9}, q0={charges[0]}, energy0={energy})"
+        )
+        out.append(
+            f"lhc.b2.particle_ref=xt.Particles(mass0={masses[0] * 1e9}, q0={charges[0]}, energy0={energy})"
+        )
+        return "\n".join(out)
 
     def get_eos_path(self, eos_repo_path=None):
         """Get the EOS path for the given time step
@@ -861,6 +1189,25 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
                 if verbose:
                     print("Empty response for '%s': %s" % (param, ex))
         return out
+    
+    def get_optics_data(self, idx=None, ts=None):
+        if ts is None:
+            ts = self.ts[idx]
+        charges = self.parent.charges
+        name = self.optics[ts]
+        data = {
+            "name": name,
+            "settings": {},
+            "ts": ts,
+            "particles": self.parent.particles,
+            "charges": charges,
+            "masses": self.parent.masses,
+        }
+        for knobname, (tdata, vdata) in self.settings.items():
+            value = float(np.interp(ts, tdata, vdata))
+            data["settings"][knobname] = value
+
+        return data
 
     def get_settings_from_lsa(
         self, params=None, start=None, end=None, part="target", verbose=False
@@ -901,7 +1248,21 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
                     print("Empty response for '%s': %s" % (param, ex))
         return out
 
+    def get_web_url(self):
+        """Get the web URL for the process"""
+        cycle_url = self.parent.get_web_url()
+        return f"{cycle_url}/{self.name}"
+
+    def get_web_optics_path_url(self, idx=None, ts=None):
+        """Get the web URL for the optics path"""
+        if ts is None:
+            ts = self.ts[idx]
+        process_url = self.get_web_url()
+        optics_url = f"{process_url}/{ts}/optics.madx"
+        return optics_url
+
     def read_data(self):
+        """Read the data from the YAML file"""
         if self.yaml.exists():
             return read_yaml(self.yaml)
         else:
@@ -909,6 +1270,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             return {}
 
     def refresh(self, data=None):
+        """Refresh the data from the YAML file and populate attributes"""
         if data is None:
             data = self.read_data()
         self.data = data
@@ -916,6 +1278,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         self.beam_process = self.data.get("beam_process", None)
         self.optics = self.data.get("optics", {})
         self.settings = self.data.get("settings", {})
+        self.description = self.data.get("description", "")
 
     def to_dict(self):
         return {
@@ -943,11 +1306,11 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         self.optics = {int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl}
         return self
 
-    def set_settings_from_lsa(self,lsa_settings=None):
+    def set_settings_from_lsa(self, lsa_settings=None):
         """Get the settings from LSA"""
         self.settings = {}
         if lsa_settings is None:
-           lsa_settings = self.get_settings_from_lsa()
+            lsa_settings = self.get_settings_from_lsa()
         knobs = self.parent.parent.knobs
         for knobname, setting in sorted(lsa_settings.items()):
             if knobname not in self.knob_blacklist:

@@ -134,3 +134,18 @@ lhc.y2018.pp_highbeta.gen_eos_data()
 
 repo=lhc.y2025
 repo.gen_html_pages()
+
+repo.vdm.ramp.label=repo.pp.ramp.label
+repo.vdm.desqueeze.label="Desqueeze to large beta*"
+repo.vdm.qchange.label=repo.pp.qchange.label
+repo.vdm.physics.label=repo.pp.physics.label
+repo.vdm.save_data(level=1)
+repo.vdm.refresh()
+
+
+repo.ions.ramp.label=repo.pp.ramp.label
+repo.ions.qchange.label=repo.pp.qchange.label
+repo.ions.physics.label=repo.pp.physics.label
+repo.ions.levelling.label=repo.pp.levelling.label
+repo.ions.save_data(level=1)
+repo.ions.refresh()
