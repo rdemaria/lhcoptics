@@ -784,6 +784,10 @@ class LHCProcess:
             optics_twiss_path1 = optics_path + "/twiss_lhcb1.tfs"
             optics_twiss_path2 = optics_path + "/twiss_lhcb2.tfs"
             link = f"<a href='{optics_twiss_path1}'>b1</a> <a href='{optics_twiss_path2}'>b2</a>"
+            # link to twiss viewer 
+            base = f"{self.parent.parent.name}/scenarios/cycle/{self.parent.name}/{self.name}/{ts}/"
+            viewer = f"../../../../../twiss5.html?base={base}"
+            link += f" <a href='{viewer}'>view</a>"
             html += f"        <td>{link}</td>\n"
             # Xsuite Script
             optics_xsuite_path = optics_path + "/xsuite.py"
@@ -1010,21 +1014,19 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         eos_lhcoptics_path = eos_ts_path / "optics.json"
 
         madx = self.get_madx_model(ts=ts)
-        madx.input("""
-select,flag=twiss,clear;
-select,flag=twiss,columns=
-name,s,l,
-lrad,angle,k1l,k2l,k3l,k1sl,k2sl,k3sl,hkick,vkick,kick,tilt,
-betx,bety,alfx,alfy,dx,dpx,dy,dpy,mux,muy,x,y,px,py,t,pt,
-wx,wy,phix,phiy,n1,ddx,ddy,ddpx,ddpy,
-keyword;
-""")
+        print("Options.....")
+        madx.input("select,flag=twiss,column="
+                   "name,s,l,lrad,angle,k1l,k2l,k3l,k1sl,k2sl,k3sl,hkick,vkick,kick,tilt,"
+                   "betx,bety,alfx,alfy,dx,dpx,dy,dpy,mux,muy,x,y,px,py,t,pt,"
+                   "wx,wy,phix,phiy,n1,ddx,ddy,ddpx,ddpy,keyword;")
         print(f"Generating {eos_ts_path}/twiss_lhcb1.tfs")
         madx.use("lhcb1")
         madx.twiss(file=str("twiss_lhcb1.tfs"))
         print(f"Generating {eos_ts_path}/twiss_lhcb2.tfs")
         madx.use("lhcb2")
         madx.twiss(file=str("twiss_lhcb2.tfs"))
+        import os
+        print(os.system("ls -llh " + str(eos_ts_path)))
 
         if xsuite_model is None:
             xsuite_model = self.parent.parent.get_xsuite_model()
