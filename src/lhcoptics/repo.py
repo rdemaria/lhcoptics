@@ -355,7 +355,7 @@ class LHCRepo:
 
     def get_web_url(self):
         """Get the web URL for the repository"""
-        url="https://acc-models.web.cern.ch/acc-models/lhc"
+        url = "https://acc-models.web.cern.ch/acc-models/lhc"
         return f"{url}/{self.name}"
 
     def get_web_lhc_json_url(self):
@@ -731,8 +731,8 @@ class LHCProcess:
         html += f"    <title>{self.parent.parent.label}/{self.parent.label}/{self.label}</title>\n"
         if plot == "yaml_plotly":
             html += (
-                "    <script src=\"https://cdn.plot.ly/plotly-2.20.0.min.js\"></script>\n"
-                "    <script src=\"https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js\"></script>\n"
+                '    <script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>\n'
+                '    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>\n'
             )
         # end head
         html += "  </head>\n"
@@ -800,16 +800,14 @@ class LHCProcess:
             if plot == "inplace_svg":
                 htmlplot = self.gen_html_setting_inplace_svg_plot(name)
             elif plot == "yaml_plotly":
-                htmlplot = (
-                    f'<img class="plotly-from-yaml" width="320" height="180" data-key="{name}" data-yaml="readme.yaml" alt="{name}"/>\n'
-                )
+                htmlplot = f'<img class="plotly-from-yaml" width="320" height="180" data-key="{name}" data-yaml="readme.yaml" alt="{name}"/>\n'
             else:
                 raise ValueError(f"Unknown plot type {plot}")
             lsa_name = self.parent.parent.knobs.mad[name].lsa
             html += f"      <tr><td>{name}</td><td>{lsa_name}</td><td>{htmlplot}</td></tr>\n"
         html += "    </table>\n"
         if plot == "yaml_plotly":
-            html+="""
+            html += """
 <script>
 (async function () {
   // Group all placeholders by YAML path so we fetch each file only once
@@ -868,7 +866,7 @@ class LHCProcess:
         html += "  </body>\n"
         html += "</html>\n"
         return html
-    
+
     def gen_html_optics_page(self, ts, plot="yaml_plotly"):
         """Generate the HTML page for a given optics time step"""
         if ts not in self.optics:
@@ -919,7 +917,7 @@ class LHCProcess:
         svg_data = svg_buffer.getvalue()
         return svg_data
 
-    def gen_html_pages(self,eos_repo_path=None, plot="yaml_plotly"):
+    def gen_html_pages(self, eos_repo_path=None, plot="yaml_plotly"):
         """Generate the HTML pages for the process"""
         files = []
         homepage = self.gen_html_homepage(plot=plot)
@@ -1012,6 +1010,15 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         eos_lhcoptics_path = eos_ts_path / "optics.json"
 
         madx = self.get_madx_model(ts=ts)
+        madx.input("""
+select,flag=twiss,clear;
+select,flag=twiss,columns=
+name,s,l,
+lrad,angle,k1l,k2l,k3l,k1sl,k2sl,k3sl,hkick,vkick,kick,tilt,
+betx,bety,alfx,alfy,dx,dpx,dy,dpy,mux,muy,x,y,px,py,t,pt,
+wx,wy,phix,phiy,n1,ddx,ddy,ddpx,ddpy,
+keyword;
+""")
         print(f"Generating {eos_ts_path}/twiss_lhcb1.tfs")
         madx.use("lhcb1")
         madx.twiss(file=str("twiss_lhcb1.tfs"))
@@ -1189,7 +1196,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
                 if verbose:
                     print("Empty response for '%s': %s" % (param, ex))
         return out
-    
+
     def get_optics_data(self, idx=None, ts=None):
         if ts is None:
             ts = self.ts[idx]
