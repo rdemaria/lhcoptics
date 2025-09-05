@@ -269,11 +269,14 @@ class LHCRepo:
         html = "<!DOCTYPE html>\n"
         html += "<html lang='en'>\n"
         html += "<head>\n"
-        html += f"<meta charset='UTF-8'>\n"
+        html += "<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        html += "<link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
+        html += "<meta charset='UTF-8'>\n"
         html += f"<title>{self.label}</title>\n"
         html += "</head>\n"
         html += f"<body>\n"
-        html += f"<h1>{self.label}</h1>\n"
+        linklhc = "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
+        html += f"<h1>{linklhc} / {self.label}</h1>\n"
         html += f"<p>{self.description}</p>\n"
         html += "<h2>Cycles</h2>\n"
         html += "<ul>\n"
@@ -503,15 +506,18 @@ class LHCCycle:
 
     def gen_html_homepage(self):
         """Generate the HTML homepage for the cycle"""
+        lhclink= "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
         linkrepo = f"<a href='../../../'>{self.parent.label}</a>"
-        html = "<DOCTYPE html>\n"
+        html = "<!DOCTYPE html>\n"
         html += "<html lang='en'>\n"
         html += "<head>\n"
         html += f"<meta charset='UTF-8'>\n"
+        html += f"<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        html += f"<link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
         html += f"<title>{self.parent.label}/{self.label}</title>\n"
         html += "</head>\n"
         html += "<body>\n"
-        html += f"<h1>{linkrepo}/{self.label}</h1>\n"
+        html += f"<h1>{lhclink} / {linkrepo} / {self.label}</h1>\n"
         html += f"<p>{self.description}</p>\n"
         html += f"<h2>Beams</h2>\n"
         html += "<ul>\n"
@@ -734,6 +740,7 @@ class LHCProcess:
 
     def gen_html_homepage(self, plot="yaml_plotly"):
         """Generate the HTML homepage for the process"""
+        linklhc = "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
         linkrepo = f"<a href='../../..'>{self.parent.parent.label}</a>"
         linkcycle = f"<a href='../'>{self.parent.label}</a>"
         # Start page
@@ -742,6 +749,8 @@ class LHCProcess:
         # Start head
         html += "  <head>\n"
         html += "    <meta charset='UTF-8'>\n"
+        html += "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        html += "    <link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
         html += f"    <title>{self.parent.parent.label}/{self.parent.label}/{self.label}</title>\n"
         if plot == "yaml_plotly":
             html += (
@@ -752,10 +761,9 @@ class LHCProcess:
         html += "  </head>\n"
         # Start body
         html += "  <body>\n"
-        html += f"    <h1>{linkrepo}/{linkcycle}/{self.label}</h1>\n"
+        html += f"    <h1>{linklhc} / {linkrepo} / {linkcycle} / {self.label}</h1>\n"
         html += f"    <p>{self.description}</p>\n"
         html += f"    <h2>Beam Process: {self.beam_process}</h2>\n"
-        html += f"    <h2>Duration: {self.duration} s</h2>\n"
         html += "    <h2>Optics</h2>\n"
         # make optics table with links and time step
         html += "    <table>\n"
@@ -813,7 +821,7 @@ class LHCProcess:
         # settings table with plots
         html += "    <h2>Settings</h2>\n"
         html += "    <table>\n"
-        html += "      <tr><th>Name</th><th>LSA Name</th><th>Plot</th></tr>\n"
+        html += "      <tr><th>Name</th><th>Plot</th></tr>\n"
         for name in sorted(self.settings.keys()):
             if plot == "inplace_svg":
                 htmlplot = self.gen_html_setting_inplace_svg_plot(name)
@@ -822,7 +830,7 @@ class LHCProcess:
             else:
                 raise ValueError(f"Unknown plot type {plot}")
             lsa_name = self.parent.parent.knobs.mad[name].lsa
-            html += f"      <tr><td>{name}</td><td>{lsa_name}</td><td>{htmlplot}</td></tr>\n"
+            html += f"      <tr><td>{name} ({lsa_name})</td><td>{htmlplot}</td></tr>\n"
         html += "    </table>\n"
         if plot == "yaml_plotly":
             html += """
