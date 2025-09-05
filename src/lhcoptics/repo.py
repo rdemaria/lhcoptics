@@ -19,6 +19,7 @@ from pathlib import Path
 import re
 import os
 import site
+from turtle import ht
 import numpy as np
 
 
@@ -265,17 +266,23 @@ class LHCRepo:
 
     def gen_html_homepage(self):
         """Generate the HTML homepage for the repository"""
-        html = f"<html><head><title>{self.label}</title></head><body>"
-        html += f"<h1>{self.label}</h1>"
-        html += f"<p>{self.description}</p>"
-        html += "<h2>Cycles</h2>"
-        html += "<ul>"
+        html = "<!DOCTYPE html>\n"
+        html += "<html lang='en'>\n"
+        html += "<head>\n"
+        html += f"<meta charset='UTF-8'>\n"
+        html += f"<title>{self.label}</title>\n"
+        html += "</head>\n"
+        html += f"<body>\n"
+        html += f"<h1>{self.label}</h1>\n"
+        html += f"<p>{self.description}</p>\n"
+        html += "<h2>Cycles</h2>\n"
+        html += "<ul>\n"
         for cycle in self.cycles.values():
             cycle_path = f"scenarios/cycle/{cycle.name}"
             link = f"<a href='{cycle_path}'>{cycle.label}</a>"
-            html += f"<li>{link}</li>"
-        html += "</ul>"
-        html += "</body></html>"
+            html += f"<li>{link}</li>\n"
+        html += "</ul>\n"
+        html += "</body>\n</html>\n"
         return html
 
     def gen_html_pages(self, eos_repo_path=None):
@@ -497,26 +504,31 @@ class LHCCycle:
     def gen_html_homepage(self):
         """Generate the HTML homepage for the cycle"""
         linkrepo = f"<a href='../../../'>{self.parent.label}</a>"
-        html = (
-            f"<html><head><title>{self.parent.label}/{self.label}</title></head><body>"
-        )
-        html += f"<h1>{linkrepo}/{self.label}</h1>"
-        html += f"<p>{self.description}</p>"
-        html += f"<h2>Beams</h2>"
-        html += "<ul>"
+        html = "<DOCTYPE html>\n"
+        html += "<html lang='en'>\n"
+        html += "<head>\n"
+        html += f"<meta charset='UTF-8'>\n"
+        html += f"<title>{self.parent.label}/{self.label}</title>\n"
+        html += "</head>\n"
+        html += "<body>\n"
+        html += f"<h1>{linkrepo}/{self.label}</h1>\n"
+        html += f"<p>{self.description}</p>\n"
+        html += f"<h2>Beams</h2>\n"
+        html += "<ul>\n"
         for i in range(len(self.particles)):
-            html += f"<li>Beam {i + 1}:  {self.particles[i]}, charge {self.charges[i]} e, mass {self.masses[i]} GeV/c2</li>"
-        html += "</ul>"
-        html += "<h2>Beam Processes</h2>"
+            html += f"<li>Beam {i + 1}:  {self.particles[i]}, charge {self.charges[i]} e, mass {self.masses[i]} GeV/c^2</li>\n"
+        html += "</ul>\n"
+        html += "<h2>Beam Processes</h2>\n"
         # make beam process table with links, duration, and beam process name
-        html += "<table>"
-        html += "<tr><th>Process</th><th>Duration</th><th>Beam Process</th></tr>"
+        html += "<table>\n"
+        html += "<tr><th>Process</th><th>Duration</th><th>Beam Process</th></tr>\n"
         for process in self.beam_processes.values():
             process_path = f"{process.name}"
             link = f"<a href='{process_path}'>{process.label}</a>"
-            html += f"<tr><td>{link}</td><td>{process.duration}</td><td>{process.beam_process}</td></tr>"
-        html += "</table>"
-        html += "</body></html>"
+            html += f"<tr><td>{link}</td><td>{process.duration}</td><td>{process.beam_process}</td></tr>\n"
+        html += "</table>\n"
+        html += "</body>\n"
+        html += "</html>\n"
         return html
 
     def gen_html_pages(self, eos_repo_path=None):
@@ -725,13 +737,15 @@ class LHCProcess:
         linkrepo = f"<a href='../../..'>{self.parent.parent.label}</a>"
         linkcycle = f"<a href='../'>{self.parent.label}</a>"
         # Start page
-        html = "<html>\n"
+        html = "<!DOCTYPE html>\n"
+        html += "<html lang='en'>\n"
         # Start head
         html += "  <head>\n"
+        html += "    <meta charset='UTF-8'>\n"
         html += f"    <title>{self.parent.parent.label}/{self.parent.label}/{self.label}</title>\n"
         if plot == "yaml_plotly":
             html += (
-                '    <script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>\n'
+                '    <script src="https://cdn.plot.ly/plotly-3.1.0.min.js"></script>\n'
                 '    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>\n'
             )
         # end head
@@ -843,10 +857,8 @@ class LHCProcess:
 
         // Create a div with the same footprint as the image, then swap
         const div = document.createElement("div");
-        const w = img.getAttribute("width")  || img.width  || 320;
-        const h = img.getAttribute("height") || img.height || 180;
-        div.style.width  = (typeof w === "number" ? w + "px" : w);
-        div.style.height = (typeof h === "number" ? h + "px" : h);
+        div.style.width  = "320px";
+        div.style.height = "180px";
         img.replaceWith(div);
 
         // Plotly v3: axis titles use { text: ... }
