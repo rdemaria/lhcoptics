@@ -35,7 +35,10 @@ from .utils import (
     git_add,
     git_commit,
     git_push,
+    unixtime_to_string,
+    string_to_unixtime,
 )
+
 from .optics import LHCOptics
 from .model_xsuite import LHCXsuiteModel
 
@@ -338,6 +341,9 @@ class LHCRepo:
         knobs.add_knob("vrf400", "RFBEAM1/TOTAL_VOLTAGE", 1.0, 1)
         return knobs
 
+    def get_run_data(self):
+        return LHCRun(self.name)
+
     def get_sets(self):
         sets = {}
         for set_name in self.data.get("sets", []):
@@ -505,13 +511,15 @@ class LHCCycle:
 
     def gen_html_homepage(self):
         """Generate the HTML homepage for the cycle"""
-        lhclink= "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
+        lhclink = "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
         linkrepo = f"<a href='../../../'>{self.parent.label}</a>"
         html = "<!DOCTYPE html>\n"
         html += "<html lang='en'>\n"
         html += "<head>\n"
         html += f"<meta charset='UTF-8'>\n"
-        html += f"<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        html += (
+            f"<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        )
         html += f"<link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
         html += f"<title>{self.parent.label}/{self.label}</title>\n"
         html += "</head>\n"
@@ -748,7 +756,9 @@ class LHCProcess:
         # Start head
         html += "  <head>\n"
         html += "    <meta charset='UTF-8'>\n"
-        html += "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        html += (
+            "    <meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        )
         html += "    <link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
         html += f"    <title>{self.parent.parent.label}/{self.parent.label}/{self.label}</title>\n"
         if plot == "yaml_plotly":
@@ -805,7 +815,7 @@ class LHCProcess:
             optics_twiss_path1 = optics_path + "/twiss_lhcb1.tfs"
             optics_twiss_path2 = optics_path + "/twiss_lhcb2.tfs"
             link = f"<a href='{optics_twiss_path1}'>b1</a> <a href='{optics_twiss_path2}'>b2</a>"
-            # link to twiss viewer 
+            # link to twiss viewer
             base = f"{self.parent.parent.name}/scenarios/cycle/{self.parent.name}/{self.name}/{ts}/"
             viewer = f"../../../../../twiss5.html?base={base}"
             link += f" <a href='{viewer}'>view</a>"
@@ -1034,10 +1044,12 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
 
         madx = self.get_madx_model(ts=ts)
         print("Options.....")
-        madx.input("select,flag=twiss,column="
-                   "name,s,l,lrad,angle,k1l,k2l,k3l,k1sl,k2sl,k3sl,hkick,vkick,kick,tilt,"
-                   "betx,bety,alfx,alfy,dx,dpx,dy,dpy,mux,muy,x,y,px,py,t,pt,"
-                   "wx,wy,phix,phiy,n1,ddx,ddy,ddpx,ddpy,keyword;")
+        madx.input(
+            "select,flag=twiss,column="
+            "name,s,l,lrad,angle,k1l,k2l,k3l,k1sl,k2sl,k3sl,hkick,vkick,kick,tilt,"
+            "betx,bety,alfx,alfy,dx,dpx,dy,dpy,mux,muy,x,y,px,py,t,pt,"
+            "wx,wy,phix,phiy,n1,ddx,ddy,ddpx,ddpy,keyword;"
+        )
         print(f"Generating {eos_ts_path}/twiss_lhcb1.tfs")
         madx.use("lhcb1")
         madx.twiss(file=str("twiss_lhcb1.tfs"))
@@ -1045,6 +1057,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         madx.use("lhcb2")
         madx.twiss(file=str("twiss_lhcb2.tfs"))
         import os
+
         print(os.system("ls -llh " + str(eos_ts_path)))
 
         if xsuite_model is None:
@@ -1584,20 +1597,7 @@ class LHCRun:
         self.year = year
         self.t1 = f"{year}-01-01 00:00:00"
         self.t2 = f"{year}-12-31 23:59:59"
-        # self.set_fills()
-        self.cycle = {}
-
-    def read_cycles(self, cycle_path=Path(".")):
-        for cycle_name in open(cycle_path / "cycles.txt"):
-            cycle_name = cycle_name.strip()
-            self.cycle[cycle_name] = LHCCycle.from_dir(
-                cycle_name, cycle_path / cycle_name
-            )
-
-    def save_models(self, knobs, cycle_path=Path(".")):
-        for cycle_name, cycle in self.cycle.items():
-            print(f"Saving {cycle_name}")
-            cycle.save_models(knobs, cycle_path / cycle_name)
+        self.set_fills()
 
     def set_fills(self):
         self.fills = {}
@@ -1638,3 +1638,16 @@ class LHCFill:
         self.beam_processes = beam_processes
         self.start = min([ts for ts, bp in beam_processes])
         self.end = max([ts for ts, bp in beam_processes])
+
+    def __repr__(self):
+        start = unixtime_to_string(self.start)
+        end = unixtime_to_string(self.end)
+        return f"<LHCFill {self.filln} {len(self.beam_processes)} processes from {start} to {end}>"
+
+    def main_processes(self):
+        """Return the main beam processes without @"""
+        out = []
+        for ts, bp in self.beam_processes:
+            if "@" not in bp and bp not in out:
+                out.append(bp)
+        return out
