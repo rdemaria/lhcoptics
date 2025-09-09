@@ -728,6 +728,13 @@ class LHCProcess:
         tw1.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
         tw2.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
 
+    def check_optics_def(self):
+        for ts,optics in self.optics.items():
+            optics_path= self.parent.parent.basedir / optics
+            if not optics_path.exists():
+                print(f"Optics path {optics_path} does not exist")
+                continue
+
     def check_settings_with_lsa(self, lsa_settings=None):
         if lsa_settings is None:
             lsa_settings = self.get_last_settings_from_lsa(verbose=False)
