@@ -308,6 +308,11 @@ class LHCRepo:
             files.extend(process_files)
         return files
 
+    def gen_repo_data(self):
+        for cycle in self.cycles.values():
+            cycle.gen_repo_data()
+        self.save_data()
+
     def gen_eos_data(self, eos_repo_path=None):
         out = []
         for cycle in self.cycles.values():
@@ -432,6 +437,7 @@ class LHCRepo:
         return {
             "name": self.name,
             "label": self.label,
+            "description": self.description,
             "start": self.start,
             "end": self.end,
             "cycles": list(self.cycles),
@@ -497,10 +503,15 @@ class LHCCycle:
         self.save_data()
         return bp
 
-    def gen_data_from_lsa(self):
-        """Generate the data from LSA"""
+    def set_data_from_lsa(self):
+        """Set the data from LSA"""
         for process in self.beam_processes.values():
-            process.gen_data_from_lsa()
+            process.set_data_from_lsa()
+
+    def gen_repo_data(self):
+        """Generate the data in the repository"""
+        for process in self.beam_processes.values():
+            process.gen_repo_data()
         self.save_data()
 
     def gen_eos_data(self, eos_repo_path=None):
@@ -738,12 +749,15 @@ class LHCProcess:
                         os.remove(ff)
                 os.rmdir(ll)
 
+    def gen_repo_data(self):
+        """Generate the data for the process using resident data"""
+        self.save_data()
+        self.gen_optics_dir()
+
     def gen_data_from_lsa(self):
         """Generate the data from LSA"""
         self.set_optics_from_lsa()
         self.set_settings_from_lsa()
-        self.save_data()
-        self.gen_optics_dir()
 
     def gen_html_homepage(self, plot="yaml_plotly"):
         """Generate the HTML homepage for the process"""
@@ -1341,6 +1355,12 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             data["settings"][knobname] = CommentedSeq(setting)
             data["settings"][knobname].fa.set_flow_style()
         write_yaml(data, self.yaml)
+
+    def set_data_from_lsa(self, lsa_settings=None):
+        """Set the optics and settings from LSA"""
+        self.set_optics_from_lsa()
+        self.set_settings_from_lsa(lsa_settings=lsa_settings)
+        return self
 
     def set_optics_from_lsa(self):
         tbl = get_lsa().getOpticTable(self.beam_process)
