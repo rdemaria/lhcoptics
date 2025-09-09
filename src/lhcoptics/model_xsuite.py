@@ -102,10 +102,10 @@ class LHCXsuiteModel:
 
         lhc = xt.Environment(lines=lines)
         for ll in lhc.lines.values():
-            #ll.twiss_default["method"] = "4d"
+            ll.twiss_default["method"] = "4d"
             ll.twiss_default["co_search_at"] = "ip7"
             ll.twiss_default["strengths"] = True
-            #ll.twiss_default["compute_chromatic_properties"] = False
+            ll.twiss_default["compute_chromatic_properties"] = False
             if "b2" in ll.name:
                 ll.twiss_default["reverse"] = True
             ll.metadata=lines[ll.name].metadata

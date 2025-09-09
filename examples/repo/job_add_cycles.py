@@ -209,6 +209,11 @@ lhc.y2023.ions.save_data(level=1)
 lhc.y2023.ions.set_data_from_lsa()
 lhc.y2023.ions.gen_repo_data()
 
+from lhcoptics import LHCOptics
+madx=lhc.y2023.pp.ramp.get_madx_model(idx=0)
+opt=LHCOptics.from_madx(madx,make_model='xsuite')
+opt.model.env.to_json("/home/rdemaria/local/acc-models-lhc/2023/xsuite/lhc.json")
+
 
 
 

@@ -1167,6 +1167,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
 
     def get_lhcoptics(self, idx=None, ts=None, xsuite=True):
         """Get the LHC optics for the given time step"""
+        assert idx is not None or ts is not None, "Either idx or ts must be provided"
         if idx is not None:
             ts = self.ts[idx]
         madx = self.get_madx_model(ts=ts)
@@ -1185,6 +1186,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
 
     def get_lhcoptics_from_eos(self, idx=None, ts=None, xsuite=True):
         """Get the LHC optics for the given time step"""
+        assert idx is not None or ts is not None, "Either idx or ts must be provided"
         if idx is not None:
             ts = self.ts[idx]
         eos_path = self.get_eos_path()
@@ -1204,6 +1206,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         If idx is provided, it will use the corresponding time step from self.ts.
 
         """
+        assert idx is not None or ts is not None, "Either idx or ts must be provided"
         if idx is not None:
             ts = self.ts[idx]
         if ts in self.optics:
@@ -1221,6 +1224,7 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
 
     def get_madx_twiss(self, idx=None, ts=None, madx=None):
         """Get the MADX twiss for the given time step"""
+        assert idx is not None or ts is not None, "Either idx or ts must be provided"
         if idx is not None:
             ts = self.ts[idx]
         madx = self.get_madx_model(ts=ts, madx=madx)
