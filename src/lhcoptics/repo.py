@@ -430,8 +430,13 @@ class LHCRepo:
         self.label = self.data.get("label", None)
         self.description = self.data.get("description", "")
 
-    def save_data(self):
+    def save_data(self, level=0):
         write_yaml(self.to_dict(), self.yaml)
+        if level > 0:
+            for cycle in self.cycles.values():
+                cycle.save_data(level=level - 1)
+            for optics_set in self.sets.values():
+                optics_set.save_data(level=level - 1)
 
     def to_dict(self):
         return {
@@ -503,10 +508,6 @@ class LHCCycle:
         self.save_data()
         return bp
 
-    def set_data_from_lsa(self):
-        """Set the data from LSA"""
-        for process in self.beam_processes.values():
-            process.set_data_from_lsa()
 
     def gen_repo_data(self):
         """Generate the data in the repository"""
@@ -640,6 +641,11 @@ class LHCCycle:
         if level > 0:
             for process in self.beam_processes.values():
                 process.save_data()
+
+    def set_data_from_lsa(self,start=None, end=None, part="target"):
+        """Set the data from LSA"""
+        for process in self.beam_processes.values():
+            process.set_data_from_lsa(start=start, end=end, part=part)
 
 
 class LHCProcess:
@@ -1269,14 +1275,14 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
     ):
         """Get settings for the given parameters"""
         if start is None:
-            t1 = (
+            start = (
                 self.parent.start
                 if self.parent.start is not None
                 else self.parent.parent.start
             )
 
         if end is None:
-            t2 = (
+            end = (
                 self.parent.end
                 if self.parent.end is not None
                 else self.parent.parent.end
@@ -1287,14 +1293,14 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
 
         out = {}
         for param in params:
+            if verbose:
+                print(f"getting {param} from {start} to {end}")
             try:
-                if verbose:
-                    print(f"getting {param} from {t1} to {t2}")
                 trims = get_lsa().getTrims(
                     param,
                     beamprocess=self.beam_process,
-                    start=t1,
-                    end=t2,
+                    start=start,
+                    end=end,
                     part=part,
                 )
                 out.update(trims)
@@ -1356,10 +1362,12 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
             data["settings"][knobname].fa.set_flow_style()
         write_yaml(data, self.yaml)
 
-    def set_data_from_lsa(self, lsa_settings=None):
+    def set_data_from_lsa(self, lsa_settings=None, start=None, end=None, part="target"):
         """Set the optics and settings from LSA"""
         self.set_optics_from_lsa()
-        self.set_settings_from_lsa(lsa_settings=lsa_settings)
+        self.set_settings_from_lsa(
+            lsa_settings=lsa_settings, start=start, end=end, part=part
+        )
         return self
 
     def set_optics_from_lsa(self):
@@ -1367,11 +1375,11 @@ call, file="acc-models-lhc/{settings_path}";""".format(**data)
         self.optics = {int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl}
         return self
 
-    def set_settings_from_lsa(self, lsa_settings=None):
+    def set_settings_from_lsa(self, lsa_settings=None, start=None, end=None, part="target"):
         """Get the settings from LSA"""
         self.settings = {}
         if lsa_settings is None:
-            lsa_settings = self.get_settings_from_lsa()
+            lsa_settings = self.get_settings_from_lsa(start=start, end=end, part=part)
         knobs = self.parent.parent.knobs
         for knobname, setting in sorted(lsa_settings.items()):
             if knobname not in self.knob_blacklist:

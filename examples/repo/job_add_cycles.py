@@ -51,11 +51,34 @@ lhc.y2025.ions.set_data_from_lsa()
 lhc.y2025.ions.gen_repo_data()
 #lhc.y2025.ions.gen_eos_data() done by gitlab actions
 
-# 2024 - VDM
+# Website
+
+lhc.y2025.gen_html_pages()
+
+lhc.y2025.vdm.ramp.label=lhc.y2025.pp.ramp.label
+lhc.y2025.vdm.desqueeze.label="Desqueeze to large beta*"
+lhc.y2025.vdm.qchange.label=lhc.y2025.pp.qchange.label
+lhc.y2025.vdm.physics.label=lhc.y2025.pp.physics.label
+lhc.y2025.vdm.save_data(level=1)
+lhc.y2025.vdm.refresh()
+
+
+lhc.y2025.ions.ramp.label=lhc.y2025.pp.ramp.label
+lhc.y2025.ions.qchange.label=lhc.y2025.pp.qchange.label
+lhc.y2025.ions.physics.label=lhc.y2025.pp.physics.label
+lhc.y2025.ions.levelling.label=lhc.y2025.pp.levelling.label
+lhc.y2025.ions.save_data(level=1)
+lhc.y2025.ions.refresh()
+
+
+
+###    2024    ###
+
 lhc.y2024.description="Optics models used in 2024"
 lhc.y2024.save_data()
 
 
+# 2024 - VDM
 lhc.y2024.add_cycle(
     name="vdm",
     label="VDM 2024",
@@ -106,6 +129,92 @@ lhc.y2024.ions.gen_repo_data()
 
 ## cp ../../2025/scripts/generate_web_data.py .
 
+# website
+lhc.y2024.pp.ramp.label="Ramp to 6.8 TeV and squeeze to 2 m"
+lhc.y2024.pp.squeeze.label="Squeeze to 1.2 m and LHCb to 1.0 m"
+lhc.y2024.pp.qchange.label="Change to physics tune"
+lhc.y2024.pp.physics.label="Proton Physics at 1.2 m"
+lhc.y2024.pp.levelling.label="Squeeze to 30 cm"
+
+lhc.y2024.vdm.ramp.label="Ramp to 6.8 TeV and desqueeze to 19 m"
+lhc.y2024.vdm.qchange.label="Change to physics tune"
+lhc.y2024.vdm.physics.label="VDM at 19 m"
+
+lhc.y2024.ions.ramp.label="Ramp to 6.8 TeV and squeeze to 1 m"
+lhc.y2024.ions.qchange.label="Change to physics tune"
+lhc.y2024.ions.squeeze.label="Squeeze to 50 cm"
+lhc.y2024.ions.physics.label="PbPb Physics at 1 m"
+
+
+
+###  2023  ###
+
+# cp ../2025/.gitlab-ci.yml
+# cp ../2025/scripts/generate_web_data.py scripts/
+# cp ../2025/scripts/generate_eos_data.py scripts/
+
+lhc.y2023.label="Run 3 - 2023"
+lhc.y2023.description="Optics models used in 2023"
+lhc.y2023.start="2023-01-01 00:00:00"
+lhc.y2023.end="2023-12-31 23:59:59"
+lhc.y2023.save_data()
+
+run=lhc.y2023.get_run_data()
+# proton physics
+run.fills[8645].main_processes()
+lhc.y2023.add_cycle(
+    name="pp",
+    label="Proton Physics 2023",
+    particles=["proton","proton"],
+    charges=[1,1]
+)
+lhc.y2023.pp.add_process("ramp","RAMP-SQUEEZE-6.8TeV-ATS-2m-2023_V1","Ramp to 6.8 TeV and squeeze to 2 m")
+lhc.y2023.pp.add_process("squeeze","SQUEEZE-6.8TeV-2m-1.2m-2023_V1","Squeeze to 1.2 m")
+lhc.y2023.pp.add_process("rotation","LHCb-ROTATION-2023_V1","Rotate IP8 crossing plane")
+lhc.y2023.pp.add_process("qchange","QCHANGE-6.8TeV-2023_V1","Change to physics tune")
+lhc.y2023.pp.add_process("physics","PHYSICS-6.8TeV-1.2m-2023_V1","Proton Physics at 1.2 m")
+lhc.y2023.pp.add_process("levelling","SQUEEZE-6.8TeV-1.2m-30cm-2023_V1","Squeeze to 30 cm")
+lhc.y2023.pp.save_data(level=1)
+lhc.y2023.pp.set_data_from_lsa()
+lhc.y2023.pp.gen_repo_data()
+
+# VDM
+run.fills[9128].main_processes()
+lhc.y2023.add_cycle(
+    name="vdm",
+    label="VDM Physics 2023",
+    particles=["proton","proton"],
+    charges=[1,1]
+)
+lhc.y2023.vdm.add_process("ramp","RAMP-DESQUEEZE-6.8TeV-19_2m-VdM-2022_V1","Ramp to 6.8 TeV and desqueeze to 19 m")
+lhc.y2023.vdm.add_process("qchange","QCHANGE-6.8TeV-2022-VdM_V1","Change to physics tune")
+lhc.y2023.vdm.add_process("physics","PHYSICS-6.8TeV-2022-VdM_V1","VDM at 19 m")
+lhc.y2023.vdm.save_data(level=1)
+lhc.y2023.vdm.set_data_from_lsa(start="2022-01-01 00:00:00")
+lhc.y2023.vdm.gen_repo_data()
+
+# Ions
+run.fills[9180].main_processes()
+
+lhc.y2023.add_cycle(
+    name="ions",
+    label="PbPb Physics 2023",
+    particles=["ions","ions"],
+    charges=[82,82],
+    masses=[193.68715,193.68715]
+)
+
+lhc.y2023.ions.add_process("ramp","RAMP-SQUEEZE-6.8TeV-IONS-50cm-2023_V2_V1","Ramp to 6.8 TeV and squeeze to 50cm m")
+lhc.y2023.ions.save_data(level=1)
+lhc.y2023.ions.set_data_from_lsa()
+lhc.y2023.ions.gen_repo_data()
+
+
+
+
+
+
+
 
 
 #HL-LHC 1.6 Optics sets
@@ -145,40 +254,6 @@ lhc.y2018.pp_highbeta.gen_eos_data()
 
 
 
-# Website
-
-repo=lhc.y2025
-repo.gen_html_pages()
-
-repo.vdm.ramp.label=repo.pp.ramp.label
-repo.vdm.desqueeze.label="Desqueeze to large beta*"
-repo.vdm.qchange.label=repo.pp.qchange.label
-repo.vdm.physics.label=repo.pp.physics.label
-repo.vdm.save_data(level=1)
-repo.vdm.refresh()
 
 
-repo.ions.ramp.label=repo.pp.ramp.label
-repo.ions.qchange.label=repo.pp.qchange.label
-repo.ions.physics.label=repo.pp.physics.label
-repo.ions.levelling.label=repo.pp.levelling.label
-repo.ions.save_data(level=1)
-repo.ions.refresh()
 
-repo=lhc.y2024
-run=repo.get_run_data()
-
-repo.vdm.ramp.label=repo.vdm.ramp.label
-repo.vdm.qchange.label=repo.vdm.qchange.label
-repo.vdm.physics.label=repo.vdm.physics.label
-repo.vdm.save_data(level=1)
-repo.vdm.refresh()
-
-repo.ions.ramp.label=repo.pp.ramp.label
-repo.ions.qchange.label=repo.pp.qchange.label
-repo.ions.physics.label=repo.pp.physics.label
-repo.ions.save_data(level=1)
-repo.ions.refresh()
-
-lhc.y2024.pp.gen_data_from_lsa()
-lhc.y2024.pp.gen_eos_data()
