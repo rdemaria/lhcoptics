@@ -768,7 +768,7 @@ class LHCProcess:
     def gen_html_homepage(self, plot="yaml_plotly"):
         """Generate the HTML homepage for the process"""
         linklhc = "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
-        linkrepo = f"<a href='../../..'>{self.parent.parent.label}</a>"
+        linkrepo = f"<a href='../../../..'>{self.parent.parent.label}</a>"
         linkcycle = f"<a href='../'>{self.parent.label}</a>"
         # Start page
         html = "<!DOCTYPE html>\n"
