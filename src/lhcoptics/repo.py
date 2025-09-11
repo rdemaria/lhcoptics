@@ -265,6 +265,10 @@ class LHCRepo:
         self.sets[name] = optics_set
         self.save_data()
         return optics_set
+    
+    def check_optics_def(self):
+        for cycle in self.cycles.values():
+            cycle.check_optics_def()
 
     def gen_html_homepage(self):
         """Generate the HTML homepage for the repository"""
@@ -508,6 +512,9 @@ class LHCCycle:
         self.save_data()
         return bp
 
+    def check_optics_def(self):
+        for process in self.beam_processes.values():
+            process.check_optics_def()
 
     def gen_repo_data(self):
         """Generate the data in the repository"""
