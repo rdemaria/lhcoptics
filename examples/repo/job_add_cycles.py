@@ -149,9 +149,11 @@ lhc.y2024.ions.physics.label="PbPb Physics at 1 m"
 
 ###  2023  ###
 
-# cp ../2025/.gitlab-ci.yml .
-# cp ../2025/scripts/generate_web_data.py scripts/
-# cp ../2025/scripts/generate_eos_data.py scripts/
+"""
+cp ../2025/.gitlab-ci.yml .
+cp ../2025/scripts/generate_web_data.py scripts/
+cp ../2025/scripts/generate_eos_data.py scripts/
+"""
 
 lhc.y2023.label="Run 3 - 2023"
 lhc.y2023.description="Optics models used in 2023"
@@ -356,24 +358,198 @@ opt.model.env.to_json("/home/rdemaria/local/acc-models-lhc/2022/xsuite/lhc.json"
 
 ### 2021 ###
 
+"""
+cp ../2025/.gitlab-ci.yml .
+cp ../2025/scripts/generate_web_data.py scripts/
+cp ../2025/scripts/generate_eos_data.py scripts/
+"""
 
+lhc.y2021.label="Run 3 - 2021"
+lhc.y2021.description="Optics models used in 2021"
+lhc.y2021.start="2021-01-01 00:00:00"
+lhc.y2021.end="2021-12-31 23:59:59"
+lhc.y2021.save_data()
+run=lhc.y2021.get_run_data()
 
 
 
 # 2018 - Proton Physics
+"""
+cp ../2025/.gitlab-ci.yml .
+cp ../2025/scripts/generate_web_data.py scripts/
+cp ../2025/scripts/generate_eos_data.py scripts/
+"""
+
+
+lhc.y2018.label="Run 2 - 2018"
+lhc.y2018.description="Optics models used in 2018"
+lhc.y2018.start="2018-01-01 00:00:00"
+lhc.y2018.end="2018-12-31 23:59:59"
+lhc.y2018.save_data()
+run=lhc.y2018.get_run_data()
+
+# proton physics
+
+
+['RAMP_PELP-SQUEEZE-6.5TeV-ATS-1m-2018_V3_V1',
+ 'QCHANGE-6.5TeV-2018_V1',
+ 'DISCRETE_LHCRING_ADT_FLATTOP',
+ 'SQUEEZE-6.5TeV-ATS-1m-30cm-2018_V1',
+ 'PHYSICS-6.5TeV-30cm-120s-2018_V1']
+
+lhc.y2018.add_cycle(
+    name="pp",
+    label="Proton Physics 2018",
+    particles=["proton","proton"],
+    charges=[1,1],
+    masses=[0.9382720813,0.9382720813],
+)
+lhc.y2018.pp.add_process(
+    "ramp",
+    "RAMP_PELP-SQUEEZE-6.5TeV-ATS-1m-2018_V3_V1",
+    "Ramp to 6.5 TeV and squeeze to 1 m"
+)
+lhc.y2018.pp.add_process(
+    "qchange",
+    "QCHANGE-6.5TeV-2018_V1",
+    "Change to physics tune"
+)
+lhc.y2018.pp.add_process(
+    "squeeze",
+    "SQUEEZE-6.5TeV-ATS-1m-30cm-2018_V1",
+    "Squeeze to 30 cm"
+)
+lhc.y2018.pp.add_process(
+    "physics",
+    "PHYSICS-6.5TeV-30cm-120s-2018_V1",
+    "Proton Physics at 30 cm"
+)
+lhc.y2018.pp.save_data(level=1)
+lhc.y2018.pp.set_data_from_lsa(part="value")
+lhc.y2018.pp.gen_repo_data()
+
+# VDM 2018
+run.fills[6864].main_processes()
+
+
+[
+ 'RAMP-DESQUEEZE-19m-2016_V1',
+ 'PHYSICS-6.5TeV-19-24m-2016_V1',
+]
+
+lhc.y2018.add_cycle(
+    name="vdm",
+    label="VDM Physics 2018",
+    particles=["proton","proton"],
+    charges=[1,1],
+    masses=[0.9382720813,0.9382720813],
+)
+lhc.y2018.vdm.add_process(
+    "ramp",
+    "RAMP-DESQUEEZE-19m-2016_V1",
+    "Ramp to 6.5 TeV and desqueeze to 19 m"
+)
+lhc.y2018.vdm.add_process(
+    "physics",
+    "PHYSICS-6.5TeV-19-24m-2016_V1",
+    "VDM Physics at 19 m"
+)
+lhc.y2018.vdm.save_data(level=1)
+lhc.y2018.vdm.set_data_from_lsa(
+    start="2016-01-03 17:12:51",
+    part="value")
+lhc.y2018.vdm.gen_repo_data()
+
+# High Beta 2018
+
+run.fills[6877].main_processes()
+[
+ 'RAMP-DESQUEEZE-6.5TeV-67m-HighB-2018_V1',
+ 'QCHANGE-6.5TeV-2018-HighBeta-90m_V2',
+ 'SQUEEZE-6.5TeV-HighB-67m-75m-2018_V1',
+ 'SQUEEZE-6.5TeV-highB-75m-90m-2018_V1',
+ 'PHYSICS-6.5TeV-90m-HighB-120s-2018_V1',
+]
+
 lhc.y2018.add_cycle(
     name="pp_highbeta",
     label="High Beta Proton Physics 2018",
     particles=["proton","proton"],
     charges=[1,1]
 )
-lhc.y2018.pp_highbeta.refresh()
-lhc.y2018.pp_highbeta.add_process("physics","PHYSICS-6.5TeV-90m-HighB-120s-2018_V1")
-lhc.y2018.pp_highbeta.gen_data_from_lsa()
-sett=lhc.y2018.pp_highbeta.physics.get_settings_from_lsa(part="value")
-lhc.y2018.pp_highbeta.physics.set_settings_from_lsa(sett)
-lhc.y2018.pp_highbeta.physics.gen_optics_dir()
-lhc.y2018.pp_highbeta.gen_eos_data()
+
+lhc.y2018.pp_highbeta.masses=[0.9382720813,0.9382720813]
+lhc.y2018.pp_highbeta.save_data(level=1)
+
+lhc.y2018.pp_highbeta.add_process(
+    "ramp",
+    "RAMP-DESQUEEZE-6.5TeV-67m-HighB-2018_V1",
+    "Ramp to 6.5 TeV and desqueeze to 67 m"
+)
+lhc.y2018.pp_highbeta.add_process(
+    "qchange",
+    "QCHANGE-6.5TeV-2018-HighBeta-90m_V2",
+    "Change to physics tune"
+)
+lhc.y2018.pp_highbeta.add_process(
+    "desqueeze1",
+    "SQUEEZE-6.5TeV-HighB-67m-75m-2018_V1",
+    "Desqueeze to 75 m"
+)
+lhc.y2018.pp_highbeta.add_process(
+    "desqueeze2",
+    "SQUEEZE-6.5TeV-highB-75m-90m-2018_V1",
+    "Desqueeze to 90 m"
+)
+lhc.y2018.pp_highbeta.add_process(
+    "physics",
+    "PHYSICS-6.5TeV-90m-HighB-120s-2018_V1",
+    "High Beta Physics at 90 m"
+)
+lhc.y2018.pp_highbeta.save_data(level=1)
+lhc.y2018.pp_highbeta.set_data_from_lsa(part="value")
+lhc.y2018.pp_highbeta.gen_repo_data()
+
+
+# ions 2018
+run.fills[7444].main_processes()
+
+[
+ 'RAMP-SQUEEZE-6.37TeV-ATS-Ion-2018_V2',
+ 'QCHANGE-6.37TeV-Ion-2018_V1',
+ 'SQUEEZE-6.37TeV-ATS-1m-50cm-2018_ION_V1',
+ 'PHYSICS-6.37TeV-50cm-240s-Ion-2018_V1']
+
+lhc.y2018.add_cycle(
+    name="ions",
+    label="PbPb Physics 2018",
+    particles=["ions","ions"],
+    charges=[82,82],
+    masses=[193.68715,193.68715]
+)
+lhc.y2018.ions.add_process(
+    "ramp",
+    "RAMP-SQUEEZE-6.37TeV-ATS-Ion-2018_V2",
+    "Ramp to 6.37 TeV and squeeze to 1 m"
+)
+lhc.y2018.ions.add_process(
+    "qchange",
+    "QCHANGE-6.37TeV-Ion-2018_V1",
+    "Change to physics tune"
+)
+lhc.y2018.ions.add_process(
+    "squeeze",
+    "SQUEEZE-6.37TeV-ATS-1m-50cm-2018_ION_V1",
+    "Squeeze to 50 cm"
+)
+lhc.y2018.ions.add_process(
+    "physics",
+    "PHYSICS-6.37TeV-50cm-240s-Ion-2018_V1",
+    "PbPb Physics at 50 cm"
+)
+lhc.y2018.ions.save_data(level=1)
+lhc.y2018.ions.set_data_from_lsa(part="value")
+lhc.y2018.ions.gen_repo_data()
 
 
 
