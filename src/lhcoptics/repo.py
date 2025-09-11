@@ -1029,7 +1029,8 @@ call, file="acc-models-lhc/lhc.seq";
 beam,  sequence=lhcb1, particle={particles[0]}, energy={energies[0]}, charge={charges[0]}, mass={masses[0]}, bv=1;
 beam,  sequence=lhcb2, particle={particles[1]}, energy={energies[1]}, charge={charges[1]}, mass={masses[1]}, bv=-1;
 call, file="acc-models-lhc/{optics_path}";
-call, file="acc-models-lhc/{settings_path}";""".format(**data)
+call, file="acc-models-lhc/{settings_path}";
+""".format(**data)
         if output is None:
             return madx
         else:

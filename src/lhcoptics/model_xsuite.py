@@ -88,6 +88,10 @@ class LHCXsuiteModel:
     @classmethod
     def from_madx(cls, madx, sliced=False, madxfile=None):
 
+        if not madx.sequence.lhcb1.has_beam:
+            madx.use(sequence="lhcb1")
+            madx.use(sequence="lhcb2")
+
         lines = xt.Environment.from_madx(
             madx=madx, enable_layout_data=True, return_lines=True
         )
