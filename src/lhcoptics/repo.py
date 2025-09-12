@@ -274,21 +274,25 @@ class LHCRepo:
             cycle.check_optics_def()
 
     def check_xml_optics_defs(self):
+        res=True
         for name in self.find_xml_optics():
             path=self.basedir / "operation" / "optics" / f"{name}.madx"
             if not path.exists():
-                raise ValueError(f"Optics {name} not found in {path}")
+                print(f"Optics {name} not found in {path}")
+                res=False
             with open(path) as f:
                 data=f.read()
                 madx_defs=self.get_xml_optics_madx(name)
                 if not data.endswith(madx_defs):
                     print(data)
                     print(madx_defs)
-                    raise ValueError(f"Optics {name} in {path} does not match XML definition")
+                    print(f"Optics {name} in {path} does not match XML definition")
+                    res=False
+        return res
 
     def find_xml_optics(self, regexp='.*', filename=None):
         lst = [oo.attrib['name']
-               for oo in self.get_xml_optics_elements(filename=filename)
+               for oo in self.get_xml_optics_elements(xml_file=filename)
                if re.match(regexp, oo.attrib['name'])]
         return lst
 
@@ -345,6 +349,14 @@ class LHCRepo:
             for process in cycle.beam_processes.values():
                 out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
         return out
+    
+    def gen_xml_optics_madx(self, name, xml_file=None):
+        path=self.basedir / "operation" / "optics" / f"{name}.madx"
+        if path.exists():
+            raise ValueError(f"File {path} already exists")
+        print(f"Writing {path}")
+        with open(path, "w") as f:
+            f.write(self.get_xml_optics_madx(name, xml_file=xml_file))
 
     def get_afs_path(self):
         return Path("/afs/cern.ch/eng/acc-models/lhc/") / self.name
@@ -407,17 +419,17 @@ class LHCRepo:
     def get_web_lhc_json_url(self):
         return f"{self.get_web_url()}/xsuite/lhc.json"
 
-    def get_xml_optics_elements(self, filename=None):
-        if filename is None:
-            filename = self.basedir / "operation" / "lhc.jmd.xml"
-        if not Path(filename).exists():
-            raise ValueError(f"File {filename} does not exist")
-        tree = ET.parse(filename)
+    def get_xml_optics_elements(self, xml_file=None):
+        if xml_file is None:
+            xml_file = self.basedir / "operation" / "lhc.jmd.xml"
+        if not Path(xml_file).exists():
+            raise ValueError(f"File {xml_file} does not exist")
+        tree = ET.parse(xml_file)
         root = tree.getroot()
         return root.find('optics').findall("optic")
 
-    def get_xml_optics_madx(self, name, filename=None):
-        for oo in self.get_xml_optics_elements(filename=filename):
+    def get_xml_optics_madx(self, name, xml_file=None):
+        for oo in self.get_xml_optics_elements(xml_file=xml_file):
             if oo.attrib['name'] == name:
                 break
         else:
