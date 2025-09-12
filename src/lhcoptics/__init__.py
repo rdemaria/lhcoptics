@@ -59,4 +59,5 @@ __all__ = [
     "get_yaml",
     "string_to_unixtime",
     "unixtime_to_string",
+    "xmltodict",
 ]

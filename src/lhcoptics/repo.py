@@ -19,6 +19,8 @@ from pathlib import Path
 import re
 import os
 import site
+import xml.etree.ElementTree as ET
+
 import numpy as np
 
 
@@ -37,6 +39,7 @@ from .utils import (
     git_push,
     unixtime_to_string,
     string_to_unixtime,
+    xmltodict,
 )
 
 from .optics import LHCOptics
@@ -270,6 +273,25 @@ class LHCRepo:
         for cycle in self.cycles.values():
             cycle.check_optics_def()
 
+    def check_xml_optics_defs(self):
+        for name in self.find_xml_optics():
+            path=self.basedir / "operation" / "optics" / f"{name}.madx"
+            if not path.exists():
+                raise ValueError(f"Optics {name} not found in {path}")
+            with open(path) as f:
+                data=f.read()
+                madx_defs=self.get_xml_optics_madx(name)
+                if not data.endswith(madx_defs):
+                    print(data)
+                    print(madx_defs)
+                    raise ValueError(f"Optics {name} in {path} does not match XML definition")
+
+    def find_xml_optics(self, regexp='.*', filename=None):
+        lst = [oo.attrib['name']
+               for oo in self.get_xml_optics_elements(filename=filename)
+               if re.match(regexp, oo.attrib['name'])]
+        return lst
+
     def gen_html_homepage(self):
         """Generate the HTML homepage for the repository"""
         html = "<!DOCTYPE html>\n"
@@ -384,6 +406,27 @@ class LHCRepo:
 
     def get_web_lhc_json_url(self):
         return f"{self.get_web_url()}/xsuite/lhc.json"
+
+    def get_xml_optics_elements(self, filename=None):
+        if filename is None:
+            filename = self.basedir / "operation" / "lhc.jmd.xml"
+        if not Path(filename).exists():
+            raise ValueError(f"File {filename} does not exist")
+        tree = ET.parse(filename)
+        root = tree.getroot()
+        return root.find('optics').findall("optic")
+
+    def get_xml_optics_madx(self, name, filename=None):
+        for oo in self.get_xml_optics_elements(filename=filename):
+            if oo.attrib['name'] == name:
+                break
+        else:
+            raise ValueError(f"Optics {name} not found in XML file")
+        out=[]
+        for cc in oo.find("init-files").findall("call-file"):
+            out.append(f'call, file="acc-models-lhc/{cc.attrib["path"]}";')
+        out.append("")
+        return "\n".join(out)
 
     def get_xsuite_json(self, basedir=None):
         if basedir is None:
