@@ -355,8 +355,9 @@ class LHCRepo:
         if path.exists():
             raise ValueError(f"File {path} already exists")
         print(f"Writing {path}")
+        madx_defs=self.get_xml_optics_madx(name, xml_file=xml_file)
         with open(path, "w") as f:
-            f.write(self.get_xml_optics_madx(name, xml_file=xml_file))
+            f.write(madx_defs)
 
     def get_afs_path(self):
         return Path("/afs/cern.ch/eng/acc-models/lhc/") / self.name
