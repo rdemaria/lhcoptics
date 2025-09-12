@@ -436,6 +436,9 @@ class LHCRepo:
             raise ValueError(f"Optics {name} not found in XML file")
         out=[]
         for cc in oo.find("init-files").findall("call-file"):
+            path=self.basedir / cc.attrib["path"]
+            if not path.exists():
+                raise ValueError(f"File {path} used in {name} does not exist")
             out.append(f'call, file="acc-models-lhc/{cc.attrib["path"]}";')
         out.append("")
         return "\n".join(out)
