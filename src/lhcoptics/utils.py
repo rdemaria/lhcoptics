@@ -6,6 +6,7 @@ import requests
 import json
 import time
 from datetime import datetime, timezone
+import xml.etree.ElementTree as ET
 
 import ruamel.yaml
 
@@ -324,3 +325,36 @@ def read_url(url, timeout=0.1):
         return response.text
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"Failed to read from URL {url}: {e}")
+
+
+def xmltodict(filename):
+    root = ET.parse(filename).getroot()
+    return etree_to_dict(root)
+
+def etree_to_dict(elem):
+    """Turn an ElementTree into a dict.
+    """
+    # convert an Element and its children into a dict
+    d = {elem.tag: {} if elem.attrib else None}
+    children = list(elem)
+    if children:
+        dd = {}
+        for dc in map(etree_to_dict, children):
+            for k, v in dc.items():
+                if k in dd:
+                    # group multiple children with same tag into a list
+                    if not isinstance(dd[k], list):
+                        dd[k] = [dd[k]]
+                    dd[k].append(v)
+                else:
+                    dd[k] = v
+        d = {elem.tag: dd}
+    if elem.attrib:
+        d[elem.tag].update(('@' + k, v) for k, v in elem.attrib.items())
+    if elem.text and elem.text.strip():
+        text = elem.text.strip()
+        if children or elem.attrib:
+            d[elem.tag]['#text'] = text
+        else:
+            d[elem.tag] = text
+    return d
