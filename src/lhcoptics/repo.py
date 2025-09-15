@@ -268,32 +268,40 @@ class LHCRepo:
         self.sets[name] = optics_set
         self.save_data()
         return optics_set
-    
+
     def check_optics_def(self):
         for cycle in self.cycles.values():
             cycle.check_optics_def()
 
-    def check_xml_optics_defs(self):
-        res=True
-        for name in self.find_xml_optics():
-            path=self.basedir / "operation" / "optics" / f"{name}.madx"
+    def check_xml_optics_defs(self, xml_file=None):
+        res = True
+        for name in self.find_xml_optics(xml_file=xml_file):
+            path = self.basedir / "operation" / "optics" / f"{name}.madx"
             if not path.exists():
                 print(f"Optics {name} not found in {path}")
-                res=False
-            with open(path) as f:
-                data=f.read()
-                madx_defs=self.get_xml_optics_madx(name)
-                if not data.endswith(madx_defs):
-                    print(data)
-                    print(madx_defs)
-                    print(f"Optics {name} in {path} does not match XML definition")
-                    res=False
+                res = False
+            else:
+                with open(path) as f:
+                    data = f.read()
+                    try:
+                       madx_defs = self.get_xml_optics_madx(name)
+                    except ValueError as e:
+                          print(e)
+                          res = False
+                          continue
+                    if not data.endswith(madx_defs):
+                        print(data)
+                        print(madx_defs)
+                        print(f"Optics {name} in {path} does not match XML definition")
+                        res = False
         return res
 
-    def find_xml_optics(self, regexp='.*', filename=None):
-        lst = [oo.attrib['name']
-               for oo in self.get_xml_optics_elements(xml_file=filename)
-               if re.match(regexp, oo.attrib['name'])]
+    def find_xml_optics(self, regexp=".*", xml_file=None):
+        lst = [
+            oo.attrib["name"]
+            for oo in self.get_xml_optics_elements(xml_file=xml_file)
+            if re.match(regexp, oo.attrib["name"])
+        ]
         return lst
 
     def gen_html_homepage(self):
@@ -349,13 +357,13 @@ class LHCRepo:
             for process in cycle.beam_processes.values():
                 out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
         return out
-    
+
     def gen_xml_optics_madx(self, name, xml_file=None):
-        path=self.basedir / "operation" / "optics" / f"{name}.madx"
+        path = self.basedir / "operation" / "optics" / f"{name}.madx"
         if path.exists():
             raise ValueError(f"File {path} already exists")
         print(f"Writing {path}")
-        madx_defs=self.get_xml_optics_madx(name, xml_file=xml_file)
+        madx_defs = self.get_xml_optics_madx(name, xml_file=xml_file)
         with open(path, "w") as f:
             f.write(madx_defs)
 
@@ -427,17 +435,17 @@ class LHCRepo:
             raise ValueError(f"File {xml_file} does not exist")
         tree = ET.parse(xml_file)
         root = tree.getroot()
-        return root.find('optics').findall("optic")
+        return root.find("optics").findall("optic")
 
     def get_xml_optics_madx(self, name, xml_file=None):
         for oo in self.get_xml_optics_elements(xml_file=xml_file):
-            if oo.attrib['name'] == name:
+            if oo.attrib["name"] == name:
                 break
         else:
             raise ValueError(f"Optics {name} not found in XML file")
-        out=[]
+        out = []
         for cc in oo.find("init-files").findall("call-file"):
-            path=self.basedir / cc.attrib["path"]
+            path = self.basedir / cc.attrib["path"]
             if not path.exists():
                 raise ValueError(f"File {path} used in {name} does not exist")
             out.append(f'call, file="acc-models-lhc/{cc.attrib["path"]}";')
@@ -708,7 +716,7 @@ class LHCCycle:
             for process in self.beam_processes.values():
                 process.save_data()
 
-    def set_data_from_lsa(self,start=None, end=None, part="target"):
+    def set_data_from_lsa(self, start=None, end=None, part="target"):
         """Set the data from LSA"""
         for process in self.beam_processes.values():
             process.set_data_from_lsa(start=start, end=end, part=part)
@@ -795,8 +803,8 @@ class LHCProcess:
         tw2.rows["ip.*"].cols["betx bety x*1e3 y*1e3 px*1e6 py*1e6"].show()
 
     def check_optics_def(self):
-        for ts,optics in self.optics.items():
-            optics_path= self.parent.parent.basedir / optics
+        for ts, optics in self.optics.items():
+            optics_path = self.parent.parent.basedir / optics
             if not optics_path.exists():
                 print(f"Optics path {optics_path} does not exist")
                 continue
@@ -1136,8 +1144,8 @@ call, file="acc-models-lhc/{settings_path}";
         eos_madx_optics_path = eos_ts_path / "optics.madx"
         eos_lhcoptics_path = eos_ts_path / "optics.json"
 
+        print(f"Generating {eos_madx_optics_path}")
         madx = self.get_madx_model(ts=ts)
-        print("Options.....")
         madx.input(
             "select,flag=twiss,column="
             "name,s,l,lrad,angle,k1l,k2l,k3l,k1sl,k2sl,k3sl,hkick,vkick,kick,tilt,"
@@ -1150,9 +1158,8 @@ call, file="acc-models-lhc/{settings_path}";
         print(f"Generating {eos_ts_path}/twiss_lhcb2.tfs")
         madx.use("lhcb2")
         madx.twiss(file=str("twiss_lhcb2.tfs"))
-        import os
-
-        print(os.system("ls -llh " + str(eos_ts_path)))
+        #import os
+        #print(os.system("ls -llh " + str(eos_ts_path)))
 
         if xsuite_model is None:
             xsuite_model = self.parent.parent.get_xsuite_model()
@@ -1453,7 +1460,9 @@ call, file="acc-models-lhc/{settings_path}";
         self.optics = {int(tt.time): f"operation/optics/{tt.name}.madx" for tt in tbl}
         return self
 
-    def set_settings_from_lsa(self, lsa_settings=None, start=None, end=None, part="target"):
+    def set_settings_from_lsa(
+        self, lsa_settings=None, start=None, end=None, part="target"
+    ):
         """Get the settings from LSA"""
         self.settings = {}
         if lsa_settings is None:
