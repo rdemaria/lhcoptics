@@ -284,11 +284,11 @@ class LHCRepo:
                 with open(path) as f:
                     data = f.read()
                     try:
-                       madx_defs = self.get_xml_optics_madx(name)
+                        madx_defs = self.get_xml_optics_madx(name)
                     except ValueError as e:
-                          print(e)
-                          res = False
-                          continue
+                        print(e)
+                        res = False
+                        continue
                     if not data.endswith(madx_defs):
                         print(data)
                         print(madx_defs)
@@ -393,6 +393,20 @@ class LHCRepo:
         knobs.add_knob("vrf400", "RFBEAM1/TOTAL_VOLTAGE", 1.0, 1)
         return knobs
 
+    def get_optics_list(self):
+        out = []
+        for cycle in self.cycles.values():
+            for process in cycle.beam_processes.values():
+                for ts in process.ts:
+                    out.append((cycle.name, process.name, ts))
+        return out
+
+    def get_processes(self):
+        out = []
+        for cycle in self.cycles.values():
+            out.extend(cycle.beam_processes.values())
+        return out
+
     def get_run_data(self):
         return LHCRun(self.name)
 
@@ -405,20 +419,6 @@ class LHCRepo:
                 parent=self,
             )
         return sets
-
-    def get_processes(self):
-        out = []
-        for cycle in self.cycles.values():
-            out.extend(cycle.beam_processes.values())
-        return out
-
-    def get_optics_list(self):
-        out = []
-        for cycle in self.cycles.values():
-            for process in cycle.beam_processes.values():
-                for ts in process.ts:
-                    out.append((cycle.name, process.name, ts))
-        return out
 
     def get_web_url(self):
         """Get the web URL for the repository"""
@@ -1158,8 +1158,8 @@ call, file="acc-models-lhc/{settings_path}";
         print(f"Generating {eos_ts_path}/twiss_lhcb2.tfs")
         madx.use("lhcb2")
         madx.twiss(file=str("twiss_lhcb2.tfs"))
-        #import os
-        #print(os.system("ls -llh " + str(eos_ts_path)))
+        # import os
+        # print(os.system("ls -llh " + str(eos_ts_path)))
 
         if xsuite_model is None:
             xsuite_model = self.parent.parent.get_xsuite_model()
@@ -1227,10 +1227,10 @@ call, file="acc-models-lhc/{settings_path}";
         charges = data["charges"]
         energy = data["settings"]["nrj"]
         out.append(
-            f"lhc.b1.particle_ref=xt.Particles(mass0={masses[0] * 1e9}, q0={charges[0]}, energy0={energy})"
+            f"lhc.b1.particle_ref=xt.Particles(mass0={masses[0]*1e9}, q0={charges[0]}, energy0={energy*1e9})"
         )
         out.append(
-            f"lhc.b2.particle_ref=xt.Particles(mass0={masses[0] * 1e9}, q0={charges[0]}, energy0={energy})"
+            f"lhc.b2.particle_ref=xt.Particles(mass0={masses[0]*1e9}, q0={charges[0]}, energy0={energy*1e9})"
         )
         return "\n".join(out)
 
