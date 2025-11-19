@@ -198,6 +198,15 @@ def read_yaml(filename):
 def write_yaml(data, filename):
     yaml.dump(data, open(filename, "w"))
 
+
+def read_json(filename):
+    with open(filename, "r") as fid:
+        return json.load(fid)
+
+def write_json(data, filename):
+    with open(filename, "w") as fid:
+        json.dump(data, fid, indent=4)
+
 def git_get_current_commit(directory):
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"],

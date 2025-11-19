@@ -23,24 +23,29 @@ class LHCArc(LHCSection):
 
     default_twiss_method = "periodic"
 
+
     @classmethod
     def from_madx(cls, madx, name, knob_names=None):
         madmodel = LHCMadxModel(madx)
+        return cls.from_model(madmodel, name, knob_names=knob_names)
+
+    @classmethod
+    def from_model(cls, model, name, knob_names=None):
         i1, i2 = int(name[1]), int(name[2])
         strength_names = []
-        strength_names += madmodel.filter(f"kq[fd]\\.*{name}$")
-        strength_names += madmodel.filter(f"kqt[fd]\\.*{name}b[12]$")
-        strength_names += madmodel.filter(f"kqs\\.*{name}b[12]$")
-        strength_names += madmodel.filter(f"ksq\\.*r{i1}b[12]$")
-        strength_names += madmodel.filter(f"ksq\\.*l{i2}b[12]$")
-        strength_names += madmodel.filter(f"ks[fd][12]\\.*{name}b[12]$")
-        strength_names += madmodel.filter(f"ko[fd]\\.*{name}b[12]$")
+        strength_names += model.filter(f"kq[fd]\\.*{name}$")
+        strength_names += model.filter(f"kqt[fd]\\.*{name}b[12]$")
+        strength_names += model.filter(f"kqs\\.*{name}b[12]$")
+        strength_names += model.filter(f"ksq\\.*r{i1}b[12]$")
+        strength_names += model.filter(f"ksq\\.*l{i2}b[12]$")
+        strength_names += model.filter(f"ks[fd][12]\\.*{name}b[12]$")
+        strength_names += model.filter(f"ko[fd]\\.*{name}b[12]$")
         if knob_names is not None:
-            knobs = madmodel.make_and_set0_knobs(knob_names)
+            knobs = model.make_and_set0_knobs(knob_names)
         else:
             knobs = {}
         params = {}
-        strengths = {st: madx.globals[st] for st in strength_names}
+        strengths = {st: model[st] for st in strength_names}
         return cls(name, strengths, params, knobs)
 
     def __init__(

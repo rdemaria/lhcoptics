@@ -395,6 +395,13 @@ use, sequence=lhcb2;
         return knobs
 
     def make_and_set0_knobs(self, knob_names):
+        """
+        for each knob name in knob_names
+           look for all expressions containing the knob name
+           compute the weights by setting the knob to 1 and 0
+           set the knob to 0
+           return knob object builit with name, knob value and weights
+        """
         madx = self.madx
         defs = {}
         for knob in knob_names:
@@ -430,6 +437,9 @@ use, sequence=lhcb2;
 
     def __setitem__(self, key, value):
         self.madx.globals[key] = value
+
+    def __contains__(self, key):
+        return key in self.madx.globals
 
     def aperture(self, irn, beam):
         self.madx.exec(f"mk_apir({irn},b{beam})")

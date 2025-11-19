@@ -1,9 +1,13 @@
+import re
+from pathlib import Path
+
 import numpy as np
 import xdeps
 import xtrack as xt
 
 from .knob import Knob
 from .model_madx import LHCMadxModel
+from .utils import read_yaml, write_yaml, read_json, write_json
 
 import matplotlib.pyplot as plt
 
@@ -70,8 +74,9 @@ class LHCXsuiteModel:
         self.mgr = env._xdeps_manager
         self.madxfile = madxfile
         self.sequence = {1: env.b1, 2: env.b2}
-        self.b1.build_tracker()
-        self.b2.build_tracker()
+        for ss in self.sequence.values():
+            if ss.tracker is None:
+                ss.build_tracker()
         self._aperture = None
 
     @classmethod
@@ -86,7 +91,14 @@ class LHCXsuiteModel:
         return self
 
     @classmethod
-    def from_madx(cls, madx, sliced=False, madxfile=None):
+    def from_madx(cls, madx, sliced=False, madxfile=None, knob_structure=None):
+
+        if isinstance(knob_structure, str) or isinstance(knob_structure, Path):
+            knob_structure = str(knob_structure)
+            if knob_structure.endswith(".yaml"):
+                knob_structure = read_yaml(knob_structure)
+            elif knob_structure.endswith(".json"):
+                knob_structure = read_json(knob_structure)
 
         if not madx.sequence.lhcb1.has_beam:
             madx.use(sequence="lhcb1")
@@ -130,6 +142,7 @@ class LHCXsuiteModel:
                 )
                 lhc.lines[f"{ln}s"] = ls
 
+        lhc.metadata["knob_structure"] = knob_structure
         out = cls(env=lhc, madxfile=madxfile)
         return out
 
@@ -268,6 +281,7 @@ class LHCXsuiteModel:
             if wname in self._var_values:
                 del self._var_values[wname]
 
+
     def get_knob(self, knob):
         value = self._var_values[knob.name]
         weights = {}
@@ -290,22 +304,65 @@ class LHCXsuiteModel:
         wname = f"_from_{name}"
         for k in self._var_values:
             if k.endswith(wname):
-                weights[k] = self._var_values[k]
+                weights[k.split(wname)[0]] = self._var_values[k]
         return Knob(name, value, weights).specialize()
 
     def get_knob_by_probing(self, name):
         weights = {}
         oldvars = self._var_values.copy()
         oldvalue = self._var_values[name]
-        self._var_values[name] = oldvalue + 1
+        self[name] = oldvalue + 1
         for k in self._var_values:
             vnew = self._var_values[k]
             if hasattr(vnew, "__sub__"):
                 dvar = self._var_values[k] - oldvars[k]
                 if dvar != 0:
                     weights[k] = dvar
-        self._var_values[name] = oldvalue
+        del weights[name]
+        self[name] = oldvalue
         return Knob(name, oldvalue, weights).specialize()
+
+    def get_knob_by_xdeps(self, name):
+        #print(name)
+        mgr=self.env.ref_manager
+        if name not in self.env:
+            return Knob(name, 0.0, {}).specialize()
+        ref=self.env.ref[name]
+        weight_names =  [xx._key for xx in  mgr.rdeps[ref]]
+        var_values = self._var_values
+        weights={}
+        tasks=mgr.tasks
+        for wname in weight_names:
+            expr=tasks[self.env.ref[wname]].expr
+            #if verbose:
+            #   print(f"Weight {wname}")
+            for term in termlist(expr):
+                if isinstance(term, xdeps.refs.MulExpr) and term._rhs==ref:
+                    if np.isscalar(term._lhs):
+                        value=float(term._lhs)
+                    else:
+                        value=var_values[term._lhs._key]
+             #       if verbose:
+             #          print(f"   Term: {term}")
+             #          print(f"     Weight: {value}")
+                    weights[wname]=value
+        value= self[name]
+        return Knob(name, value, weights).specialize()
+
+
+
+    def filter(self, pattern):
+        vv=list(self._var_values.keys())
+        return list(filter(lambda x: re.match(pattern,x), vv))
+
+    def make_and_set0_knobs(self, knob_names):
+        #print("Creating knobs:", knob_names)
+        knobs = {}
+        for knob_name in knob_names:
+            knob = self.get_knob_by_xdeps(knob_name)
+            knobs[knob_name] = knob
+            self[knob_name] = 0
+        return knobs
 
     def update(self, src):
         if hasattr(src, "strengths"):

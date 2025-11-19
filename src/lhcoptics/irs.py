@@ -24,41 +24,45 @@ class LHCIR(LHCSection):
     @classmethod
     def from_madx(cls, madx, name=None, knob_names=None):
         madmodel = LHCMadxModel(madx)
+        return cls.from_model(madmodel, name, knob_names=knob_names)
+
+    @classmethod
+    def from_model(cls, model, name=None, knob_names=None):
         if name is None:
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        quads = madmodel.filter(f"kt?q[xt]?[0-9]?\\.[lr]{irn}$")
-        quads += madmodel.filter(f"kq[0-9]\\.lr{irn}$")
-        quads += madmodel.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
+        quads = model.filter(f"kt?q[xt]?[0-9]?\\.[lr]{irn}$")
+        quads += model.filter(f"kq[0-9]\\.lr{irn}$")
+        quads += model.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
         if irn == 7:
             if "kqt5.l7" in quads:
                 quads.remove("kqt5.l7")
             if "kqt5.r7" in quads:
                 quads.remove("kqt5.r7")
         strength_names += sort_n(quads)
-        strength_names += madmodel.filter(f"kqs\\..*[lr]{irn}b[12]$")
-        acb = madmodel.filter(f"acbx.*[lr]{irn}$")
-        acb += madmodel.filter(f"acb.*[lr]{irn}b[12]$")
+        strength_names += model.filter(f"kqs\\..*[lr]{irn}b[12]$")
+        acb = model.filter(f"acbx.*[lr]{irn}$")
+        acb += model.filter(f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)
         if knob_names is None:
             knob_names = cls.knob_names
-        knobs = madmodel.make_and_set0_knobs(knob_names)
-        strengths = {st: madx.globals[st] for st in strength_names}
+        knobs = model.make_and_set0_knobs(knob_names)
+        strengths = {st: model[st] for st in strength_names}
         for knob in knobs:
-            madx.globals[knob] = knobs[knob].value
+            model[knob] = knobs[knob].value
         params = {}
         for param in "betx bety alfx alfy dx dpx".split():
             for beam in "12":
                 ppname = f"{param}ip{irn}b{beam}"
-                if ppname in madx.globals:
-                    params[ppname] = madx.globals[ppname]
+                if ppname in model:
+                    params[ppname] = model[ppname]
         for param in "mux muy".split():
             for beam in "12":
                 for suffix in ["", "_l", "_r"]:
                     ppname = f"{param}ip{irn}b{beam}{suffix}"
-                    if ppname in madx.globals:
-                        params[ppname] = madx.globals[ppname]
+                    if ppname in model:
+                        params[ppname] = model[ppname]
         return cls(name, strengths, params, knobs)
 
     @classmethod
@@ -146,9 +150,7 @@ class LHCIR(LHCSection):
 
     @property
     def quads(self):
-        return {
-            k: v for k, v in self.strengths.items() if re.match("kt?q[^s]", k)
-        }
+        return {k: v for k, v in self.strengths.items() if re.match("kt?q[^s]", k)}
 
     @property
     def kqxl(self):
@@ -167,22 +169,18 @@ class LHCIR(LHCSection):
     ):
         if p0c is None:
             p0c = self.parent.params["p0c"]
-        out={}
+        out = {}
         if ratio is not None:
-            self.get_quad_max_ratio(
-                verbose=verbose, ratio=ratio
-            )
+            self.get_quad_max_ratio(verbose=verbose, ratio=ratio)
         if margin is not None:
-            #if verbose:
+            # if verbose:
             #    print(f"Name                  Strength      Low    High")
             for k, v in self.quads.items():
                 kmin, kmax = self.parent.get_quad_margin(k)
                 if kmin < margin or kmax < margin:
                     out[k] = (v, kmin, kmax)
                     if verbose:
-                      print(
-                        f"{k:20} {v:12.8f} {kmin*100:5.1f}% {kmax*100:5.1f}%"
-                    )
+                        print(f"{k:20} {v:12.8f} {kmin * 100:5.1f}% {kmax * 100:5.1f}%")
         return out
 
     def get_kqx(self, n, lr):
@@ -355,9 +353,7 @@ class LHCIR(LHCSection):
             if not right and f"r{self.irn}" in kk:
                 add = False
             if add:
-                limits = self.parent.circuits.get_klimits(
-                    kk, self.parent.params["p0c"]
-                )
+                limits = self.parent.circuits.get_klimits(kk, self.parent.params["p0c"])
                 if abs(limits[0]) > abs(limits[1]) * 1.2:
                     limits[0] *= 1 - dkmax
                     limits[1] *= 1 + dkmin
@@ -611,7 +607,7 @@ class LHCIR(LHCSection):
 
     def set_betastar(self, betx=None, bety=None):
         if bety is None:
-            bety=betx
+            bety = betx
         if self.irn in [1, 2, 5, 8]:
             self.params[f"betx{self.ipname}b1"] = betx
             self.params[f"betx{self.ipname}b2"] = betx
@@ -628,11 +624,11 @@ class LHCIR(LHCSection):
 
     def set_init(self):
         self.init_left = {}
-        self.set_init_left(1),
-        self.set_init_left(2),
+        (self.set_init_left(1),)
+        (self.set_init_left(2),)
         self.init_right = {}
-        self.set_init_right(1),
-        self.set_init_right(2),
+        (self.set_init_right(1),)
+        (self.set_init_right(2),)
 
     def specialize_knobs(self):
         for k, knob in list(self.knobs.items()):
@@ -700,6 +696,4 @@ class LHCIR(LHCSection):
         start = self.startb12[beam - 1]
         end = self.endb12[beam - 1]
         init = sequence.twiss(strengths=strengths).get_twiss_init(start)
-        return sequence.twiss(
-            start=start, end=end, init=init, strengths=strengths
-        )
+        return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
