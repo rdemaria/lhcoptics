@@ -8,6 +8,10 @@ from .model_madx import LHCMadxModel
 from .section import LHCSection, lhcprev, lhcsucc, sort_n
 
 
+def is_hllhc(variant):
+    return variant.startswith("hl")
+
+
 class LHCIR(LHCSection):
     """
     Model of an LHC Interaction Region
@@ -32,8 +36,15 @@ class LHCIR(LHCSection):
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        quads = model.filter(f"kt?q[xt]?[0-9]?\\.[lr]{irn}$") 
-        quads += model.filter(f"kq[0-9]\\.lr{irn}$")
+        quads = []
+        if is_hllhc(variant) and irn in [1, 5]:
+            triplets = model.filter(f"kqx[123][ab]?\\.[lr]{irn}$")
+        else:
+            triplets = model.filter(f"kqx\\.[lr]{irn}$")
+            triplets += model.filter(f"ktqx[12]\\.[lr]{irn}$")
+        quads += triplets
+        quads += model.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
+        quads += model.filter(f"kqt?[45]\\.[lr]+{irn}$")
         quads += model.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
         if irn == 7:
             if "kqt5.l7" in quads:
@@ -63,7 +74,7 @@ class LHCIR(LHCSection):
                     ppname = f"{param}ip{irn}b{beam}{suffix}"
                     if ppname in model:
                         params[ppname] = model[ppname]
-        return cls(name, strengths, params, knobs)
+        return cls(name, strengths, params, knobs, variant=variant)
 
     @classmethod
     def from_madxfile(cls, filename, name=None, stdout=False, variant="2025"):
@@ -83,7 +94,7 @@ class LHCIR(LHCSection):
         end=None,
         filename=None,
         parent=None,
-        variant="2025"
+        variant="2025",
     ):
         if name is None:
             name = self.__class__.name
@@ -99,6 +110,7 @@ class LHCIR(LHCSection):
             knobs,
             filename=filename,
             parent=parent,
+            variant=variant,
         )
         self.arc_left_name = f"a{lhcprev(irn)}{irn}"
         self.arc_right_name = f"a{irn}{lhcsucc(irn)}"

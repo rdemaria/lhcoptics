@@ -176,6 +176,7 @@ class LHCOptics:
         circuits=None,
         knob_structure=None,
         verbose=False,
+        variant='2025'
     ):
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
@@ -185,11 +186,11 @@ class LHCOptics:
             knob_structure = read_knob_structure(xsuite_model.env.metadata['knob_structure'])
         knobs = xsuite_model.make_and_set0_knobs(knob_structure.get('global', []))
         irs = [
-            ir.from_model(xsuite_model, knob_names=knob_structure.get(ir.name))
+            ir.from_model(xsuite_model, knob_names=knob_structure.get(ir.name), variant=variant)
             for ir in cls._irs
         ]
         arcs = [
-            LHCArc.from_model(xsuite_model, arc, knob_names=knob_structure.get(arc))
+            LHCArc.from_model(xsuite_model, arc, knob_names=knob_structure.get(arc), variant=variant)
             for arc in cls._arcs
         ]
         for k, knob in knobs.items():
@@ -211,6 +212,7 @@ class LHCOptics:
         stdout=False,
         verbose=False,
         knob_structure=None,
+        variant='2025'
     ):
         """
         Create an LHCOptics object from a MADX file.
@@ -251,6 +253,7 @@ class LHCOptics:
             make_model=make_model,
             xsuite_model=xsuite_model,
             verbose=verbose,
+            variant=variant
         )
 
     def __init__(
@@ -263,14 +266,15 @@ class LHCOptics:
         model=None,
         circuits=None,
         aperture=None,
+        variant='2025'
     ):
         if name is None:
             name = "lhcoptics"
         self.name = name
         if irs is None:
-            irs = [IR() for IR in self._irs]
+            irs = [IR(variant=variant) for IR in self._irs]
         if arcs is None:
-            arcs = [LHCArc(arc) for arc in self._arcs]
+            arcs = [LHCArc(arc, variant=variant) for arc in self._arcs]
         for ir in irs:
             setattr(self, ir.name, ir)
             ir.parent = self
