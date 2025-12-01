@@ -7,7 +7,7 @@ import xtrack as xt
 
 from .knob import Knob
 from .model_madx import LHCMadxModel
-from .utils import read_yaml, write_yaml, read_json, write_json
+from .utils import read_yaml, read_json, read_knob_structure
 
 import matplotlib.pyplot as plt
 
@@ -93,12 +93,7 @@ class LHCXsuiteModel:
     @classmethod
     def from_madx(cls, madx, sliced=False, madxfile=None, knob_structure=None):
 
-        if isinstance(knob_structure, str) or isinstance(knob_structure, Path):
-            knob_structure = str(knob_structure)
-            if knob_structure.endswith(".yaml"):
-                knob_structure = read_yaml(knob_structure)
-            elif knob_structure.endswith(".json"):
-                knob_structure = read_json(knob_structure)
+        knob_structure = read_knob_structure(knob_structure)
 
         if not madx.sequence.lhcb1.has_beam:
             madx.use(sequence="lhcb1")

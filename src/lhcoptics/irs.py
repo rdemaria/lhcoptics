@@ -22,17 +22,17 @@ class LHCIR(LHCSection):
     default_twiss_method = "init"
 
     @classmethod
-    def from_madx(cls, madx, name=None, knob_names=None):
+    def from_madx(cls, madx, name=None, knob_names=None, variant="2025"):
         madmodel = LHCMadxModel(madx)
-        return cls.from_model(madmodel, name, knob_names=knob_names)
+        return cls.from_model(madmodel, name, knob_names=knob_names, variant=variant)
 
     @classmethod
-    def from_model(cls, model, name=None, knob_names=None):
+    def from_model(cls, model, name=None, knob_names=None, variant="2025"):
         if name is None:
             name = cls.name
         irn = int(name[-1])
         strength_names = []
-        quads = model.filter(f"kt?q[xt]?[0-9]?\\.[lr]{irn}$")
+        quads = model.filter(f"kt?q[xt]?[0-9]?\\.[lr]{irn}$") 
         quads += model.filter(f"kq[0-9]\\.lr{irn}$")
         quads += model.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
         if irn == 7:
@@ -66,12 +66,12 @@ class LHCIR(LHCSection):
         return cls(name, strengths, params, knobs)
 
     @classmethod
-    def from_madxfile(cls, filename, name=None, stdout=False):
+    def from_madxfile(cls, filename, name=None, stdout=False, variant="2025"):
         from cpymad.madx import Madx
 
         madx = Madx(stdout=stdout)
         madx.call(filename)
-        return cls.from_madx(madx, name)
+        return cls.from_madx(madx, name, variant=variant)
 
     def __init__(
         self,
@@ -83,6 +83,7 @@ class LHCIR(LHCSection):
         end=None,
         filename=None,
         parent=None,
+        variant="2025"
     ):
         if name is None:
             name = self.__class__.name

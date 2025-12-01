@@ -17,10 +17,14 @@ class LHCIR1(LHCIR):
         "on_ov1",
     ]
 
+
     @property
     def quads(self):
-        return {
-            k: v
-            for k, v in self.strengths.items()
-            if re.match("kt?q[^s]", k) and not k.startswith("kq4")
-        }
+        if self.variant == "2025":
+            return {
+                k: v
+                for k, v in self.strengths.items()
+                if re.match("kt?q[^s]", k) and not k.startswith("kq4")
+            }
+        else:
+            return LHCIR.quads.__get__(self)

@@ -99,7 +99,7 @@ class LHCSection:
     @classmethod
     def from_madxfile(cls, filename):
         model = LHCMadxModel.from_madxfile(filename)
-        return cls.from_madx(model.madx, filename=filename)
+        return cls.from_madx(model.madx, filename=filename, variant="2025")
 
     def __init__(
         self,
@@ -111,8 +111,10 @@ class LHCSection:
         knobs=None,
         parent=None,
         filename=None,
+        variant="2025"
     ):
         self.name = name
+        self.variant = variant
         self.start = start
         self.end = end
         if strengths is None:

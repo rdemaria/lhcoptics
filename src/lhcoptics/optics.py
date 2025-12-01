@@ -25,25 +25,11 @@ from .utils import (
     deliver_list_str,
     print_diff_dict_float,
     print_diff_dict_objs,
-    read_yaml,
-    write_yaml,
-    read_json,
-    write_json,
+    read_knob_structure
 )
 
 _opl = ["_op", "_sq", ""]
 
-
-def read_knob_structure(filename_or_path_or_dict):
-    if isinstance(filename_or_path_or_dict, dict):
-        return filename_or_path_or_dict
-    filename = str(filename_or_path_or_dict)
-    if filename.endswith(".yaml"):
-        return read_yaml(filename)
-    elif filename.endswith(".json"):
-        return read_json(filename)
-    else:
-        raise ValueError(f"Unknown knob_structure file format: {filename}")
 
 
 class LHCOptics:
@@ -150,12 +136,13 @@ class LHCOptics:
         xsuite_model=None,
         circuits=None,
         verbose=False,
+        variant='2025'
     ):
         madmodel = LHCMadxModel(madx)
         knob_structure = read_knob_structure(knob_structure)
         knobs = madmodel.make_and_set0_knobs(knob_structure.get('global', []))
         irs = [
-            ir.from_model(madmodel, knob_names=knob_structure.get(ir.name))
+            ir.from_model(madmodel, knob_names=knob_structure.get(ir.name), variant=variant)
             for ir in cls._irs
         ]
         arcs = [
@@ -187,13 +174,15 @@ class LHCOptics:
         xsuite_model,
         name=None,
         circuits=None,
+        knob_structure=None,
         verbose=False,
     ):
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
         elif hasattr(xsuite_model, "to_json"):
             xsuite_model = LHCXsuiteModel(xsuite_model)
-        knob_structure = xsuite_model.env.metadata['knob_structure']
+        if knob_structure is None:
+            knob_structure = read_knob_structure(xsuite_model.env.metadata['knob_structure'])
         knobs = xsuite_model.make_and_set0_knobs(knob_structure.get('global', []))
         irs = [
             ir.from_model(xsuite_model, knob_names=knob_structure.get(ir.name))

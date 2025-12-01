@@ -25,12 +25,12 @@ class LHCArc(LHCSection):
 
 
     @classmethod
-    def from_madx(cls, madx, name, knob_names=None):
+    def from_madx(cls, madx, name, knob_names=None, variant="2025"):
         madmodel = LHCMadxModel(madx)
-        return cls.from_model(madmodel, name, knob_names=knob_names)
+        return cls.from_model(madmodel, name, knob_names=knob_names, variant=variant)
 
     @classmethod
-    def from_model(cls, model, name, knob_names=None):
+    def from_model(cls, model, name, knob_names=None, variant="2025"):
         i1, i2 = int(name[1]), int(name[2])
         strength_names = []
         strength_names += model.filter(f"kq[fd]\\.*{name}$")
@@ -58,6 +58,7 @@ class LHCArc(LHCSection):
         end=None,
         filename=None,
         parent=None,
+        variant="2025"
     ):
         i1, i2 = int(name[1]), int(name[2])
         start = f"s.ds.r{i1}"
@@ -71,6 +72,7 @@ class LHCArc(LHCSection):
             knobs,
             filename=filename,
             parent=parent,
+            variant=variant
         )
         self.i1 = i1
         self.i2 = i2

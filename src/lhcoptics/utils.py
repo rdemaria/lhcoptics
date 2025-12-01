@@ -367,3 +367,15 @@ def etree_to_dict(elem):
         else:
             d[elem.tag] = text
     return d
+
+
+def read_knob_structure(filename_or_path_or_dict):
+    if isinstance(filename_or_path_or_dict, dict):
+        return filename_or_path_or_dict
+    filename = str(filename_or_path_or_dict)
+    if filename.endswith(".yaml"):
+        return read_yaml(filename)
+    elif filename.endswith(".json"):
+        return read_json(filename)
+    else:
+        raise ValueError(f"Unknown knob_structure file format: {filename}")

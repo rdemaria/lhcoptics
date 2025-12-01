@@ -139,14 +139,9 @@ See `examples/repo/job_add_cycles.py`.
 ## TODO
 
 - add extra 2025 MD cycles
-- compile optics files in EOS
-    - madx files for madx/native xsuite
-    - LHCOptics json for the python library
-- add twiss tables in EOS
 - LHCOptics for hl optics
     - for the knobs use class approach based on some euristic in from_madx
 - missing knobs specialization
     - octupole knobs
     - dpp knmob
 - documentation
-- website
