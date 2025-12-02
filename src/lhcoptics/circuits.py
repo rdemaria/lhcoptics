@@ -4,24 +4,30 @@ import time
 from datetime import datetime
 
 import matplotlib.pyplot as plt
-#import matplotlib.dates as mdates
+
+# import matplotlib.dates as mdates
 import numpy as np
 
 from .lsa_util import get_lsa
-#from .nxcals_util import get_nxcals
+# from .nxcals_util import get_nxcals
+
 
 def str_to_unixtime(datestr):
-    return time.mktime(time.strptime(datestr,"%Y-%m-%d %H:%M:%S.%f"))
+    return time.mktime(time.strptime(datestr, "%Y-%m-%d %H:%M:%S.%f"))
+
 
 def format_xticks_as_datetime():
-    ax=plt.gca()
+    ax = plt.gca()
     unix_times = ax.get_xticks()
     ax.set_xticks(unix_times)
-    datetime_labels = [datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S') for ts in unix_times]
-    ax.set_xticklabels(datetime_labels, rotation=45, ha='right')
+    datetime_labels = [
+        datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S") for ts in unix_times
+    ]
+    ax.set_xticklabels(datetime_labels, rotation=45, ha="right")
     plt.tight_layout()
 
-kqx_limits = {
+
+kqx_limits = { #LHC 2025 with polarity inversions
     "kqx.l1": [0, 205.0],
     "kqx.r1": [-205.0, 0],
     "kqx.l2": [0, 205.0],
@@ -30,7 +36,15 @@ kqx_limits = {
     "kqx.r5": [0, 205.0],
     "kqx.l8": [0, 205.0],
     "kqx.r8": [-205.0, 0],
-}
+} 
+for irn in "15":
+    for q in ["1","2a","2b","3"]:
+      for lr in "lr":
+         a,b=0,132.6
+         if (lr=="r" and q.startswith("2")) or (lr=="l" and not q.startswith("2")):
+            a,b=-132.6,0
+        # HL-LHC   standard polarity
+         kqx_limits[f"kqx{q}.{lr}{irn}"] = [a,b]
 
 
 def madname_from_pcname(pc):
@@ -42,7 +56,6 @@ def madname_from_pcname(pc):
 
 
 class LHCCircuit:
-
     def __init__(
         self,
         pcname,
@@ -144,17 +157,17 @@ class LHCCircuit:
         return cls(**dct)
 
     def to_dict(self):
-        return {
-            k: v for k, v in self.__dict__.items() if not k.startswith("_")
-        }
+        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
-    def get_field(self, current):
+    def get_field(self, current, madname=None):
+        assert madname is None or madname == self.madname
         return self._calib.get_field(current) * self.calibsign
 
     def get_current(self, k, p0c=7e12):
         return self._calib.get_current(k, p0c) * self.calibsign
 
-    def get_klimits(self, pc=7e12):
+    def get_klimits(self, pc=7e12, madname=None):
+        assert madname is None or madname == self.madname
         brho = pc / 299792458
         limits = self.get_field([self.imin, self.imax]) / brho
         limits.sort()
@@ -175,7 +188,7 @@ class LHCCircuit:
     def plot_calib_deviation(self):
         self._calib.plot_deviation()
 
-    def get_measurements(self,db, start, end):
+    def get_measurements(self, db, start, end):
         if isinstance(start, str):
             start = str_to_unixtime(start)
         if isinstance(end, str):
@@ -183,11 +196,10 @@ class LHCCircuit:
         return db.get(self.get_nxcals_variables(), start, end)
 
     def get_nxcals_variables(self):
-        return [f"{self.pcname}:{ss}" for ss in ["I_MEAS", "V_MEAS","I_REF","V_REF"]]
+        return [f"{self.pcname}:{ss}" for ss in ["I_MEAS", "V_MEAS", "I_REF", "V_REF"]]
 
 
 class LHCCalibration:
-
     def __init__(self, name, current, field, fieldtype):
         self.name = name
         self.current = current
@@ -246,9 +258,7 @@ class LHCCalibration:
         brho = p0c / 299792458
         fieldk = k * brho
         if np.all(fieldk < self.fmin) or np.all(fieldk > self.fmax):
-            raise ValueError(
-                f"Field {fieldk} out of range [{self.fmin}, {self.fmax}]"
-            )
+            raise ValueError(f"Field {fieldk} out of range [{self.fmin}, {self.fmax}]")
         return np.interp(fieldk, self.field, self.current)
 
     def to_dict(self):
@@ -262,21 +272,15 @@ class LHCCalibration:
         plt.plot(self.current, self.field, "k", label="Field")
         plt.xlabel("Current [A]")
         plt.ylabel("Field [T/m^n]")
-        dfdi = (self.field[-1] - self.field[0]) / (
-            self.current[-1] - self.current[0]
-        )
-        plt.plot(
-            self.current, dfdi * self.current, "r", label="Field Deviation"
-        )
+        dfdi = (self.field[-1] - self.field[0]) / (self.current[-1] - self.current[0])
+        plt.plot(self.current, dfdi * self.current, "r", label="Field Deviation")
         plt.title(self.name)
         plt.grid(True)
         plt.legend()
 
     def plot_deviation(self):
         plt.figure(num=self.name + " deviation")
-        dfdi = (self.field[-1] - self.field[0]) / (
-            self.current[-1] - self.current[0]
-        )
+        dfdi = (self.field[-1] - self.field[0]) / (self.current[-1] - self.current[0])
         plt.plot(self.current, self.field - dfdi * self.current, "k")
         plt.xlabel("Current [A]")
         plt.ylabel("Field Deviation [T/m^n]")
@@ -292,9 +296,7 @@ class LHCCalibration:
             return f"<LHCCalibration {self.name}, empty>"
 
 
-
 class LHCCircuits:
-
     def __init__(self, circuits, calibrations=None, circuits2in1=None):
         self.pcname = circuits
         if calibrations is None:
@@ -370,9 +372,7 @@ class LHCCircuits:
             circuits[cir.pcname] = cir
 
         calibnames = {
-            cir.calibname
-            for cir in circuits.values()
-            if cir.calibname is not None
+            cir.calibname for cir in circuits.values() if cir.calibname is not None
         }
         calibrations = cls.get_calibs_from_lsa(calibnames)
         return cls(circuits, calibrations=calibrations)
@@ -381,8 +381,7 @@ class LHCCircuits:
     def from_dict(cls, dct):
         circuits = {k: LHCCircuit.from_dict(v) for k, v in dct["circuits"].items()}
         calibrations = {
-            k: LHCCalibration.from_dict(v)
-            for k, v in dct["calibrations"].items()
+            k: LHCCalibration.from_dict(v) for k, v in dct["calibrations"].items()
         }
         circuits2in1 = {
             k: LHCCircuit2in1.from_dict(v)
@@ -396,15 +395,69 @@ class LHCCircuits:
             data = json.load(f)
             return cls.from_dict(data)
 
+    def add_calibration(self, name, field, current, fieldtype):
+        calibration = LHCCalibration(name, current, field, fieldtype)
+        self.calibrations[calibration.name] = calibration
+
+    def add_circuit(
+        self,
+        pcname,
+        logicalname=None,
+        madname=None,
+        calibname=None,
+        calibsign=None,
+        imin=0,
+        imax=0,
+        inominal=0,
+        iultimate=0,
+        vmin=0,
+        vmax=0,
+        ipmin=0,
+        ipmax=0,
+        ippmin=0,
+        ippmax=0,
+        vpmin=0,
+        vpmax=0,
+        polarity=0,
+        r1=0,
+        l1=0,
+        c1=0,
+    ):
+        circuit = LHCCircuit(
+            pcname,
+            logicalname=logicalname,
+            madname=madname,
+            calibname=calibname,
+            calibsign=calibsign,
+            imin=imin,
+            imax=imax,
+            inominal=inominal,
+            iultimate=iultimate,
+            vmin=vmin,
+            vmax=vmax,
+            ipmin=ipmin,
+            ipmax=ipmax,
+            ippmin=ippmin,
+            ippmax=ippmax,
+            vpmin=vpmin,
+            vpmax=vpmax,
+            polarity=polarity,
+            r1=r1,
+            l1=l1,
+            c1=c1,
+        )
+        circuit._calib = self.calibrations.get(circuit.calibname)
+        self.pcname[pcname] = circuit
+        if madname:
+            self.madname[madname] = circuit
+        if logicalname:
+            self.logicalname[logicalname] = circuit
+
     def to_dict(self):
         return {
             "circuits": {k: v.to_dict() for k, v in self.pcname.items()},
-            "calibrations": {
-                k: v.to_dict() for k, v in self.calibrations.items()
-            },
-            "circuits2in1": {
-                k: v.to_dict() for k, v in self.pcname2in1.items()
-            },
+            "calibrations": {k: v.to_dict() for k, v in self.calibrations.items()},
+            "circuits2in1": {k: v.to_dict() for k, v in self.pcname2in1.items()},
         }
 
     def to_json(self, filename):
@@ -473,10 +526,14 @@ class LHCCircuits:
 
     def find_calib(self, name):
         return [
-            calib
-            for cname, calib in self.calibrations.items()
-            if re.match(name, cname)
+            calib for cname, calib in self.calibrations.items() if re.match(name, cname)
         ]
+
+    def delete_unused_calibrations(self):
+        used_calibs = {cir.calibname for cir in self.pcname.values()}
+        unused_calibs = set(self.calibrations.keys()) - used_calibs
+        for calibname in unused_calibs:
+            del self.calibrations[calibname]
 
     def find_pc(self, madname=None, pcname=None, logicalname=None):
         out = []
@@ -487,11 +544,7 @@ class LHCCircuits:
                 if pc.madname and re.match(madname, pc.madname)
             ]
         if pcname:
-            out += [
-                pc
-                for pc in self.pcname.values()
-                if re.match(pcname, pc.pcname)
-            ]
+            out += [pc for pc in self.pcname.values() if re.match(pcname, pc.pcname)]
         if logicalname:
             out += [
                 pc
@@ -509,7 +562,9 @@ class LHCCircuits:
             raise KeyError(f"Key {key} not found in {self}")
 
     def __repr__(self) -> str:
-        return f"<LHCCircuits {len(self.pcname)} circuits, {len(self.pcname2in1)} 2-in-1>"
+        return (
+            f"<LHCCircuits {len(self.pcname)} circuits, {len(self.pcname2in1)} 2-in-1>"
+        )
 
 
 class LHCCircuit2in1:

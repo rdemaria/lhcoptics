@@ -7,7 +7,7 @@ LHCArc -> Contains strengths, constraints, knobs
 
 __version__ = "0.0.3"
 from .arcs import LHCArc
-from .circuits import LHCCircuits
+from .circuits import LHCCircuits, LHCCalibration, LHCCircuit, LHCCircuit2in1
 from .lsa_util import get_lsa
 from .nxcals_util import get_spark, get_nxcals, NXCals
 from .ir1 import LHCIR1
@@ -40,6 +40,9 @@ __all__ = [
     "LHCAperture",
     "LHCArc",
     "LHCCircuits",
+    "LHCCalibration",
+    "LHCCircuit",
+    "LHCCircuit2in1",
     "LHCIR1",
     "LHCIR2",
     "LHCIR3",

@@ -184,6 +184,10 @@ class LHCOptics:
             xsuite_model = LHCXsuiteModel(xsuite_model)
         if knob_structure is None:
             knob_structure = read_knob_structure(xsuite_model.env.metadata['knob_structure'])
+        elif isinstance(knob_structure, str) or isinstance(knob_structure, Path):
+            knob_structure = read_knob_structure(knob_structure)
+        else:
+            print("No knob_structure provided")
         knobs = xsuite_model.make_and_set0_knobs(knob_structure.get('global', []))
         irs = [
             ir.from_model(xsuite_model, knob_names=knob_structure.get(ir.name), variant=variant)
@@ -199,6 +203,7 @@ class LHCOptics:
         self.model=xsuite_model#  TODO replace with set_xsuite_model to make more checks
         if circuits is not None:
             self.set_circuits(circuits)
+        self.set_params()
         return self
 
     @classmethod

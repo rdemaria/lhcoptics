@@ -194,4 +194,6 @@ class LHCIR7(LHCIR):
         opt.disable(target="spdx")
         opt.disable(target="mu.*_l")
         self.optmizer = opt
+        opt.target_status()
+        opt.vary_status()
         return opt

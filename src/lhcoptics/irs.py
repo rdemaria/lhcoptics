@@ -530,6 +530,13 @@ class LHCIR(LHCSection):
                 match.disable(vary_name=kl)
                 match.disable(vary_name=kr)
 
+        for kl, kr in zip(self.kqxl, self.kqxr):
+            if "kqx2b" in kl:
+                self.parent.model.vars[kl] = self.parent.model.vars[kl.replace("2b", "2a")]
+                self.parent.model.vars[kr] = self.parent.model.vars[kr.replace("2b", "2a")]
+                match.disable(vary_name=kl)
+                match.disable(vary_name=kr)
+
         if self.parent.params.get("match_inj"):
             if self.name == "ir2" or self.name == "ir8":
                 match.disable(vary_name="kt?qx.*")
