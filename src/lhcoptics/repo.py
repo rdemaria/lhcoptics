@@ -1257,7 +1257,7 @@ call, file="acc-models-lhc/{settings_path}";
             eos_repo_path = Path(eos_repo_path)
         return eos_repo_path / time_step_relative_path
 
-    def get_lhcoptics(self, idx=None, ts=None, xsuite=True):
+    def get_lhcoptics(self, idx=None, ts=None, xsuite=True, set_params=True):
         """Get the LHC optics for the given time step"""
         assert idx is not None or ts is not None, "Either idx or ts must be provided"
         if idx is not None:
@@ -1272,9 +1272,12 @@ call, file="acc-models-lhc/{settings_path}";
             madx=madx,
             name=name,
             xsuite_model=xsuite_model,
-            knob_structure=self.parent.parent.get_knob_structure()
+            knob_structure=self.parent.parent.get_knob_structure(),
         )
-        opt.set_params()
+        if set_params:
+            opt.set_knobs_off()
+            opt.set_params()
+            opt.set_knobs_on()
         return opt
 
     def get_lhcoptics_from_eos(self, idx=None, ts=None, xsuite=True):

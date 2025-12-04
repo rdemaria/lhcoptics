@@ -138,6 +138,25 @@ class LHCOptics:
         verbose=False,
         variant='2025'
     ):
+        """
+        Create an LHCOptics object from a MADX model.
+    
+        Steps:
+            1. Create a MADX model from the provided `madx` object.
+            2. Read the knob structure from the `knob_structure` parameter.
+            3. Create knobs using the MADX model and the knob structure.
+               This sets also the knob values to zero in the model
+            4. Populate the sections using from_model
+                1. collect stregnth names
+                2. make and set knob values to zero
+                3. get strengths values
+                4. put knobs back
+                5. get params from variables if they exist
+            5. Restores the knob values
+            6. If ask create an xsuite or madx model, or uses one
+            7. Set the model
+            8. Set the ciruits if needed
+        """
         madmodel = LHCMadxModel(madx)
         knob_structure = read_knob_structure(knob_structure)
         knobs = madmodel.make_and_set0_knobs(knob_structure.get('global', []))
