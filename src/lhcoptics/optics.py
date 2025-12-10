@@ -26,6 +26,7 @@ from .utils import (
     print_diff_dict_float,
     print_diff_dict_objs,
     read_knob_structure,
+    find_comparable_values,
 )
 
 _opl = ["_op", "_sq", ""]
@@ -225,8 +226,6 @@ class LHCOptics:
         LHCOptics
             The LHCOptics object.
         """
-
-
 
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
@@ -442,6 +441,39 @@ class LHCOptics:
             out.update(irout)
         return out
 
+    def compare_init_ir15(self, tol=1e-6):
+        """
+        Compare the initial ATS at the left of IR1 and IR5 for both beams.
+        """
+        self.ir1.set_init()
+        self.ir5.set_init()
+        for beam in [1, 2]:
+            for var in "betx bety alfx alfy dx dpx".split():
+                for lr in ["left", "right"]:
+                    ini1 = getattr(self.ir1, "init_" + lr)[beam]
+                    ini5 = getattr(self.ir5, "init_" + lr)[beam]
+                    v1 = getattr(ini1, var)
+                    v5 = getattr(ini5, var)
+                    diff = abs(v1 - v5)
+                    print(
+                        f"{lr.capitalize():<5} b{beam} {var:<4}: IR1={v1:15.6e} IR5={v5:15.6e} diff={diff:15.6e}"
+                    )
+
+    def compare_twiss_ir15(self, stol=1e-6):
+        out = {}
+        for beam in [1, 2]:
+            tw1 = self.ir1.twiss_from_params(beam)
+            tw5 = self.ir5.twiss_from_params(beam)
+            ia, ib = find_comparable_values(tw1.s, tw5.s, tol=stol)
+            for var in "s betx bety alfx alfy dx dpx".split():
+                v1 = tw1[var][ia]
+                v5 = tw5[var][ib]
+                out[f"{var}b{beam}_ir{1}"] = v1
+                out[f"{var}b{beam}_ir{5}"] = v5
+        return out
+
+
+
     def copy(self, name=None):
         """
         Copy the optics object, including all sections and knobs.
@@ -459,19 +491,35 @@ class LHCOptics:
         )
         return other
 
-    def diff(self, other, full=True):
+    def copy_ir1_to_ir5(self):
+        """
+        Copy the IR1 parameters, strengths and knobs to IR5.
+        """
+        for name, value in self.ir1.params.items():
+            if name.replace("ip1", "ip5") in self.ir5.params:
+                self.ir5.params[name.replace("ip1", "ip5")] = value
+        for name, value in self.ir1.strengths.items():
+            name5 = name.replace(".l1", ".l5").replace(".r1", ".r5")
+            if name5 in self.ir5.strengths:
+                print(f"Copying strength {name} to {name5}: {value}")
+                self.ir5.strengths[name5] = value
+
+    def diff(self, other=None, full=True):
         """
         Compare the optics with another optics object or a json file.
         """
-        if isinstance(other, str) or isinstance(other, Path):
-            other = self.__class__.from_json(other)
-        self.diff_knobs(other)
-        self.diff_params(other)
-        if full:
-            for ss, so in zip(self.irs + self.arcs, other.irs + other.arcs):
-                ss.diff_strengths(so)
-                ss.diff_knobs(so)
-                ss.diff_params(so)
+        if other is None:
+            self.diff_model()
+        else:
+            if isinstance(other, str) or isinstance(other, Path):
+                other = self.__class__.from_json(other)
+            self.diff_knobs(other)
+            self.diff_params(other)
+            if full:
+                for ss, so in zip(self.irs + self.arcs, other.irs + other.arcs):
+                    ss.diff_strengths(so)
+                    ss.diff_knobs(so)
+                    ss.diff_params(so)
 
     def diff_model(self, model=None):
         """Display differences in strengths with respect to a model."""
@@ -618,13 +666,17 @@ class LHCOptics:
         }
         return out
 
-    def get_params(self,mode="from_twiss_init"):
+    def get_params(self, mode="from_twiss_init"):
         """
         Get the parameters from the optics and its sections.
         """
         if mode.startswith("from_twiss"):
-            tw1 = self.model.b1.twiss(compute_chromatic_properties=True, strengths=False)
-            tw2 = self.model.b2.twiss(compute_chromatic_properties=True, strengths=False)
+            tw1 = self.model.b1.twiss(
+                compute_chromatic_properties=True, strengths=False
+            )
+            tw2 = self.model.b2.twiss(
+                compute_chromatic_properties=True, strengths=False
+            )
             return self.get_params_from_twiss(tw1, tw2)
         elif mode == "from_variables":
             return self.get_params_from_variables()
@@ -655,7 +707,12 @@ class LHCOptics:
         Get the parameters from the model variables.
         """
         params = {}
-        params["p0c"]=self.model.get("p0c",self.model.get("nrj",0)*1e9)
+        if "p0c" in self.model:
+            params["p0c"] = self.model["p0c"]
+        elif "nrj" in self.model:
+            params["p0c"] = self.model["nrj"] * 1e9
+        else:
+            params["p0c"] = self.model.get_p0c()
         var_names = (
             "qxb1",
             "qyb1",

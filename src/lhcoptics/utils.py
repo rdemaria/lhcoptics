@@ -7,6 +7,7 @@ import json
 import time
 from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
+import numpy as np
 
 import ruamel.yaml
 
@@ -391,3 +392,37 @@ def read_knob_structure(filename_or_path_or_dict):
         return read_json(filename)
     else:
         raise ValueError(f"Unknown knob_structure file format: {filename}")
+
+
+def find_comparable_values(a, b, tol=1e-6):
+    """
+    Return the indices of values that are comparable between two lists a and b ascending values, not necessarily of the same length.
+
+    Args:
+        a (list of float): First list of values.
+        b (list of float): Second list of values.
+        tol (float): Tolerance for comparison.
+    Returns:
+        list of int: Indices of comparable values.
+    """
+    a=sorted(a)
+    b=sorted(b)
+    ia=0
+    ib=0
+    indices_a=[]
+    indices_b=[]
+    while ia < len(a) and ib < len(b):
+        if abs(a[ia]-b[ib]) < tol:
+            indices_a.append(ia)
+            indices_b.append(ib)
+            ia += 1
+            ib += 1
+        elif a[ia] < b[ib]:
+            ia += 1
+        else:
+            ib += 1
+    return np.array(indices_a), np.array(indices_b)
+
+
+
+

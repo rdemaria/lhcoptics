@@ -504,6 +504,9 @@ class LHCXsuiteModel:
     def get(self, key, default=None):
         return self._var_values.get(key, default)
 
+    def get_p0c(self):
+        return self.env.b1.particle_ref.p0c[0]
+
     def __getitem__(self, key):
         return self._var_values[key]
 

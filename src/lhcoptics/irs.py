@@ -733,7 +733,8 @@ class LHCIR(LHCSection):
             dpx=self.params[f"dpx{self.ipname}b{beam}"],
         )
         return sequence.twiss(
-            start=self.startb12[beam - 1], end=self.endb12[beam - 1], init=init
+            start=self.startb12[beam - 1], end=self.endb12[beam - 1], init=init,
+            zero_at=self.ipname
         )
 
     def twiss_full(self, beam, strengths=True):
