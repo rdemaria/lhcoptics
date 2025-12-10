@@ -58,7 +58,7 @@ class LHCIR(LHCSection):
         strength_names += sort_n(acb)
         if knob_names is None:
             knob_names = cls.knob_names
-        knobs = model.make_and_set0_knobs(knob_names)
+        knobs = model.make_and_set0_knobs(knob_names, variant=variant)
         strengths = {st: model[st] for st in strength_names}
         for knob in knobs:
             model[knob] = knobs[knob].value
@@ -172,6 +172,7 @@ class LHCIR(LHCSection):
     @property
     def kqxr(self):
         return [k for k in self.quads if "r" in k and "x" in k]
+
 
     def check_quad_strengths(
         self,
@@ -522,6 +523,7 @@ class LHCIR(LHCSection):
 
         if sym_triplets:
             for kl, kr in zip(self.kqxl, self.kqxr):
+                print(f"Setting {kl} = -{kr} -> {-self.parent.model[kr]}")
                 self.parent.model.vars[kl] = -self.parent.model.vars[kr]
                 match.disable(vary_name=kl)
 
@@ -563,8 +565,8 @@ class LHCIR(LHCSection):
             match.disable(vary_name="kq4.r6b2")
         self.optimizer = match
         if verbose:
-            match.target_status()
             match.vary_status()
+            match.target_status()
         return match
 
     def match_knobs(self, **kwargs):

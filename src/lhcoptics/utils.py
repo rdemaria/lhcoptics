@@ -90,8 +90,13 @@ def iter_rows(table):
         yield Row(*[table._data[cn][i] for cn in table._col_names])
 
 
-def print_diff_dict_float(dct1, dct2):
-    allk = set(dct1.keys()) | set(dct2.keys())
+def print_diff_dict_float(dct1, dct2, keys='union'):
+    if keys == 'union':
+        allk = set(dct1.keys()) | set(dct2.keys())
+    elif keys == 'intersection':
+        allk = set(dct1.keys()) & set(dct2.keys())
+    else:
+        allk = set(keys)
     for k in sorted(allk):
         if k not in dct1:
             print(f"{k:20} {dct2[k]:15.6g} only in other")
@@ -101,8 +106,15 @@ def print_diff_dict_float(dct1, dct2):
             print(f"{k:20} {dct1[k]:15.6g} != {dct2[k]:15.6g}")
 
 
-def print_diff_dict_objs(dct1, dct2):
-    allk = set(dct1.keys()) | set(dct2.keys())
+
+
+def print_diff_dict_objs(dct1, dct2, keys='union'):
+    if keys == 'union':
+        allk = set(dct1.keys()) | set(dct2.keys())
+    elif keys == 'intersection':
+        allk = set(dct1.keys()) & set(dct2.keys())
+    else:
+        allk = set(keys)
     for k in sorted(allk):
         if k not in dct1:
             print(f"{k:20} only in other")

@@ -25,11 +25,10 @@ from .utils import (
     deliver_list_str,
     print_diff_dict_float,
     print_diff_dict_objs,
-    read_knob_structure
+    read_knob_structure,
 )
 
 _opl = ["_op", "_sq", ""]
-
 
 
 class LHCOptics:
@@ -136,11 +135,11 @@ class LHCOptics:
         xsuite_model=None,
         circuits=None,
         verbose=False,
-        variant='2025'
+        variant="2025",
     ):
         """
         Create an LHCOptics object from a MADX model.
-    
+
         Steps:
             1. Create a MADX model from the provided `madx` object.
             2. Read the knob structure from the `knob_structure` parameter.
@@ -159,9 +158,13 @@ class LHCOptics:
         """
         madmodel = LHCMadxModel(madx)
         knob_structure = read_knob_structure(knob_structure)
-        knobs = madmodel.make_and_set0_knobs(knob_structure.get('global', []))
+        knobs = madmodel.make_and_set0_knobs(
+            knob_structure.get("global", []), variant=variant
+        )
         irs = [
-            ir.from_model(madmodel, knob_names=knob_structure.get(ir.name), variant=variant)
+            ir.from_model(
+                madmodel, knob_names=knob_structure.get(ir.name), variant=variant
+            )
             for ir in cls._irs
         ]
         arcs = [
@@ -172,7 +175,9 @@ class LHCOptics:
             madmodel[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs)
         if make_model == "xsuite":
-            xsuite_model = LHCXsuiteModel.from_madx(madx, sliced=sliced, knob_structure=knob_structure)
+            xsuite_model = LHCXsuiteModel.from_madx(
+                madx, sliced=sliced, knob_structure=knob_structure
+            )
         elif make_model == "madx":
             self.model = madmodel
         elif make_model is None:
@@ -195,34 +200,44 @@ class LHCOptics:
         circuits=None,
         knob_structure=None,
         verbose=False,
-        variant='2025'
+        variant="2025",
     ):
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
         elif hasattr(xsuite_model, "to_json"):
             xsuite_model = LHCXsuiteModel(xsuite_model)
         if knob_structure is None:
-            knob_structure = read_knob_structure(xsuite_model.env.metadata['knob_structure'])
+            knob_structure = read_knob_structure(
+                xsuite_model.env.metadata["knob_structure"]
+            )
         elif isinstance(knob_structure, str) or isinstance(knob_structure, Path):
             knob_structure = read_knob_structure(knob_structure)
         else:
             print("No knob_structure provided")
-        knobs = xsuite_model.make_and_set0_knobs(knob_structure.get('global', []))
+        knobs = xsuite_model.make_and_set0_knobs(
+            knob_structure.get("global", []), variant=variant
+        )
         irs = [
-            ir.from_model(xsuite_model, knob_names=knob_structure.get(ir.name), variant=variant)
+            ir.from_model(
+                xsuite_model, knob_names=knob_structure.get(ir.name), variant=variant
+            )
             for ir in cls._irs
         ]
         arcs = [
-            LHCArc.from_model(xsuite_model, arc, knob_names=knob_structure.get(arc), variant=variant)
+            LHCArc.from_model(
+                xsuite_model, arc, knob_names=knob_structure.get(arc), variant=variant
+            )
             for arc in cls._arcs
         ]
-        for k, knob in knobs.items():
-            xsuite_model[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs)
-        self.model=xsuite_model#  TODO replace with set_xsuite_model to make more checks
+        self.model = (
+            xsuite_model  #  TODO replace with set_xsuite_model to make more checks
+        )
         if circuits is not None:
             self.set_circuits(circuits)
         self.set_params()
+        for k, knob in knobs.items():
+            xsuite_model[k] = knob.value
         return self
 
     @classmethod
@@ -236,7 +251,7 @@ class LHCOptics:
         stdout=False,
         verbose=False,
         knob_structure=None,
-        variant='2025'
+        variant="2025",
     ):
         """
         Create an LHCOptics object from a MADX file.
@@ -277,7 +292,7 @@ class LHCOptics:
             make_model=make_model,
             xsuite_model=xsuite_model,
             verbose=verbose,
-            variant=variant
+            variant=variant,
         )
 
     def __init__(
@@ -290,7 +305,7 @@ class LHCOptics:
         model=None,
         circuits=None,
         aperture=None,
-        variant='2025'
+        variant="2025",
     ):
         if name is None:
             name = "lhcoptics"
@@ -370,7 +385,15 @@ class LHCOptics:
 
     def check_knobs(self):
         for knob in self.find_knobs():
-            knob.check()
+            try:
+                knob.check()
+            except Exception as e:
+                print(f"Error checking knob {knob.name}: {e}")
+
+    def check_match(self):
+        for ss in self.irs + self.arcs:
+            res = ss.check_match()
+            print(f"{ss.name} {res}")
 
     def check_quad_strengths(
         self,
@@ -391,11 +414,6 @@ class LHCOptics:
             )
             out.update(irout)
         return out
-
-    def check_match(self):
-        for ss in self.irs + self.arcs:
-            opt = ss.match()
-            print(f"{ss.name} {opt.within_tol}")
 
     def copy(self, name=None):
         """
@@ -427,6 +445,12 @@ class LHCOptics:
                 ss.diff_strengths(so)
                 ss.diff_knobs(so)
                 ss.diff_params(so)
+
+    def diff_model(self, model=None):
+        """Display differences in strengths with respect to a model."""
+        model = self.model if model is None else model
+        for ss in self.irs + self.arcs:
+            ss.diff_model(model=model)
 
     def diff_knobs(self, other):
         print_diff_dict_objs(self.knobs, other.knobs)
@@ -970,6 +994,7 @@ class LHCOptics:
         knobs_off=False,
         set_init=True,
         knobs=True,
+        knobs_check=False,
     ):
         """
         Update model from an optics or a dict.
@@ -989,12 +1014,19 @@ class LHCOptics:
                     lbl = f"{src}[{ss.name!r}]"
                 if verbose:
                     print(f"Update strengths and knobs in {ss.name!r} from {lbl}")
-                ss.update_model(src=src_ss, verbose=verbose, knobs_off=knobs_off)
+                ss.update_model(
+                    src=src_ss,
+                    verbose=verbose,
+                    knobs_off=knobs_off,
+                    knobs_check=knobs_check,
+                )
         # knobs must be updated after the strengths
         if knobs:
             if verbose:
                 print(f"Update knobs from {src}")
-            self.model.update_knobs(src.knobs, verbose=verbose, knobs_off=knobs_off)
+            self.model.update_knobs(
+                src.knobs, verbose=verbose, knobs_off=knobs_off, knobs_check=knobs_check
+            )
         if "p0c" in self.params:
             self.model.p0c = self.params["p0c"]
         if set_init:

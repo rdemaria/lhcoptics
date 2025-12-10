@@ -1,12 +1,21 @@
+from pathlib import Path
+
 import pytest
-from lhcoptics import LHC
+import xtrack as xt
+from lhcoptics import LHCOptics
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data" / "hllhc"
+
 
 @pytest.fixture
-def lhc_optics(request):
-    lhc = LHC()
-    opt= lhc.y2025.pp.ramp[0]
-    return opt
+def lhc_model():
+    return xt.load(str(DATA_DIR / "lhc.json"))
 
-def test_lhcoptics(lhc_optics):
-    opt = lhc_optics
+def test_lhcoptics_from_xsuite(lhc_model):
+    opt = LHCOptics.from_xsuite(
+        lhc_model,
+        variant="hl",
+        knob_structure=str(DATA_DIR / "knobs.yaml"),
+        circuits=str(DATA_DIR / "lhccircuits.json"),
+    )
     assert opt is not None

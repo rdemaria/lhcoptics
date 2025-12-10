@@ -106,6 +106,7 @@ class LHCIR7(LHCIR):
         b2=True,
         common=True,
         hold_init=False,
+        verbose=True,
     ):
         if self.parent.model is None:
             raise ValueError("Model not set for {self)")
@@ -194,6 +195,7 @@ class LHCIR7(LHCIR):
         opt.disable(target="spdx")
         opt.disable(target="mu.*_l")
         self.optmizer = opt
-        opt.target_status()
-        opt.vary_status()
+        if verbose:
+            opt.vary_status()
+            opt.target_status()
         return opt

@@ -134,14 +134,3 @@ Repository objects have the following methods
 ## Generating scenario directory
 
 See `examples/repo/job_add_cycles.py`.
-
-
-## TODO
-
-- add extra 2025 MD cycles
-- LHCOptics for hl optics
-    - for the knobs use class approach based on some euristic in from_madx
-- missing knobs specialization
-    - octupole knobs
-    - dpp knmob
-- documentation

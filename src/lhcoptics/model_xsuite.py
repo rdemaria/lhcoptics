@@ -92,7 +92,6 @@ class LHCXsuiteModel:
 
     @classmethod
     def from_madx(cls, madx, sliced=False, madxfile=None, knob_structure=None):
-
         knob_structure = read_knob_structure(knob_structure)
 
         if not madx.sequence.lhcb1.has_beam:
@@ -104,12 +103,8 @@ class LHCXsuiteModel:
         )
         lines["b1"] = lines.pop("lhcb1")
         lines["b2"] = lines.pop("lhcb2")
-        lines["b1"].particle_ref = xt.Particles(
-            mass0=xt.PROTON_MASS_EV, p0c=450e9
-        )
-        lines["b2"].particle_ref = xt.Particles(
-            mass0=xt.PROTON_MASS_EV, p0c=450e9
-        )
+        lines["b1"].particle_ref = xt.Particles(mass0=xt.PROTON_MASS_EV, p0c=450e9)
+        lines["b2"].particle_ref = xt.Particles(mass0=xt.PROTON_MASS_EV, p0c=450e9)
 
         lhc = xt.Environment(lines=lines)
         for ll in lhc.lines.values():
@@ -119,7 +114,7 @@ class LHCXsuiteModel:
             ll.twiss_default["compute_chromatic_properties"] = False
             if "b2" in ll.name:
                 ll.twiss_default["reverse"] = True
-            ll.metadata=lines[ll.name].metadata
+            ll.metadata = lines[ll.name].metadata
 
         if sliced:
             for ln, ll in list(lines.items()):
@@ -127,12 +122,8 @@ class LHCXsuiteModel:
                 ls.slice_thick_elements(
                     slicing_strategies=[
                         xt.Strategy(slicing=None),
-                        xt.Strategy(
-                            slicing=xt.Uniform(8, mode="thick"), name="mb.*"
-                        ),
-                        xt.Strategy(
-                            slicing=xt.Uniform(8, mode="thick"), name="mq.*"
-                        ),
+                        xt.Strategy(slicing=xt.Uniform(8, mode="thick"), name="mb.*"),
+                        xt.Strategy(slicing=xt.Uniform(8, mode="thick"), name="mq.*"),
                     ]
                 )
                 lhc.lines[f"{ln}s"] = ls
@@ -141,10 +132,14 @@ class LHCXsuiteModel:
         out = cls(env=lhc, madxfile=madxfile)
         return out
 
+    def keys(self):
+        return self._var_values.keys()
+
     @classmethod
     def from_json(cls, jsonfile):
         import xtrack as xt
-        jsonfile=str(jsonfile)
+
+        jsonfile = str(jsonfile)
 
         lhc = xt.Environment.from_json(jsonfile)
         return cls(lhc, jsonfile=jsonfile)
@@ -180,6 +175,7 @@ class LHCXsuiteModel:
         self.env.b1.particle_ref.p0c = value
         self.env.b2.particle_ref.p0c = value
 
+
     def update_vars(self, strengths, verbose=False):
         for k, v in strengths.items():
             if verbose:
@@ -209,9 +205,8 @@ class LHCXsuiteModel:
             print(f"Dependencies {depnames!r}")
         if depnames != set(knob.weights.keys()):
             if verbose:
-                print(
-                    f"Dependencies do not match with {set(knob.weights.keys())}"
-                )
+                knob_weights = set(knob.weights.keys())
+                print(f"Model weghts `{depnames}` != knob weights `{knob_weights}`")
             return False
         else:
             for depname in depnames:
@@ -222,11 +217,13 @@ class LHCXsuiteModel:
                     return False
             return True
 
-    def update_knobs(self, knobs, verbose=False, knobs_off=False):
+    def update_knobs(self, knobs, verbose=False, knobs_off=False, knobs_check=True):
         for k, knob in knobs.items():
-            self.update_knob(knob, verbose=verbose, knobs_off=knobs_off)
+            self.update_knob(
+                knob, verbose=verbose, knobs_off=knobs_off, knob_check=knobs_check
+            )
 
-    def update_knob(self, knob, verbose=False, knobs_off=False):
+    def update_knob(self, knob, verbose=False, knobs_off=False, knob_check=True):
         """
         Update the model with the knob
 
@@ -234,15 +231,18 @@ class LHCXsuiteModel:
         If it exists, check that has the same structure
         else raise an error.
         If it does not exist, create it.
-
+        When  knob_check is False, skip the structure check and create a new knob
+        if the knob does not exist.
+        This is danagerous because it can break other knobs.
         """
         knobname = knob.name
-        check = self.knob_check(knob)
+        if knob_check:
+            check = self.knob_check(knob)
+        else:
+            check = None
         if check is False:
             self.knob_check(knob, verbose=verbose)
-            raise ValueError(
-                f"Knob {knobname} has different structure in {self}"
-            )
+            raise ValueError(f"Knob {knobname} has different structure in {self}")
         else:
             if not knobs_off:
                 if verbose and knob.value != self[knobname]:
@@ -253,16 +253,12 @@ class LHCXsuiteModel:
             for wtarget, value in knob.weights.items():
                 wname = f"{wtarget}_from_{knobname}"
                 if verbose and wname in self and self[wname] != value:
-                    print(
-                        f"Update {wname} from {self[wname]:15.6g} to {value:15.6g}"
-                    )
+                    print(f"Update {wname} from {self[wname]:15.6g} to {value:15.6g}")
                 self[wname] = value
                 if check is None:
-                    # if verbose:
-                    #    print(f"Add expression {wtarget} += {wname}*{knobname}")
-                    self.vars[wtarget] += (
-                        self.vars[wname] * self.vars[knobname]
-                    )
+                    if verbose:
+                        print(f"Add expression {wtarget} += {wname}*{knobname}")
+                    self.vars[wtarget] += self.vars[wname] * self.vars[knobname]
 
     def _erase_knob(self, knob):
         """
@@ -276,13 +272,12 @@ class LHCXsuiteModel:
             if wname in self._var_values:
                 del self._var_values[wname]
 
-
     def get_knob(self, knob):
         value = self._var_values[knob.name]
         weights = {}
         for wname in knob.weights:
             weights[wname] = self._var_values[f"{wname}_from_{knob.name}"]
-        return Knob(knob.name, value, weights).specialize()
+        return Knob(knob.name, value, weights, variant=knob.variant).specialize()
 
     def show_knob(self, knobname):
         print(f"Knob: {knobname} = {self[knobname]:15.6g}")
@@ -293,16 +288,22 @@ class LHCXsuiteModel:
             if wname in self:
                 print(f"    Weight {wname} = {self[wname]:15.6g}")
 
-    def get_knob_by_weight_names(self, name):
+    def get_knob_by_weight_names(self, name, variant=None, verbose=False):
+        if verbose:
+            print(f"Getting knob {name} by weight names with variant={variant}")
         weights = {}
         value = self._var_values[name]
         wname = f"_from_{name}"
         for k in self._var_values:
             if k.endswith(wname):
                 weights[k.split(wname)[0]] = self._var_values[k]
-        return Knob(name, value, weights).specialize()
+                if verbose:
+                    print(f"Weight {k.split(wname)[0]} = {self._var_values[k]:15.6g}")
+        return Knob(name, value, weights, variant=variant).specialize()
 
-    def get_knob_by_probing(self, name):
+    def get_knob_by_probing(self, name, variant=None, verbose=False):
+        if verbose:
+            print(f"Getting knob {name} by probing with variant={variant}")
         weights = {}
         oldvars = self._var_values.copy()
         oldvalue = self._var_values[name]
@@ -313,65 +314,68 @@ class LHCXsuiteModel:
                 dvar = self._var_values[k] - oldvars[k]
                 if dvar != 0:
                     weights[k] = dvar
+                    if verbose:
+                        print(f"Weight {k} = {dvar:15.6g}")
         del weights[name]
         self[name] = oldvalue
-        return Knob(name, oldvalue, weights).specialize()
+        return Knob(name, oldvalue, weights, variant=variant).specialize()
 
-    def get_knob_by_xdeps(self, name):
-        #print(name)
-        mgr=self.env.ref_manager
+    def get_knob_by_xdeps(self, name, variant=None, verbose=False):
+        if verbose:
+            print(f"Getting knob {name} by xdeps with variant={variant}")
+        mgr = self.env.ref_manager
         if name not in self.env:
-            return Knob(name, 0.0, {}).specialize()
-        ref=self.env.ref[name]
-        weight_names =  [xx._key for xx in  mgr.rdeps[ref]]
+            return Knob(name, value=0.0, weights={}, variant=variant).specialize()
+        ref = self.env.ref[name]
+        weight_names = [xx._key for xx in mgr.rdeps[ref]]
         var_values = self._var_values
-        weights={}
-        tasks=mgr.tasks
+        weights = {}
+        tasks = mgr.tasks
         for wname in weight_names:
-            expr=tasks[self.env.ref[wname]].expr
-            #if verbose:
-            #   print(f"Weight {wname}")
+            expr = tasks[self.env.ref[wname]].expr
+            if verbose:
+                print(f"Weight {wname}")
             for term in termlist(expr):
-                if isinstance(term, xdeps.refs.MulExpr) and term._rhs==ref:
+                if isinstance(term, xdeps.refs.MulExpr) and term._rhs == ref:
                     if np.isscalar(term._lhs):
-                        value=float(term._lhs)
+                        value = float(term._lhs)
                     else:
-                        value=var_values[term._lhs._key]
-             #       if verbose:
-             #          print(f"   Term: {term}")
-             #          print(f"     Weight: {value}")
-                    weights[wname]=value
-        value= self[name]
-        return Knob(name, value, weights).specialize()
-
-
+                        value = var_values[term._lhs._key]
+                        if verbose:
+                            print(f"   Term: {term}")
+                            print(f"   Weight: {value}")
+                    weights[wname] = value
+        value = self[name]
+        return Knob(name, value, weights, variant=variant).specialize()
 
     def filter(self, pattern):
-        vv=list(self._var_values.keys())
-        return list(filter(lambda x: re.match(pattern,x), vv))
+        vv = list(self._var_values.keys())
+        return list(filter(lambda x: re.match(pattern, x), vv))
 
-    def make_and_set0_knobs(self, knob_names):
-        #print("Creating knobs:", knob_names)
+    def make_and_set0_knobs(self, knob_names, variant=None):
+        # print("Creating knobs:", knob_names)
         knobs = {}
         for knob_name in knob_names:
-            knob = self.get_knob_by_xdeps(knob_name)
+            knob = self.get_knob_by_xdeps(knob_name, variant=variant)
             knobs[knob_name] = knob
             self[knob_name] = 0
         return knobs
 
-    def update(self, src):
+    def update(self, src, knobs_check=True):
         if hasattr(src, "strengths"):
             self.update_vars(src.strengths)
         else:
             self.update_vars(src)
         if hasattr(src, "knobs"):
-            self.update_knobs(src.knobs)
+            self.update_knobs(src.knobs, knobs_check=knobs_check)
 
     def twiss_open(self, start, end, init, beam, strengths=True):
         # line=self.sequence[beam]
         # aux=line.element_names[0]
         # line.cycle(init.element_name)
-        tw = self.sequence[beam].twiss(start=start, end=end, init=init, strengths=strengths)
+        tw = self.sequence[beam].twiss(
+            start=start, end=end, init=init, strengths=strengths
+        )
         # line.cycle(aux)
         return tw
 
@@ -466,8 +470,8 @@ class LHCXsuiteModel:
         )
 
     def cycle(self, element):
-        self.b1.cycle(element,inplace=True)
-        self.b2.cycle(element,inplace=True)
+        self.b1.cycle(element, inplace=True)
+        self.b2.cycle(element, inplace=True)
 
     def diff(self, other):
         allk = set(self._var_values.keys()) | set(other._var_values.keys())
@@ -551,25 +555,17 @@ class LHCXsuiteModel:
         dy_err = 2.0 * np.sqrt(tw.bety / 170) * ndisp_err
         dx = tw.dx + dx_err
         dy = tw.dy + dy_err
-        #print(f"dx_err={dx_err.max()} dy_err={dy_err.max()}")
-        #print(f"dx={dx_err.max()} dy={dy.max()}")
-        #print(f"ex={ex} ey={ey}")
-        sx = (
-            nsigma * bbeat * np.sqrt(tw.betx * ex)
-            + abs(dx) * delta_err
-            + co_error
-        )
-        sy = (
-            nsigma * bbeat * np.sqrt(tw.bety * ey)
-            + abs(dy) * delta_err
-            + co_error
-        )
-        x=tw.x
-        y=tw.y
+        # print(f"dx_err={dx_err.max()} dy_err={dy_err.max()}")
+        # print(f"dx={dx_err.max()} dy={dy.max()}")
+        # print(f"ex={ex} ey={ey}")
+        sx = nsigma * bbeat * np.sqrt(tw.betx * ex) + abs(dx) * delta_err + co_error
+        sy = nsigma * bbeat * np.sqrt(tw.bety * ey) + abs(dy) * delta_err + co_error
+        x = tw.x
+        y = tw.y
         if survey:
-            su=self.get_survey_flat(beam)
-            x+=su.X
-            y+=su.Y
+            su = self.get_survey_flat(beam)
+            x += su.X
+            y += su.Y
         xp = x + sx
         xm = x - sx
         yp = y + sy
@@ -577,8 +573,10 @@ class LHCXsuiteModel:
         if not survey:
             fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
         else:
-            if beam==1:
-                fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", figsize=(12, 6))
+            if beam == 1:
+                fig, (ax1, ax2) = plt.subplots(
+                    2, 1, num=f"aperture{beam}", figsize=(12, 6)
+                )
             else:
                 ax1, ax2 = plt.gcf().get_axes()
         color = "b" if beam == 1 else "r"
@@ -586,12 +584,8 @@ class LHCXsuiteModel:
         ax2.plot(tw.s, y, label="y", color=color)
         ax1.set_ylabel("x [m]")
         ax2.set_ylabel("y [m]")
-        ax1.fill_between(
-            tw.s, xp, xm, alpha=0.5, color=color, label=f"{nsigma} sigma"
-        )
-        ax2.fill_between(
-            tw.s, yp, ym, alpha=0.5, color=color, label=f"{nsigma} sigma"
-        )
+        ax1.fill_between(tw.s, xp, xm, alpha=0.5, color=color, label=f"{nsigma} sigma")
+        ax2.fill_between(tw.s, yp, ym, alpha=0.5, color=color, label=f"{nsigma} sigma")
         return ax1, ax2
 
     def plot_aperture(self, beam=None):
@@ -600,7 +594,7 @@ class LHCXsuiteModel:
         su = self.get_survey_flat(beam)
         line = self.sequence[beam]
         fig, (ax1, ax2) = plt.subplots(2, 1, num=f"aperture{beam}", clear=True)
-        print(su,line, fig, ax1, ax2)
+        print(su, line, fig, ax1, ax2)
         raise NotImplementedError("Not implemented")
 
     def get_survey_flat(self, beam=None):
@@ -611,7 +605,7 @@ class LHCXsuiteModel:
         for name, elem in line.element_dict.items():
             if name.startswith("mb."):
                 elem.h = 0
-        su = line.survey(reverse=False) #needs to force it because not supported
+        su = line.survey(reverse=False)  # needs to force it because not supported
         if beam == 2:
             su = su.reverse()
         return su
@@ -629,28 +623,28 @@ class LHCXsuiteModel:
             return [self.plot_survey(beam=1), self.plot_survey(beam=2)]
         su = self.get_survey(beam)
 
-        plt.figure("LHC Survey",figsize=(6,6))
-        ax=plt.subplot(111)
-        color="b" if beam==1 else "r"
-        ax.plot(su.Z, su.X, label=f"Beam {beam}",color=color)
+        plt.figure("LHC Survey", figsize=(6, 6))
+        ax = plt.subplot(111)
+        color = "b" if beam == 1 else "r"
+        ax.plot(su.Z, su.X, label=f"Beam {beam}", color=color)
         ax.set_xlabel("Z [m]")
         ax.set_ylabel("X [m]")
-        suips=su.rows["ip[1-8]"].cols["name Z X"]
-        for name,x,y in suips.rows:
-            plt.text(x,y,name.upper(),color="black")
+        suips = su.rows["ip[1-8]"].cols["name Z X"]
+        for name, x, y in suips.rows:
+            plt.text(x, y, name.upper(), color="black")
         return self
 
     def plot_survey_flat(self, figsize=(12, 3)):
         su1 = self.get_survey_flat(beam=1)
         su2 = self.get_survey_flat(beam=2)
-        plt.figure("LHC Survey Flat",figsize=figsize)
-        plt.plot(su1.s, su1.X,label="Beam 1", color="blue")
-        plt.plot(su2.s, su2.X,label="Beam 2", color="red")
+        plt.figure("LHC Survey Flat", figsize=figsize)
+        plt.plot(su1.s, su1.X, label="Beam 1", color="blue")
+        plt.plot(su2.s, su2.X, label="Beam 2", color="red")
         plt.xlabel("S [m]")
         plt.ylabel("X [m]")
-        suips=su1.rows["ip[1-8]"].cols["name s X"]
-        for name,x,y in suips.rows:
-            plt.text(x,0,name.upper(),color="black")
+        suips = su1.rows["ip[1-8]"].cols["name s X"]
+        for name, x, y in suips.rows:
+            plt.text(x, 0, name.upper(), color="black")
         plt.tight_layout()
         return self
 
@@ -660,12 +654,8 @@ class LHCXsuiteModel:
             line.slice_thick_elements(
                 slicing_strategies=[
                     xt.Strategy(slicing=None),
-                    xt.Strategy(
-                        slicing=xt.Uniform(slices, mode="thick"), name="mb.*"
-                    ),
-                    xt.Strategy(
-                        slicing=xt.Uniform(slices, mode="thick"), name="mq.*"
-                    ),
+                    xt.Strategy(slicing=xt.Uniform(slices, mode="thick"), name="mb.*"),
+                    xt.Strategy(slicing=xt.Uniform(slices, mode="thick"), name="mq.*"),
                 ]
             )
 

@@ -157,6 +157,10 @@ class LHCSection:
         else:
             return self.parent.circuits
 
+    def check_match(self):
+        opt = self.match(verbose=False)
+        targets = opt.target_status()
+
     def copy(self):
         return self.__class__(
             name=self.name,
@@ -173,6 +177,11 @@ class LHCSection:
         self.diff_strengths(other)
         self.diff_knobs(other)
         self.diff_params(other)
+
+    def diff_model(self, model=None):
+        if model is None:
+            model = self.parent.model
+        print_diff_dict_float(self.strengths, model, keys=self.strengths.keys())
 
     def diff_strengths(self, other):
         print_diff_dict_float(self.strengths, other.strengths)
@@ -316,7 +325,7 @@ class LHCSection:
                 self.knobs[k].parent = self.parent
         return self
 
-    def update_model(self, src=None, verbose=False, knobs_off=False):
+    def update_model(self, src=None, verbose=False, knobs_off=False, knobs_check=True):
         """Update the model with the local strengths, knobs
         If a src is provided, it will be used to update the local values, else self will be used.
         If src is a dict containing strengths, knobs or a LHCSection, they will be used to update the model.
@@ -339,7 +348,7 @@ class LHCSection:
             knobs = src["knobs"]
         else:
             knobs = {}
-        self.model.update_knobs(knobs, verbose=verbose, knobs_off=knobs_off)
+        self.model.update_knobs(knobs, verbose=verbose, knobs_off=knobs_off, knobs_check=knobs_check)
         return self
 
     def update_strengths(

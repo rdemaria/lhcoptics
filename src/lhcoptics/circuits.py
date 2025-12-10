@@ -34,17 +34,13 @@ kqx_limits = { #LHC 2025 with polarity inversions
     "kqx.r2": [-205.0, 0],
     "kqx.l5": [-205.0, 0],
     "kqx.r5": [0, 205.0],
-    "kqx.l8": [0, 205.0],
+    "kqx.l8": [0,205.0],
     "kqx.r8": [-205.0, 0],
 } 
 for irn in "15":
     for q in ["1","2a","2b","3"]:
-      for lr in "lr":
-         a,b=0,132.6
-         if (lr=="r" and q.startswith("2")) or (lr=="l" and not q.startswith("2")):
-            a,b=-132.6,0
-        # HL-LHC   standard polarity
-         kqx_limits[f"kqx{q}.{lr}{irn}"] = [a,b]
+      kqx_limits[f"kqx{q}.l{irn}"] = [-132.6,0]
+      kqx_limits[f"kqx{q}.r{irn}"] = [0,132.6]
 
 
 def madname_from_pcname(pc):

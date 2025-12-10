@@ -41,7 +41,7 @@ class LHCArc(LHCSection):
         strength_names += model.filter(f"ks[fd][12]\\.*{name}b[12]$")
         strength_names += model.filter(f"ko[fd]\\.*{name}b[12]$")
         if knob_names is not None:
-            knobs = model.make_and_set0_knobs(knob_names)
+            knobs = model.make_and_set0_knobs(knob_names, variant=variant)
         else:
             knobs = {}
         params = {}
@@ -229,7 +229,7 @@ class LHCArc(LHCSection):
         tag = beam if beam else "common"
         return xt.Vary(name=kname, limits=limits, step=1e-8, tag=tag)
 
-    def match(self, b1=True, b2=True):
+    def match(self, b1=True, b2=True,verbose=False):
         lhc = self.parent.model.env
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
@@ -259,6 +259,9 @@ class LHCArc(LHCSection):
             check_limits=False,
             strengths=False,
         )
+        if verbose:
+            opt.vary_status()
+            opt.target_status()
         return opt
 
     def get_close_irs(self):

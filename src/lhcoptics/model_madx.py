@@ -329,7 +329,7 @@ use, sequence=lhcb2;
                 print(f"{k:20} {self[k]:15.6g} -> {v:15.6g}")
             self[k] = v
 
-    def update_knobs(self, knobs, verbose=False, knobs_off=False):
+    def update_knobs(self, knobs, verbose=False, knobs_off=False, knobs_check=False):
         for k, knob in knobs.items():
             if not knobs_off:
               if verbose:
@@ -349,15 +349,15 @@ use, sequence=lhcb2;
                 elif expr is not None and k not in expr:
                     self.madx.input(f"{wn} := {expr} + ({name} * {k});")
 
-    def update(self, src):
+    def update(self, src, knobs_check=True):
         if hasattr(src, "strengths"):
             self.update_vars(src.strengths)
         else:
             self.update_vars(src)
         if hasattr(src, "knobs"):
-            self.update_knobs(src.knobs)
+            self.update_knobs(src.knobs, knobs_check=knobs_check)
 
-    def mad_mkknob(self, name):
+    def mad_mkknob(self, name, variant=None):
         madx = self.madx
         base = dict(madx.globals)
         value = madx.globals.get(name, 0)
@@ -368,9 +368,9 @@ use, sequence=lhcb2;
             if dvalue != 0:
                 weights[s] = dvalue
         madx.globals[name] = value
-        return Knob(name, value, weights)
+        return Knob(name, value, weights,variant=variant).specialize()
 
-    def mad_find_and_set0_knobs(madx, strengths):
+    def mad_find_and_set0_knobs(madx, strengths, variant=None):
         """
         Find knobs that are used to set the strengths and set knob value to 0
         """
@@ -391,10 +391,10 @@ use, sequence=lhcb2;
                 dvalue = madx.globals[s] - base[s]
                 weights[s] = dvalue
             madx.globals[knob] = 0
-            knobs[knob] = Knob(knob, value, weights).specialize()
+            knobs[knob] = Knob(knob, value, weights, variant=variant).specialize()
         return knobs
 
-    def make_and_set0_knobs(self, knob_names):
+    def make_and_set0_knobs(self, knob_names, variant=None):
         """
         for each knob name in knob_names
            look for all expressions containing the knob name
@@ -420,7 +420,7 @@ use, sequence=lhcb2;
                 dvalue = madx.globals[s] - base[s]
                 weights[s] = dvalue
             madx.globals[knob] = 0
-            knobs[knob] = Knob(knob, value, weights).specialize()
+            knobs[knob] = Knob(knob, value, weights, variant=variant).specialize()
         return knobs
 
     def diff(self, other):
