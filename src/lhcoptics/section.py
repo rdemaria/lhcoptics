@@ -220,11 +220,11 @@ class LHCSection:
             plot.ax.set_title(figlabel)
             return plot
 
-    def set_params(self):
+    def set_params(self,mode="from_twiss"):
         """
         Copy all parameters from get_params() to self.params
         """
-        self.params.update(self.get_params())
+        self.params.update(self.get_params(mode=mode))
         return self
 
     def set_bumps_off(self):

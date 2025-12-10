@@ -70,7 +70,7 @@ class LHCXsuiteModel:
         self.settings = settings
         self.jsonfile = jsonfile
         self._var_values = env._xdeps_vref._owner
-        self.vars = env._xdeps_vref
+        self.ref = env._xdeps_vref
         self.mgr = env._xdeps_manager
         self.madxfile = madxfile
         self.sequence = {1: env.b1, 2: env.b2}
@@ -135,6 +135,16 @@ class LHCXsuiteModel:
     def keys(self):
         return self._var_values.keys()
 
+    def search(self, pattern):
+        out={}
+        for k in self._var_values.keys():
+            if re.match(pattern,k):
+                out[k]=self.env[k]
+        for k, v in self.env.elements.items():
+            if re.match(pattern,k):
+                out[k]=v
+        return out
+
     @classmethod
     def from_json(cls, jsonfile):
         import xtrack as xt
@@ -194,7 +204,7 @@ class LHCXsuiteModel:
         Return None if it does not exist
         """
         knobname = knob.name
-        deps = self.mgr.rdeps.get(self.vars[knobname], {})
+        deps = self.mgr.rdeps.get(self.ref[knobname], {})
         if len(deps) == 0:
             if verbose:
                 print(f"Missing knob {knobname}")
@@ -258,14 +268,14 @@ class LHCXsuiteModel:
                 if check is None:
                     if verbose:
                         print(f"Add expression {wtarget} += {wname}*{knobname}")
-                    self.vars[wtarget] += self.vars[wname] * self.vars[knobname]
+                    self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
 
     def _erase_knob(self, knob):
         """
         Delete knobs and weights from the model, very unsafe, because it can break other knobs. To be used only in tests.
         """
         knobname = knob.name
-        deps = list(self.mgr.rdeps.get(self.vars[knobname], {}))
+        deps = list(self.mgr.rdeps.get(self.ref[knobname], {}))
         for dep in deps:
             wname = f"{dep._key}_from_{knobname}"
             self.mgr.set_value(dep, dep._get_value())
@@ -281,7 +291,7 @@ class LHCXsuiteModel:
 
     def show_knob(self, knobname):
         print(f"Knob: {knobname} = {self[knobname]:15.6g}")
-        for deps in self.mgr.rdeps.get(self.vars[knobname], {}):
+        for deps in self.mgr.rdeps.get(self.ref[knobname], {}):
             print("Target:", deps._key)
             print("     Expr:", pprint(deps._expr))
             wname = f"{deps._key}_from_{knobname}"
@@ -491,11 +501,14 @@ class LHCXsuiteModel:
     def match_knob(self, *args, **kwargs):
         return self.env.match_knob(*args, **kwargs)
 
+    def get(self, key, default=None):
+        return self._var_values.get(key, default)
+
     def __getitem__(self, key):
         return self._var_values[key]
 
     def __setitem__(self, key, value):
-        self.vars[key] = value
+        self.ref[key] = value
 
     def __contains__(self, key):
         return key in self._var_values

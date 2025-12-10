@@ -20,9 +20,7 @@ class ActionArcPhaseAdvance(xt.Action):
 
 
 class LHCArc(LHCSection):
-
     default_twiss_method = "periodic"
-
 
     @classmethod
     def from_madx(cls, madx, name, knob_names=None, variant="2025"):
@@ -58,7 +56,7 @@ class LHCArc(LHCSection):
         end=None,
         filename=None,
         parent=None,
-        variant="2025"
+        variant="2025",
     ):
         i1, i2 = int(name[1]), int(name[2])
         start = f"s.ds.r{i1}"
@@ -72,7 +70,7 @@ class LHCArc(LHCSection):
             knobs,
             filename=filename,
             parent=parent,
-            variant=variant
+            variant=variant,
         )
         self.i1 = i1
         self.i2 = i2
@@ -164,15 +162,13 @@ class LHCArc(LHCSection):
             start = self.startb12[beam - 1]
             end = self.endb12[beam - 1]
             init = sequence.twiss(strengths=False).get_twiss_init(start)
-            return sequence.twiss(
-                start=start, end=end, init=init, strengths=strengths
-            )
+            return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
 
     def get_params_from_twiss(self, tw1, tw2):
         params = {
             f"mux{self.name}b1": tw1.mux[-1],
-            f"muy{self.name}b1": tw1.muy[-1],
             f"mux{self.name}b2": tw2.mux[-1],
+            f"muy{self.name}b1": tw1.muy[-1],
             f"muy{self.name}b2": tw2.muy[-1],
             f"muxcell{self.name[1:]}b1": tw1["mux", self.end_cellb1]
             - tw1["mux", self.start_cellb1],
@@ -185,10 +181,31 @@ class LHCArc(LHCSection):
         }
         return params
 
-    def get_params(self):
+    def get_params(self, mode="from_twiss"):
         """Get params from model"""
-        tw1, tw2 = self.twiss(strengths=False)
-        return self.get_params_from_twiss(tw1, tw2)
+        if mode.startswith("from_twiss"):
+            tw1, tw2 = self.twiss(strengths=False)
+            return self.get_params_from_twiss(tw1, tw2)
+        elif mode == "from_variables":
+            return self.get_params_from_variables()
+        else:
+            raise ValueError("mode must be 'from_twiss' or 'from_variables'")
+
+    def get_params_from_variables(self, model=None):
+        """Get params from model variables"""
+        if model is None:
+            model = self.model
+        params = {}
+        for pr in ["a", "cell"]:
+             for xy in "xy":
+              for beam in [1, 2]:
+                    key = f"mu{xy}{pr}{self.name[1:]}b{beam}"
+                    if self.parent.variant.startswith("hl"):
+                        key2 = key.replace("a", "")
+                    else:
+                        key2 = key
+                    params[key] = model[key2]
+        return params
 
     @property
     def quads(self):
@@ -221,15 +238,13 @@ class LHCArc(LHCSection):
             kname = f"kqt{fd}.{self.name}{beam}"
         else:
             kname = f"kq{fd}.{self.name}"
-        limits = self.parent.circuits.get_klimits(
-            kname, self.parent.params["p0c"]
-        )
+        limits = self.parent.circuits.get_klimits(kname, self.parent.params["p0c"])
         limits[0] *= 1 + kmax_marg
         limits[1] *= 1 - kmax_marg
         tag = beam if beam else "common"
         return xt.Vary(name=kname, limits=limits, step=1e-8, tag=tag)
 
-    def match(self, b1=True, b2=True,verbose=False):
+    def match(self, b1=True, b2=True, verbose=False):
         lhc = self.parent.model.env
         if lhc.b1.tracker is None:
             lhc.b1.build_tracker()
@@ -269,9 +284,7 @@ class LHCArc(LHCSection):
         irb = getattr(self.parent, f"ir{self.i2}")
         return ira, irb
 
-    def shift_phase(
-        self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0, rematch_irs=True
-    ):
+    def shift_phase(self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0, rematch_irs=True):
         arc = self.name
         self.params[f"mux{arc}b1"] += dmuxb1
         self.params[f"muy{arc}b1"] += dmuyb1

@@ -80,6 +80,7 @@ class LHCOptics:
             params=data["params"],
             knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
             model=xsuite_model,
+            variant=data.get("variant", "2025"),
         )
         if xsuite_model is not None:
             out.update_model(verbose=verbose)
@@ -173,7 +174,7 @@ class LHCOptics:
         ]
         for k, knob in knobs.items():
             madmodel[k] = knob.value
-        self = cls(name, irs, arcs, knobs=knobs)
+        self = cls(name, irs, arcs, knobs=knobs, variant=variant)
         if make_model == "xsuite":
             xsuite_model = LHCXsuiteModel.from_madx(
                 madx, sliced=sliced, knob_structure=knob_structure
@@ -199,9 +200,34 @@ class LHCOptics:
         name=None,
         circuits=None,
         knob_structure=None,
-        verbose=False,
         variant="2025",
+        params_mode="from_twiss_init",
     ):
+        """
+        Create an LHCOptics object from an Xsuite model.
+        Parameters
+        ----------
+        xsuite_model : LHCXsuiteModel or str or Path
+            The Xsuite model or the path to the json file.
+        name : str
+            The name of the optics object.
+        circuits : LHCCircuits or str or Path
+            The circuits object or the path to the json file.
+        knob_structure : dict or str or Path
+            The knob structure or the path to the yaml file.
+        variant : str
+            The optics variant such as '2025' or 'hl'.
+        params_mode : str
+            The mode to get the parameters from the model.
+            Options are 'from_twiss_init', 'from_variables'.
+        Returns
+        -------
+        LHCOptics
+            The LHCOptics object.
+        """
+
+
+
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
         elif hasattr(xsuite_model, "to_json"):
@@ -229,13 +255,13 @@ class LHCOptics:
             )
             for arc in cls._arcs
         ]
-        self = cls(name, irs, arcs, knobs=knobs)
+        self = cls(name, irs, arcs, knobs=knobs, variant=variant)
         self.model = (
             xsuite_model  #  TODO replace with set_xsuite_model to make more checks
         )
         if circuits is not None:
             self.set_circuits(circuits)
-        self.set_params()
+        self.set_params(mode=params_mode)
         for k, knob in knobs.items():
             xsuite_model[k] = knob.value
         return self
@@ -329,6 +355,7 @@ class LHCOptics:
         self.model = model
         self.circuits = circuits
         self.aperture = aperture
+        self.variant = variant
         # print(f"Optics {self.name} created")
         for knob in knobs.values():
             knob.parent = self
@@ -591,13 +618,18 @@ class LHCOptics:
         }
         return out
 
-    def get_params(self):
+    def get_params(self,mode="from_twiss_init"):
         """
         Get the parameters from the optics and its sections.
         """
-        tw1 = self.model.b1.twiss(compute_chromatic_properties=True, strengths=False)
-        tw2 = self.model.b2.twiss(compute_chromatic_properties=True, strengths=False)
-        return self.get_params_from_twiss(tw1, tw2)
+        if mode.startswith("from_twiss"):
+            tw1 = self.model.b1.twiss(compute_chromatic_properties=True, strengths=False)
+            tw2 = self.model.b2.twiss(compute_chromatic_properties=True, strengths=False)
+            return self.get_params_from_twiss(tw1, tw2)
+        elif mode == "from_variables":
+            return self.get_params_from_variables()
+        else:
+            raise ValueError("mode must be 'from_twiss' or 'from_variables'")
 
     def get_params_from_twiss(self, tw1, tw2):
         """
@@ -616,6 +648,27 @@ class LHCOptics:
         }
         # for ss in self.irs + self.arcs:
         #    params.update(ss.get_params_from_twiss(tw1, tw2))
+        return params
+
+    def get_params_from_variables(self):
+        """
+        Get the parameters from the model variables.
+        """
+        params = {}
+        params["p0c"]=self.model.get("p0c",self.model.get("nrj",0)*1e9)
+        var_names = (
+            "qxb1",
+            "qyb1",
+            "qxb2",
+            "qyb2",
+            "qpxb1",
+            "qpyb1",
+            "qpxb2",
+            "qpyb2",
+        )
+        for var_name in var_names:
+            if var_name in self.model:
+                params[var_name] = self.model[var_name]
         return params
 
     def get_phase_arcs(self):
@@ -683,7 +736,7 @@ class LHCOptics:
             line = getattr(model, beam)
             for fd in "fd":
                 for ks in self.find_strengths(f"ks{fd}.*{beam}"):
-                    model.vars[ks] = model[ks]  # reset otherwise error in knobs
+                    model.ref[ks] = model[ks]  # reset otherwise error in knobs
                     if arcs == "weak":
                         if "a81" in ks or "a12" in ks or "a45" in ks or "a56" in ks:
                             continue
@@ -693,8 +746,8 @@ class LHCOptics:
                     tmp = f"ks{fd}_{beam}"
                     model[tmp] = model[ks]
                     print(f"Set {tmp} from {ks} to {model[tmp]}")
-                    model.vars[ks] = model.vars[tmp]  # expr
-                    print(model.vars[ks]._expr)
+                    model.ref[ks] = model.ref[tmp]  # expr
+                    print(model.ref[ks]._expr)
             mtc = line.match(
                 solve=solve,
                 vary=[xt.VaryList([f"ksf_{beam}", f"ksd_{beam}"], step=1e-9)],
@@ -830,14 +883,14 @@ class LHCOptics:
         self.update_model()
         return self
 
-    def set_params(self, full=True):
+    def set_params(self, full=True, mode="from_twiss"):
         """
         Copy all parameters from get_params() into params
         """
-        self.params.update(self.get_params())
+        self.params.update(self.get_params(mode=mode))
         if full:
             for ss in self.irs + self.arcs:
-                ss.set_params()
+                ss.set_params(mode=mode)
         return self
 
     def set_xsuite_model(self, model, verbose=False):
@@ -880,6 +933,7 @@ class LHCOptics:
             "arcs": [arc.to_dict() for arc in self.arcs],
             "params": self.params,
             "knobs": {n: k.to_dict() for n, k in self.knobs.items()},
+            "variant": self.variant,
         }
 
     def to_json(self, filename):

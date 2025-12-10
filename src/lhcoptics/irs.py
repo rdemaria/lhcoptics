@@ -173,7 +173,6 @@ class LHCIR(LHCSection):
     def kqxr(self):
         return [k for k in self.quads if "r" in k and "x" in k]
 
-
     def check_quad_strengths(
         self,
         verbose=False,
@@ -235,14 +234,39 @@ class LHCIR(LHCSection):
                 )
         return params
 
-    def get_params(self, mode="init"):
-        if mode == "init":
+    def get_params_from_variables(self, model=None):
+        if model is None:
+            model = self.parent.model
+
+        params = {}
+        for param in "betx bety alfx alfy dx dpx".split():
+            for beam in "12":
+                ppname = f"{param}ip{self.irn}b{beam}"
+                if ppname in model:
+                    params[ppname] = model[ppname]
+        for param in "mux muy".split():
+            for beam in "12":
+                for suffix in ["", "_l", "_r"]:
+                    ppname = f"{param}ip{self.irn}b{beam}{suffix}"
+                    if ppname in model:
+                        params[ppname] = model[ppname]
+        return params
+
+    def get_params(self, mode="from_twiss_init"):
+        if mode == "from_twiss_init":
             tw1 = self.twiss_from_init(1, strengths=False)
             tw2 = self.twiss_from_init(2, strengths=False)
-        elif mode == "full":
+            params = self.get_params_from_twiss(tw1, tw2)
+        elif mode == "from_twiss_full":
             tw1 = self.twiss_full(1, strengths=False)
             tw2 = self.twiss_full(2, strengths=False)
-        params = self.get_params_from_twiss(tw1, tw2)
+            params = self.get_params_from_twiss(tw1, tw2)
+        elif mode == "from_variables":
+            params = self.get_params_from_variables()
+        else:
+            raise ValueError(
+                f"mode must be 'init', 'full' or 'from_variables' instead of {mode!r}"
+            )
         return {k: np.round(v, 8) for k, v in params.items()}
 
     def get_extra_match_targets(self):
@@ -523,7 +547,7 @@ class LHCIR(LHCSection):
 
         if sym_triplets:
             for kl, kr in zip(self.kqxl, self.kqxr):
-                print(f"Setting {kl} = -{kr} -> {-self.parent.model[kr]}")
+                # print(f"Setting {kl} = -{kr} -> {-self.parent.model[kr]}")
                 self.parent.model.vars[kl] = -self.parent.model.vars[kr]
                 match.disable(vary_name=kl)
 
@@ -534,8 +558,12 @@ class LHCIR(LHCSection):
 
         for kl, kr in zip(self.kqxl, self.kqxr):
             if "kqx2b" in kl:
-                self.parent.model.vars[kl] = self.parent.model.vars[kl.replace("2b", "2a")]
-                self.parent.model.vars[kr] = self.parent.model.vars[kr.replace("2b", "2a")]
+                self.parent.model.vars[kl] = self.parent.model.vars[
+                    kl.replace("2b", "2a")
+                ]
+                self.parent.model.vars[kr] = self.parent.model.vars[
+                    kr.replace("2b", "2a")
+                ]
                 match.disable(vary_name=kl)
                 match.disable(vary_name=kr)
 
