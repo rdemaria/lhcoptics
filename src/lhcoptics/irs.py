@@ -510,7 +510,7 @@ class LHCIR(LHCSection):
                     kother = k.replace("b1", "b2")
                 rat_name = f"{k}_ratio"
                 model[rat_name] = -model[k] / model[kother]
-                model.vars[k] = -model.vars[rat_name] * model.vars[kother]
+                model.ref[k] = -model.ref[rat_name] * model.ref[kother]
                 varylst.append(
                     xt.Vary(
                         rat_name,
@@ -548,7 +548,7 @@ class LHCIR(LHCSection):
         if sym_triplets:
             for kl, kr in zip(self.kqxl, self.kqxr):
                 # print(f"Setting {kl} = -{kr} -> {-self.parent.model[kr]}")
-                self.parent.model.vars[kl] = -self.parent.model.vars[kr]
+                self.parent.model.ref[kl] = -self.parent.model.ref[kr]
                 match.disable(vary_name=kl)
 
         if no_triplets:
@@ -558,10 +558,10 @@ class LHCIR(LHCSection):
 
         for kl, kr in zip(self.kqxl, self.kqxr):
             if "kqx2b" in kl:
-                self.parent.model.vars[kl] = self.parent.model.vars[
+                self.parent.model.ref[kl] = self.parent.model.ref[
                     kl.replace("2b", "2a")
                 ]
-                self.parent.model.vars[kr] = self.parent.model.vars[
+                self.parent.model.ref[kr] = self.parent.model.ref[
                     kr.replace("2b", "2a")
                 ]
                 match.disable(vary_name=kl)

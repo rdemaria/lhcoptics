@@ -645,7 +645,7 @@ class ChromaKnob(Knob):
                 family = re.match(r"ks([fd]).*", wn).group(1)
                 tmp = f"ks{family}_temp"
                 model[tmp] = model[wn]
-                model.vars[wn] = model.vars[tmp]
+                model.ref[wn] = model.ref[tmp]
                 print(f"Setting {wn} := {tmp};")
 
         vary = [xt.VaryList(["ksf_temp", "ksd_temp"], step=1e-9)]
@@ -683,7 +683,7 @@ class ChromaKnob(Knob):
         # reset weights
         for wn in self.get_weight_knob_names():
             if self.weights[wn.split("_from_")[0]] != 0:
-                model.vars[wn] = model[wn]
+                model.ref[wn] = model[wn]
         model.get_knob(self).diff(self)
         return mtc
 
