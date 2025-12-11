@@ -7,7 +7,10 @@ from .utils import print_diff_dict_float
 
 
 def is_specialized(knob, cls):
-    return knob.__class__.__name__ == cls.__name__ or knob.__class__.__name__ != "Knob"
+    return (
+        knob.__class__.__name__ == cls.__name__
+        or knob.__class__.__name__ != "Knob"
+    )
 
 
 """Knobs for LHC optics.
@@ -61,7 +64,11 @@ class Knob:
 
     @classmethod
     def from_src(cls, src):
-        if hasattr(src, "name") and hasattr(src, "value") and hasattr(src, "weights"):
+        if (
+            hasattr(src, "name")
+            and hasattr(src, "value")
+            and hasattr(src, "weights")
+        ):
             return cls.from_dict(src.__dict__)
         else:
             return cls.from_dict(src)
@@ -114,7 +121,9 @@ class Knob:
             print(f"Knob {self.name}  frpm {self.value} to  {other.value}")
         for key, value in self.weights.items():
             if key in other.weights and value != other.weights[key]:
-                print(f"Knob {self.name}: {key} from {value} to {other.weights[key]}")
+                print(
+                    f"Knob {self.name}: {key} from {value} to {other.weights[key]}"
+                )
 
     def get_weight_knob_names(self):
         return [f"{key}_from_{self.name}" for key in self.weights.keys()]
@@ -188,7 +197,9 @@ class IPKnob(Knob):
                 elif kind == "o" and irn in "58":
                     hv = "h"
                 else:
-                    raise ValueError(f"Cannot determine plane for {knob.name!r}")
+                    raise ValueError(
+                        f"Cannot determine plane for {knob.name!r}"
+                    )
             xy = {"h": "x", "v": "y"}[hv]
             match_value = 1
             if kind in ["x", "sep", "oh", "ov", "a", "o"]:
@@ -202,7 +213,9 @@ class IPKnob(Knob):
                     if knob.variant.startswith("hl"):
                         dxy = 1e-3
                     else:
-                        if (irn == "5" and hv == "h") or (irn == "1" and hv == "v"):
+                        if (irn == "5" and hv == "h") or (
+                            irn == "1" and hv == "v"
+                        ):
                             dxy = -1e-3
                         else:
                             dxy = 1e-3
@@ -223,7 +236,9 @@ class IPKnob(Knob):
                     f"p{xy}b1": dpxy,
                     f"p{xy}b2": ss * dpxy,
                 }
-                const = [k for k in knob.weights.keys() if re.match(f"acbx{hv}", k)]
+                const = [
+                    k for k in knob.weights.keys() if re.match(f"acbx{hv}", k)
+                ]
             elif kind == "xip" or kind == "yip":
                 specs = {kind[0] + beam: 1e-3, "p" + kind[0] + beam: 0.0}
                 const = []
@@ -256,7 +271,9 @@ class IPKnob(Knob):
         ipname = f"ip{self.ip}"
         if len(self.beams) == 2:
             tw1, tw2 = self.parent.twiss(strengths=False)
-            expected = {(col, f"ip{ip}"): (0, 0) for ip in range(1, 9) for col in cols}
+            expected = {
+                (col, f"ip{ip}"): (0, 0) for ip in range(1, 9) for col in cols
+            }
             if self.kind in ["x", "a"]:
                 pp = f"p{self.xy}"
             else:
@@ -273,8 +290,12 @@ class IPKnob(Knob):
                         )
         else:
             tw = self.parent.twiss(strengths=False, beam=int(self.beams[0][1]))
-            expected = {(col, f"ip{ip}"): 0 for ip in range(1, 9) for col in cols}
-            expected[self.xy, ipname] = self.specs[self.xy + self.beams[0]] * test_value
+            expected = {
+                (col, f"ip{ip}"): 0 for ip in range(1, 9) for col in cols
+            }
+            expected[self.xy, ipname] = (
+                self.specs[self.xy + self.beams[0]] * test_value
+            )
             for (col, ips), vv in expected.items():
                 if abs(tw[col, ips] - vv) > threshold:
                     msg.append(
@@ -339,7 +360,9 @@ class IPKnob(Knob):
             for bb in self.beams
         ]
         targets += [
-            xt.Target(tt + self.xy, value=0, line=bb, at=xt.END, tol=self.tols[tt])
+            xt.Target(
+                tt + self.xy, value=0, line=bb, at=xt.END, tol=self.tols[tt]
+            )
             for tt in ("", "p")
             for bb in self.beams
         ]
@@ -597,10 +620,14 @@ class ChromaKnob(Knob):
         model = self.parent.model
         old_value = model[self.name]
         model[self.name] = 0
-        tw = self.parent.twiss(strengths=False, chrom=True, beam=int(self.beam[1]))
+        tw = self.parent.twiss(
+            strengths=False, chrom=True, beam=int(self.beam[1])
+        )
         zero_dqxy = tw.dqx, tw.dqy
         model[self.name] = test_value
-        tw = self.parent.twiss(strengths=False, chrom=True, beam=int(self.beam[1]))
+        tw = self.parent.twiss(
+            strengths=False, chrom=True, beam=int(self.beam[1])
+        )
         delta = tw.dqx - zero_dqxy[0], tw.dqy - zero_dqxy[1]
         if self.xy == "x":
             expected = (test_value, 0)
@@ -860,7 +887,9 @@ class CouplingKnob(Knob):
         knob_start = model[self.name]
         model[self.name] = 0
         q0 = {"r": act_cmin.run()["r"], "i": act_cmin.run()["i"]}
-        targets = [act_cmin.target(ri, value=q0[ri] + dq[ri], tol=1e-8) for ri in "ri"]
+        targets = [
+            act_cmin.target(ri, value=q0[ri] + dq[ri], tol=1e-8) for ri in "ri"
+        ]
         model[self.name] = self.match_value
         mtc = line.match(
             solve=False,
@@ -998,7 +1027,9 @@ class DispKnob(Knob):
             for at in (self.ipname, e_arc_right)
         ]
         targets += [
-            xt.Target(f"d{tt}{self.xy}", value=0, at=self.ipname, tol=self.tols[tt])
+            xt.Target(
+                f"d{tt}{self.xy}", value=0, at=self.ipname, tol=self.tols[tt]
+            )
             for tt in ("", "p")
         ]
         vary = [
@@ -1073,7 +1104,9 @@ class DispKnob(Knob):
 class CrabKnob(Knob):
     reorb = re.compile("on_crab[15]")
 
-    def __init__(self, name, value=0, weights=None, parent=None, ip=None, variant=None):
+    def __init__(
+        self, name, value=0, weights=None, parent=None, ip=None, variant=None
+    ):
         if len(weights) == 0:
             weights = {
                 f"vcrab{ab}4{rl}{ip}.b{beam}": 0
@@ -1175,6 +1208,8 @@ class CrabKnob(Knob):
                     print(f"Setting {wn} := {model.ref[wn]._expr};")
             # add offset in the knobs
             model[self.name] = match_value
+            mtc.target_status()
+            mtc.vary_status()
             mtc.solve()
             mtc.target_status()
             mtc.vary_status()
@@ -1185,13 +1220,12 @@ class CrabKnob(Knob):
             raise (ex)
         model[self.name] = knob_start
         max_voltage = max(
-            [
-                abs(model[wn])
-                for wn in self.get_weight_knob_names()
-            ]
+            [abs(model[wn]) for wn in self.get_weight_knob_names()]
         )
-        max_crabbing=3.4/max_voltage
-        print(f"Maximum crabbing angle achieved: {max_crabbing*match_value:.3f} urad")
+        max_crabbing = 3.4 / max_voltage
+        print(
+            f"Maximum crabbing angle achieved: {max_crabbing*match_value:.3f} urad"
+        )
         return mtc
 
     def plot(self, value=None):

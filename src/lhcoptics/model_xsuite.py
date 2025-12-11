@@ -248,8 +248,11 @@ class LHCXsuiteModel:
         knobname = knob.name
         if knob_check:
             check = self.knob_check(knob)
+            if verbose:
+                print(f"Knob {knob.name} check is {check}")
         else:
             check = None
+
         if check is False:
             self.knob_check(knob, verbose=verbose)
             raise ValueError(f"Knob {knobname} has different structure in {self}")
