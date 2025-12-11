@@ -502,7 +502,7 @@ class LHCIR(LHCSection):
             dkmin=dkmin,
             dkmax=dkmax,
         )
-        if self.name == "ir1":
+        if self.name == "ir1" and not self.parent.variant.startswith("hl"):
             varylst = [v for v in varylst if not v.name.startswith("kq4")]
 
         if vary_ratio is not None:

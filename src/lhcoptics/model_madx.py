@@ -258,6 +258,63 @@ ablw.r8       := -0.000180681598453109894*on_lhcb   ;
 abxws.r8      := +0.000045681598453109894*on_lhcb   ;
     """
 
+    extra_defs_hllhc="""
+kd1.l1             := ad1.l1/l.mbxf      ;
+kd1.r1             := ad1.r1/l.mbxf      ;
+kd2.l1             := ad2.l1/l.mbrd      ;
+kd2.r1             := ad2.r1/l.mbrd      ;
+kd1.l2             := ad1.l2/l.mbx       ;
+kd1.r2             := ad1.r2/l.mbx       ;
+kd2.l2             := ad2.l2/l.mbrc      ;
+kd2.r2             := ad2.r2/l.mbrc      ;
+kd3.lr3            := ad3.lr3/l.mbw      ;
+kd4.lr3            := ad4.lr3/l.mbw      ;
+kd3.l4             := ad3.l4/l.mbrs      ;
+kd3.r4             := ad3.r4/l.mbrs      ;
+kd4.l4             := ad4.l4/l.mbrb      ;
+kd4.r4             := ad4.r4/l.mbrb      ;
+kd34.lr3           := ad3.lr3/l.mbw      ;
+kd34.lr7           := ad3.lr7/l.mbw      ;
+kd1.l5             := ad1.l5/l.mbxf      ;
+kd1.r5             := ad1.r5/l.mbxf      ;
+kd2.l5             := ad2.l5/l.mbrd      ;
+kd2.r5             := ad2.r5/l.mbrd      ;
+kd3.lr7            := ad3.lr7/l.mbw      ;
+kd4.lr7            := ad4.lr7/l.mbw      ;
+kd1.l8             := ad1.l8/l.mbx       ;
+kd1.r8             := ad1.r8/l.mbx       ;
+kd2.l8             := ad2.l8/l.mbrc      ;
+kd2.r8             := ad2.r8/l.mbrc      ;
+ksumd2.l1b2        := kd2.l1             ;
+ksumd2.l2b2        := kd2.l2             ;
+ksumd2.l5b2        := kd2.l5             ;
+ksumd2.l8b2        := kd2.l8             ;
+ksumd2.r1b2        := kd2.l1             ;
+ksumd2.r2b2        := kd2.l2             ;
+ksumd2.r5b2        := kd2.l5             ;
+ksumd2.r8b2        := kd2.l8             ;
+kb.a12             := ab.a12/l.mb        ;
+kb.a23             := ab.a23/l.mb        ;
+kb.a34             := ab.a34/l.mb        ;
+kb.a45             := ab.a45/l.mb        ;
+kb.a56             := ab.a56/l.mb        ;
+kb.a67             := ab.a67/l.mb        ;
+kb.a78             := ab.a78/l.mb        ;
+kb.a81             := ab.a81/l.mb        ;
+
+abas               := 12.00/6.0*clight/(7e12)*on_sol_atlas ;
+abls               := 6.05/12.1*clight/(7e12)*on_sol_alice ;
+abcs               := 52.00/13.0*clight/(7e12)*on_sol_cms ;
+abxwt.l2           := -0.0000772587268993839836*on_alice ;
+abwmd.l2           := +0.0001472587268993839840*on_alice ;
+abaw.r2            := -0.0001335474860334838000*on_alice ;
+abxwt.r2           := +0.0000635474860334838004*on_alice ;
+abxws.l8           := -0.000045681598453109894*on_lhcb ;
+abxwh.l8           := +0.000180681598453109894*on_lhcb ;
+ablw.r8            := -0.000180681598453109894*on_lhcb ;
+abxws.r8           := +0.000045681598453109894*on_lhcb ;
+"""
+
     extra_madx = (
         extra_defs
         + """

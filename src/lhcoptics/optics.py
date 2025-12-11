@@ -1054,7 +1054,10 @@ class LHCOptics:
             out.append("")
 
         out.append("! Constant definitions\n")
-        out.append(LHCMadxModel.extra_defs)
+        if self.variant.startswith("hl"):
+            out.append(LHCMadxModel.extra_defs_hllhc)
+        else:
+            out.append(LHCMadxModel.extra_defs)
         return deliver_list_str(out, output)
 
     def to_table(self, *rows):
