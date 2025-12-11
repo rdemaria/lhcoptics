@@ -1,7 +1,7 @@
 # Issues
 
 Fixes:
-- add crab matching
+- fix crab matching, knob is not added properly when needs, h is not converging
 - add HL matching orbit knobs
 - add rx parameters for ATS optics
 
