@@ -5,7 +5,7 @@ import gzip
 
 import numpy as np
 
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from cpymad.madx import Madx
 
 from .arcs import LHCArc
@@ -898,6 +898,41 @@ class LHCOptics:
                 plot.ax.set_xlabel(None)
             plot.figure.tight_layout()
         return plot
+
+
+    def plot_crabbing(self, figlabel="Crabbing", filename=None, ax=None, figsize=(8, 4)):
+        tw1, tw2 = self.twiss()
+        idx_ip={'1b1':tw1.rows.indices['ip1'][0],
+                '1b2':tw2.rows.indices['ip1'][0],
+                '5b1':tw1.rows.indices['ip5'][0],
+                '5b2':tw2.rows.indices['ip5'][0],
+               }
+        out={}
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize,num=figlabel)
+
+        emit=2.5e-6/tw1.particle_on_co.gamma0[0]
+        sigma_z = 0.075
+        for s, bet,dx,hv,beam in [
+            (tw1.s, tw1.betx, tw1.dx_zeta, "H", 1),
+            (tw1.s, tw1.bety, tw1.dy_zeta, "V", 1),
+            (tw2.s, tw2.betx, tw2.dx_zeta, "H", 2),
+            (tw2.s, tw2.bety, tw2.dy_zeta, "V", 2),
+        ]:
+            sigma_x = np.sqrt(bet * emit)
+            crabbing = dx * sigma_z / sigma_x
+            ax.plot(s, crabbing, label=f"Beam {beam} {hv}")
+            out[f"ip{beam}_{hv}_1"] = dx[idx_ip[f"1b{beam}"]]*1e6
+            out[f"ip{beam}_{hv}_5"] = dx[idx_ip[f"5b{beam}"]]*1e6
+
+        ax.set_xlabel("s [m]")
+        ax.set_ylabel("$x\\;\\text{or}\\;y(z=\\sigma_z)/\\sigma_x$")
+        plt.legend()
+        for ip in ['1','5']:
+            for beam in ['1','2']:
+                print(f"IP{ip} B{beam} Cxy= {out[f'ip{beam}_H_{ip}']:9.3f}, {out[f'ip{beam}_V_{ip}']:9.3f} urad")
+        return ax
 
     def round_params(self, full=False):
         if full:

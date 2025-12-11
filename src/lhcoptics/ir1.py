@@ -28,3 +28,5 @@ class LHCIR1(LHCIR):
             }
         else:
             return LHCIR.quads.__get__(self)
+
+

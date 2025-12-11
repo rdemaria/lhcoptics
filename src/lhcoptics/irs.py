@@ -53,6 +53,8 @@ class LHCIR(LHCSection):
                 quads.remove("kqt5.r7")
         strength_names += sort_n(quads)
         strength_names += model.filter(f"kqs\\..*[lr]{irn}b[12]$")
+        crabs= model.filter(f"[lv]crab[ab]4[lr]{irn}\\.b[12]$")
+        strength_names += sort_n(crabs)
         acb = model.filter(f"acbx.*[lr]{irn}$")
         acb += model.filter(f"acb.*[lr]{irn}b[12]$")
         strength_names += sort_n(acb)

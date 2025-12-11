@@ -6,6 +6,28 @@ import xtrack as xt
 from .utils import print_diff_dict_float
 
 
+def is_specialized(knob, cls):
+    return knob.__class__.__name__ == cls.__name__ or knob.__class__.__name__ != "Knob"
+
+
+"""Knobs for LHC optics.
+
+Knobs uses a specialization mechanism to return specific knob types.
+
+The Knob class has a specialize() method that checks the knob name against known patterns and returns an instance of the appropriate subclass if a match is found.
+
+The pattern is based on name. Each subclass has a class method specialize() that checks if the knob name matches its pattern. If it does, it returns an instance of that subclass; otherwise, it returns the original knob.
+
+The order of specialization checks is important, as some patterns may overlap. The specialize() method in the base Knob class calls the specialize() methods of each subclass in a specific order to ensure correct specialization.
+
+At import time, the Knob class can be used to create generic knobs, the weights are collected from the model by looking at the variables that refer to the knob name.
+This method allows for a flexible way for certain knobs for which is not possible to define a clear pattern on the weights, such as the IP knobs.
+
+Currently the removal of a single knob is not implemented, so the mechanism to enforce knobs structure is rather brittle and relies on the complete redefinition of all knobs when loading from a file.
+
+"""
+
+
 class Knob:
     """
     Generic knob class for LHC optics.
@@ -49,6 +71,7 @@ class Knob:
         Return a specialized knob based on the current knob.
         """
         out = self
+        out = CrabKnob.specialize(out)
         out = IPKnob.specialize(out)
         out = DispKnob.specialize(out)
         out = TuneKnob.specialize(out)
@@ -138,7 +161,7 @@ class IPKnob(Knob):
         """
         Specialize the knob to a specific type or return the original knob.
         """
-        if isinstance(knob, cls):
+        if is_specialized(knob, cls):
             return knob
         mtc = cls.reorb.match(knob.name)
         if mtc is None:
@@ -287,7 +310,6 @@ class IPKnob(Knob):
         return vleft, vright
 
     def match(self):
-        model = self.parent.model
         """
         In general the problem is to find
 
@@ -301,6 +323,7 @@ class IPKnob(Knob):
 
         needs to get limits in vary (limits will be check during the dry-run with currents)
         """
+        model = self.parent.model
 
         xt = model._xt
         ir = getattr(self.parent, f"ir{self.ip}")
@@ -439,7 +462,7 @@ class TuneKnob(Knob):
         """
         Specialize the knob to a specific type or return the original knob.
         """
-        if isinstance(knob, cls):
+        if is_specialized(knob, cls):
             return knob
         mtc = cls.retune.match(knob.name)
         if mtc is None:
@@ -618,7 +641,7 @@ class ChromaKnob(Knob):
         """
         Specialize the knob to a specific type or return the original knob.
         """
-        if isinstance(knob, cls):
+        if is_specialized(knob, cls):
             return knob
         mtc = cls.retune.match(knob.name)
         if mtc is None:
@@ -788,7 +811,7 @@ class CouplingKnob(Knob):
         """
         Specialize the knob to a specific type or return the original knob.
         """
-        if isinstance(knob, cls):
+        if is_specialized(knob, cls):
             return knob
         mtc = cls.retune.match(knob.name)
         if mtc is None:
@@ -904,7 +927,7 @@ class DispKnob(Knob):
         """
         Specialize the knob to a specific type or return the original knob.
         """
-        if isinstance(knob, cls):
+        if is_specialized(knob, cls):
             return knob
         mtc = cls.reorb.match(knob.name)
         if mtc is None:
@@ -1045,3 +1068,137 @@ class DispKnob(Knob):
 
     def __repr__(self):
         return f"<DispKnob {self.name!r} = {self.value}>"
+
+
+class CrabKnob(Knob):
+    reorb = re.compile("on_crab[15]")
+
+    def __init__(self, name, value=0, weights=None, parent=None, ip=None, variant=None):
+        if len(weights) == 0:
+            weights = {
+                f"vcrab{ab}4{rl}{ip}.b{beam}": 0
+                for ab in "ab"
+                for rl in "lr"
+                for beam in "12"
+            }
+        super().__init__(name, value, weights, parent, variant=variant)
+        self.ip = ip
+
+    @classmethod
+    def specialize(cls, knob):
+        """
+        Specialize the knob to a specific type or return the original knob.
+        """
+        if is_specialized(knob, cls):
+            return knob
+        mtc = cls.reorb.match(knob.name)
+        if mtc is None:
+            return knob
+        else:
+            irn = knob.name[-1]
+            return cls(
+                knob.name,
+                value=knob.value,
+                weights=knob.weights,
+                parent=knob.parent,
+                ip=irn,
+                variant=knob.variant,
+            )
+
+    def __repr__(self):
+        return f"<CrabKnob {self.name!r} = {self.value}>"
+
+    def copy(self):
+        return CrabKnob(
+            name=self.name,
+            value=self.value,
+            weights=self.weights.copy(),
+            parent=self.parent,
+            ip=self.ip,
+            variant=self.variant,
+        )
+
+    def match(self):
+        match_value = 1  # in urad used for the matching
+        model = self.parent.model
+        xt = model._xt
+        ipn = f"ip{self.ip}"
+        if self.ip == "1":
+            cxy = "dx_zeta"
+            cpxy = "dpx_zeta"
+        elif self.ip == "5":
+            cxy = "dy_zeta"
+            cpxy = "dpy_zeta"
+        targets = [
+            xt.Target(
+                tt,
+                value=vv,
+                line=bb,
+                at=ipn,
+                tol=1e-16,
+            )
+            for tt, vv, bb in [
+                (cxy, 1e-6 * match_value, "b1"),
+                (cxy, -1e-6 * match_value, "b2"),
+                (cpxy, 0, "b1"),
+                (cpxy, 0, "b2"),
+            ]
+        ]
+        vary = [
+            xt.Vary(wn, step=1e-9)
+            for wn in self.get_weight_knob_names()
+            if "vcrabb" not in wn
+        ]
+        mtc = model.match(
+            solve=False,
+            vary=vary,
+            targets=targets,
+            strengths=False,
+            compute_chromatic_properties=False,
+        )
+
+        knob_start = model[self.name]
+        try:
+            model[self.name] = 0
+            # get present target values
+            mtc._err(None, check_limits=False)
+            # add offsets
+            for val, tt in zip(mtc._err.last_res_values, mtc.targets):
+                tt.value += val
+                print(f"adding val to target {tt.tag}: new value = {tt.value}")
+            # update definitions, potentially mismatched
+            model.update_knob(self)
+            # set crab cavity voltages equal for a and b
+            for wn in self.get_weight_knob_names():
+                if "vcrabb" in wn:
+                    model.ref[wn] = model.ref[wn.replace("vcrabb", "vcraba")]
+                    print(f"Setting {wn} := {model.ref[wn]._expr};")
+            # add offset in the knobs
+            model[self.name] = match_value
+            mtc.solve()
+            mtc.target_status()
+            mtc.vary_status()
+        except Exception as ex:
+            mtc.vary_status()
+            print(f"Failed to match {self.name}")
+            model.update_knob(self)
+            raise (ex)
+        model[self.name] = knob_start
+        max_voltage = max(
+            [
+                abs(model[wn])
+                for wn in self.get_weight_knob_names()
+            ]
+        )
+        max_crabbing=3.4/max_voltage
+        print(f"Maximum crabbing angle achieved: {max_crabbing*match_value:.3f} urad")
+        return mtc
+
+    def plot(self, value=None):
+        model = self.parent.model
+        aux = self.value
+        if value is None:
+            value = self.value
+        model[self.name] = value
+        self.parent.plot_crabbing()
+        model[self.name] = aux

@@ -75,3 +75,5 @@ class LHCIR5(LHCIR):
         init.mux -= mux
         init.muy -= muy
         return init
+
+
