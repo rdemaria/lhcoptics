@@ -1,9 +1,9 @@
 # Issues
 
 Fixes:
-- fix crab matching, knob is not added properly when needs, h is not converging
-- add HL matching orbit knobs
+- fix/add HL matching orbit knobs
 - add rx parameters for ATS optics
+- check proper ATS matching
 
 Features:
 - add in xsuite delete_knob, create_knob, update_knob
