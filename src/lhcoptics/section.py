@@ -111,7 +111,7 @@ class LHCSection:
         knobs=None,
         parent=None,
         filename=None,
-        variant="2025"
+        variant="2025",
     ):
         self.name = name
         self.variant = variant
@@ -172,6 +172,11 @@ class LHCSection:
             parent=self.parent,
             filename=self.filename,
         )
+ 
+    def create_knobs(self, verbose=False):
+        """Create knobs in the model from the optics knobs."""
+        self.model.create_knobs(self.knobs, verbose=verbose)
+        return self
 
     def diff(self, other):
         self.diff_strengths(other)
@@ -212,15 +217,13 @@ class LHCSection:
             twiss = self.twiss(beam, method=method, strengths=True)
             if figlabel is None:
                 figlabel = f"{self.name}b{beam}".upper()
-            plot=twiss.plot(
-                figlabel=figlabel, yl=yl, yr=yr
-            )
+            plot = twiss.plot(figlabel=figlabel, yl=yl, yr=yr)
             if filename is not None:
                 plt.savefig(filename.format(figlabel=figlabel))
             plot.ax.set_title(figlabel)
             return plot
 
-    def set_params(self,mode="from_twiss"):
+    def set_params(self, mode="from_twiss"):
         """
         Copy all parameters from get_params() to self.params
         """
@@ -268,9 +271,7 @@ class LHCSection:
             out.append("")
         if knobs and len(self.knobs) > 0:
             out.append(f"! Knobs of {self.name.upper()}")
-            for expr in LHCMadxModel.knobs_to_expr(
-                self.knobs.values(), self.strengths
-            ):
+            for expr in LHCMadxModel.knobs_to_expr(self.knobs.values(), self.strengths):
                 out.append(expr)
             out.append("")
         return deliver_list_str(out, output)
@@ -325,7 +326,9 @@ class LHCSection:
                 self.knobs[k].parent = self.parent
         return self
 
-    def update_model(self, src=None, verbose=False, knobs_off=False, knobs_check=True):
+    def update_model(
+        self, src=None, verbose=False, knobs_off=False, create_knobs=False
+    ):
         """Update the model with the local strengths, knobs
         If a src is provided, it will be used to update the local values, else self will be used.
         If src is a dict containing strengths, knobs or a LHCSection, they will be used to update the model.
@@ -348,7 +351,10 @@ class LHCSection:
             knobs = src["knobs"]
         else:
             knobs = {}
-        self.model.update_knobs(knobs, verbose=verbose, knobs_off=knobs_off, knobs_check=knobs_check)
+        if create_knobs:
+            self.model.create_knobs(knobs, verbose=verbose)
+        else:
+            self.model.update_knobs(knobs, verbose=verbose, knobs_off=knobs_off)
         return self
 
     def update_strengths(
@@ -362,9 +368,7 @@ class LHCSection:
         elif hasattr(src, "strengths"):
             src = src.strengths
         if hasattr(self, "irn"):
-            filter = filter_lrb12(
-                self.irn, left=left, right=right, b1=b1, b2=b2
-            )
+            filter = filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
         else:
 
             def filter(x):
@@ -373,9 +377,7 @@ class LHCSection:
         for kk in self.strengths:
             if kk in src and filter(kk):
                 if verbose and self.strengths[kk] != src[kk]:
-                    print(
-                        f"Updating {kk!r} from {self.strengths[kk]} to {src[kk]}"
-                    )
+                    print(f"Updating {kk!r} from {self.strengths[kk]} to {src[kk]}")
                 self.strengths[kk] = src[kk]
         return self
 
@@ -397,9 +399,7 @@ class LHCSection:
         elif hasattr(src, "params"):
             src = src.params
         if hasattr(self, "irn"):
-            filter = filter_lrb12(
-                self.irn, left=left, right=right, b1=b1, b2=b2
-            )
+            filter = filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
         else:
 
             def filter(x):

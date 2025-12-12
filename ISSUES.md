@@ -15,3 +15,4 @@ Features:
 - add detuning knobs
 - add q'' knobs
 - add rotation crabbing plane
+- redefine the voltages of H crab  beam2 in the sequence

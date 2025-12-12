@@ -49,6 +49,15 @@ def termlist(ex, lst=[]):
     else:
         return [ex]
 
+def delete_term(ex, var):
+    terms= []
+    for term in termlist(ex):
+        if isinstance(term, xdeps.refs.MulExpr) and term._rhs == var:
+            continue
+        else:
+            terms.append(term)
+    return sum(terms)
+
 
 def pprint(expr):
     return "\n + ".join([str(t) for t in termlist(expr)])
@@ -136,13 +145,13 @@ class LHCXsuiteModel:
         return self._var_values.keys()
 
     def search(self, pattern):
-        out={}
+        out = {}
         for k in self._var_values.keys():
-            if re.match(pattern,k):
-                out[k]=self.env[k]
+            if re.match(pattern, k):
+                out[k] = self.env[k]
         for k, v in self.env.elements.items():
-            if re.match(pattern,k):
-                out[k]=v
+            if re.match(pattern, k):
+                out[k] = v
         return out
 
     @classmethod
@@ -185,7 +194,6 @@ class LHCXsuiteModel:
         self.env.b1.particle_ref.p0c = value
         self.env.b2.particle_ref.p0c = value
 
-
     def update_vars(self, strengths, verbose=False):
         for k, v in strengths.items():
             if verbose:
@@ -201,39 +209,42 @@ class LHCXsuiteModel:
         """
         Return True has the expeceted structure
         Return False has a different structure
-        Return None if it does not exist
         """
         knobname = knob.name
         deps = self.mgr.rdeps.get(self.ref[knobname], {})
-        if len(deps) == 0:
-            if verbose:
-                print(f"Missing knob {knobname}")
-            return None
         depnames = {dep._key for dep in deps}
         if verbose:
             print(f"Check knob {knobname}")
-            print(f"Dependencies {depnames!r}")
+            for dep in deps:
+                print(f"- {dep._key} {dep._expr}")
         if depnames != set(knob.weights.keys()):
             if verbose:
                 knob_weights = set(knob.weights.keys())
                 print(f"Model weghts `{depnames}` != knob weights `{knob_weights}`")
             return False
         else:
-            for depname in depnames:
-                wname = f"{depname}_from_{knobname}"
-                if wname not in self._var_values:
-                    if verbose:
-                        print(f"Missing weight {wname}")
-                    return False
             return True
 
-    def update_knobs(self, knobs, verbose=False, knobs_off=False, knobs_check=True):
+    def update_knobs(self, knobs, verbose=False, knobs_off=False):
         for k, knob in knobs.items():
-            self.update_knob(
-                knob, verbose=verbose, knobs_off=knobs_off, knob_check=knobs_check
-            )
+            self.update_knob(knob, verbose=verbose, knobs_off=knobs_off)
 
-    def update_knob(self, knob, verbose=False, knobs_off=False, knob_check=True):
+    def create_knobs(self, knobs, verbose=False):
+        for k, knob in knobs.items():
+            self.create_knob(knob, verbose=verbose)
+
+    def create_knob(self, knob, verbose=False):
+        self.delete_knob(knob.name,verbose=verbose,dry_run=False)
+        knobname = knob.name
+        for wtarget, value in knob.weights.items():
+            wname = f"{wtarget}_from_{knobname}"
+            if verbose:
+                print(f"Creating expression {wtarget} += {wname} * {knobname}")
+                print(f" Setting weight {wname} = {value:15.6g}")
+            self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
+            self[wname] = value
+
+    def update_knob(self, knob, verbose=False, knobs_off=False):
         """
         Update the model with the knob
 
@@ -245,18 +256,13 @@ class LHCXsuiteModel:
         if the knob does not exist.
         This is danagerous because it can break other knobs.
         """
+        check = self.knob_check(knob)
         knobname = knob.name
-        if knob_check:
-            check = self.knob_check(knob)
-            if verbose:
-                print(f"Knob {knob.name} check is {check}")
-        else:
-            check = None
 
         if check is False:
             self.knob_check(knob, verbose=verbose)
             raise ValueError(f"Knob {knobname} has different structure in {self}")
-        else:
+        else: #update weight variables and expressions only if check is None
             if not knobs_off:
                 if verbose and knob.value != self[knobname]:
                     print(
@@ -268,22 +274,7 @@ class LHCXsuiteModel:
                 if verbose and wname in self and self[wname] != value:
                     print(f"Update {wname} from {self[wname]:15.6g} to {value:15.6g}")
                 self[wname] = value
-                if check is None:
-                    if verbose:
-                        print(f"Add expression {wtarget} += {wname}*{knobname}")
-                    self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
 
-    def _erase_knob(self, knob):
-        """
-        Delete knobs and weights from the model, very unsafe, because it can break other knobs. To be used only in tests.
-        """
-        knobname = knob.name
-        deps = list(self.mgr.rdeps.get(self.ref[knobname], {}))
-        for dep in deps:
-            wname = f"{dep._key}_from_{knobname}"
-            self.mgr.set_value(dep, dep._get_value())
-            if wname in self._var_values:
-                del self._var_values[wname]
 
     def get_knob(self, knob):
         value = self._var_values[knob.name]
@@ -360,6 +351,17 @@ class LHCXsuiteModel:
                     weights[wname] = value
         value = self[name]
         return Knob(name, value, weights, variant=variant).specialize()
+
+    def print_deps(self, varname):
+        ref = self.env.ref[varname]
+        direct_deps = self.mgr.rdeps.get(ref, {})
+        print(f"Direct dependencies of {varname!r}:")
+        for dd in direct_deps:
+            print(f" - {dd} {dd._expr}")
+        print(f"Indirect dependencies of {varname!r}:")
+        indirect_deps = set(self.mgr.find_deps([ref])) - set(direct_deps) - {ref}
+        for idd in indirect_deps:
+            print(f" - {idd} {idd._expr}")
 
     def filter(self, pattern):
         vv = list(self._var_values.keys())
@@ -526,6 +528,26 @@ class LHCXsuiteModel:
             return f"<LHCXsuiteModel {self.jsonfile!r}>"
         else:
             return f"<LHCXsuiteModel {id(self)}>"
+
+    def delete_knob(self, knobname,verbose=False,dry_run=False):
+        direct_deps = list(self.mgr.rdeps.get(self.ref[knobname], {}))
+        for dd in direct_deps:
+            if verbose:
+                print(f"Deleting dependency {dd}")
+            oldexpr = dd._expr
+            newexpr = delete_term(oldexpr, self.ref[knobname])
+            if verbose:
+                print(f" Old expr: {oldexpr}")
+                print(f" New expr: {newexpr}")
+            if not dry_run:
+                self.mgr.set_value(dd, newexpr)
+        direct_deps=list(self.mgr.rdeps.get(self.ref[knobname], {}))
+        if len(direct_deps)>0:
+            print(f"After deletion, knob {knobname} still has dependencies:")
+            for dd in direct_deps:
+                print(f" - {dd}")
+            raise ValueError(f"Knob {knobname} still has dependencies after deletion")
+
 
     def plot_beamsize(
         self,

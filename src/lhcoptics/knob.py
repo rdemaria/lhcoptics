@@ -3,6 +3,7 @@ import re
 import numpy as np
 import xtrack as xt
 
+
 from .utils import print_diff_dict_float
 
 
@@ -94,6 +95,27 @@ class Knob:
     def check(self, threshold=1e-10, test_value=1):
         print(f"Warning knob {self.name!r} check not implemented")
 
+    def check_structure(self):
+        from lhcoptics.model_xsuite import termlist
+        model= self.parent.model
+        res= True
+        for name in self.get_weight_knob_names():
+            if name not in model:
+                print(
+                    f"Weight {name!r} not found in model for knob {self.name!r}"
+                )
+                res= False
+        for name in self.weights:
+            if model.ref[name]._expr is None:
+                print(
+                    f"Weight {name!r} has no expression in model for knob {self.name!r}"
+                )
+                res= False
+            else:
+                terms= termlist(model.ref[name]._expr)
+                print(terms)
+        return res
+
     def copy(self):
         return Knob(
             self.name,
@@ -102,6 +124,21 @@ class Knob:
             parent=self.parent,
             variant=self.variant,
         )
+
+    def create(self, model=None):
+        if model is None:
+            model = self.parent.model
+        model.create_knob(
+            self.name,
+            value=self.value,
+            weights=self.weights,
+        )
+
+    def delete(self, model=None):
+        if model is None:
+            model = self.parent.model
+        model.delete_knob(self.name)
+
 
     def to_dict(self):
         return {
@@ -130,6 +167,17 @@ class Knob:
 
     def __repr__(self):
         return f"<Knob {self.name!r} = {self.value}>"
+
+    def update(self,model=None, verbose=False):
+        if model is None:
+            model = self.parent.model
+        for wn in self.weights:
+            if verbose:
+                value=model[wn + "_from_" + self.name]
+                if value != self.weights[wn]:
+                    print(f"Updating weight {wn} from {self.weights[wn]} to {value}")
+            self.weights[wn] = model[wn + "_from_" + self.name]
+        return self
 
 
 class IPKnob(Knob):
@@ -1152,7 +1200,7 @@ class CrabKnob(Knob):
         )
 
     def match(self):
-        match_value = 1  # in urad used for the matching
+        match_value = 190  # in urad used for the matching
         model = self.parent.model
         xt = model._xt
         ipn = f"ip{self.ip}"
@@ -1168,7 +1216,7 @@ class CrabKnob(Knob):
                 value=vv,
                 line=bb,
                 at=ipn,
-                tol=1e-16,
+                tol=1e-9,
             )
             for tt, vv, bb in [
                 (cxy, 1e-6 * match_value, "b1"),
@@ -1178,7 +1226,7 @@ class CrabKnob(Knob):
             ]
         ]
         vary = [
-            xt.Vary(wn, step=1e-9)
+            xt.Vary(wn, step=1e-5)
             for wn in self.get_weight_knob_names()
             if "vcrabb" not in wn
         ]
@@ -1198,21 +1246,21 @@ class CrabKnob(Knob):
             # add offsets
             for val, tt in zip(mtc._err.last_res_values, mtc.targets):
                 tt.value += val
-                print(f"adding val to target {tt.tag}: new value = {tt.value}")
+                #print(f"adding val to target {tt.tag}: new value = {tt.value}")
             # update definitions, potentially mismatched
             model.update_knob(self)
             # set crab cavity voltages equal for a and b
             for wn in self.get_weight_knob_names():
                 if "vcrabb" in wn:
                     model.ref[wn] = model.ref[wn.replace("vcrabb", "vcraba")]
-                    print(f"Setting {wn} := {model.ref[wn]._expr};")
+                    #print(f"Setting {wn} := {model.ref[wn]._expr};")
             # add offset in the knobs
             model[self.name] = match_value
-            mtc.target_status()
+            #mtc.target_status()
             mtc.vary_status()
             mtc.solve()
-            mtc.target_status()
-            mtc.vary_status()
+            #mtc.target_status()
+            #mtc.vary_status()
         except Exception as ex:
             mtc.vary_status()
             print(f"Failed to match {self.name}")
@@ -1224,7 +1272,7 @@ class CrabKnob(Knob):
         )
         max_crabbing = 3.4 / max_voltage
         print(
-            f"Maximum crabbing angle achieved: {max_crabbing*match_value:.3f} urad"
+            f"Maximum crabbing angle achieved: {max_crabbing:.3f} urad"
         )
         return mtc
 
