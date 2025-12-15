@@ -378,7 +378,7 @@ class IPKnob(Knob):
         vright = sum([self.weights[k] for k in right])
         return vleft, vright
 
-    def match(self):
+    def match(self, return_match=False):
         """
         In general the problem is to find
 
@@ -414,21 +414,22 @@ class IPKnob(Knob):
             for tt in ("", "p")
             for bb in self.beams
         ]
+
+        names=self.get_weight_knob_names()
+        names=[k for k in names if self.weights[k.split("_from_")[0]] != 0]
+        names=[k for k in names if not k in self.const]
+        names=[k for k in names if k.startswith(f"acb")]
         varyb1 = [
-            xt.Vary(wn, step=self.step)
-            for wn in self.get_weight_knob_names()
-            if "b1" in wn and self.weights[wn.split("_from_")[0]] != 0
-        ]
+            xt.Vary(wn, step=self.step) 
+            for wn in names if "b1" in wn]
         varyb2 = [
             xt.Vary(wn, step=self.step)
-            for wn in self.get_weight_knob_names()
-            if "b2" in wn and self.weights[wn.split("_from_")[0]] != 0
+            for wn in names if "b2" in wn
         ]
         varycmn = [
             xt.Vary(wn, step=self.step)
-            for wn in self.get_weight_knob_names()
+            for wn in names
             if wn.startswith(f"acbx{self.hv}")
-            and self.weights[wn.split("_from_")[0]] != 0
         ]
         if len(self.beams) == 2:
             vary = varycmn + varyb1 + varyb2
@@ -455,6 +456,8 @@ class IPKnob(Knob):
         )
 
         mtc.disable(vary_name=self.const)
+        if return_match:
+            return mtc
         knob_start = model[self.name]
         try:
             model[self.name] = 0
@@ -502,6 +505,12 @@ class IPKnob(Knob):
             self.weights[k] = vleft / len(left)
         for k in right:
             self.weights[k] = vright / len(right)
+
+    def preset_weights(self):
+        if self.kind in ["x", "a", 'xs', 'sep']:
+            for k in self.weights:
+                if k.startswith(f"acbx{self.hv}") or k.startswith(f"acbrd{self.hv}"):
+                    self.weights[k] = 1e-7
 
     def __repr__(self):
         return f"<IPKnob {self.name!r} = {self.value}>"
@@ -1275,6 +1284,13 @@ class CrabKnob(Knob):
             f"Maximum crabbing angle achieved: {max_crabbing:.3f} urad"
         )
         return mtc
+
+    def get_crabbing_angle(self, voltage=3.4e6):
+        max_voltage = max(
+            [abs(v) for v in self.weights.values()]
+        )
+        crabbing = voltage/1e6 / max_voltage
+        return crabbing
 
     def plot(self, value=None):
         model = self.parent.model

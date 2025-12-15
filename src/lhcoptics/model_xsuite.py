@@ -244,6 +244,9 @@ class LHCXsuiteModel:
         for wtarget, value in knob.weights.items():
             wname = f"{wtarget}_from_{knobname}"
             if verbose:
+                print(f" Creating weight {wname} = {value:15.6g}")
+            self[wname] = value
+            if verbose:
                 print(f"Creating expression {wtarget} += {wname} * {knobname}")
                 print(f" Setting weight {wname} = {value:15.6g}")
             self.ref[wtarget] += self.ref[wname] * self.ref[knobname]

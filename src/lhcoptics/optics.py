@@ -1113,26 +1113,26 @@ class LHCOptics:
 
     def update_knobs(self, src=None, full=True, verbose=False):
         """
-        Update optics knobs from src, if full incluiding all sections nobs
+        Update optics knobs from src, if full incluiding all sections knobs
         """
         if src is None:
             src = self.model
         if hasattr(src, "knobs"):
-            src = src.knobs
+            knobs_dict = src.knobs
         elif hasattr(src, "get_knob"):
-            src = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
+            knobs_dict = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
         elif src == "default":
             if verbose:
                 print("Update knobs from default list")
-            src = {
+            knobs_dict = {
                 k: self.model.get_knob_by_probing(k)
                 for k in self.get_default_knob_names()
             }
         for k in self.knobs:
-            if k in src:
+            if k in knobs_dict:
                 if verbose:
-                    self.knobs[k].print_update_diff(src[k])
-                self.knobs[k] = Knob.from_src(src[k])
+                    self.knobs[k].print_update_diff(knobs_dict[k])
+                self.knobs[k] = Knob.from_src(knobs_dict[k])
                 self.knobs[k].parent = self
         if full:
             for ss in self.irs + self.arcs:
