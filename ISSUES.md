@@ -2,11 +2,12 @@
 
 Fixes:
 - fix/add HL matching orbit knobs
+- check 50cm strengths margins
+- check apertures at injection
 - add rx parameters for ATS optics
 - check proper ATS matching
 
 Features:
-- add in xsuite delete_knob, create_knob, update_knob
 - remove twiss defaults, enforce correct options
 - introduce multi i/k power converter for triplets
 - used named particles in json for correct energy

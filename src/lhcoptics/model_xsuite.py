@@ -49,8 +49,9 @@ def termlist(ex, lst=[]):
     else:
         return [ex]
 
+
 def delete_term(ex, var):
-    terms= []
+    terms = []
     for term in termlist(ex):
         if isinstance(term, xdeps.refs.MulExpr) and term._rhs == var:
             continue
@@ -220,21 +221,25 @@ class LHCXsuiteModel:
         if depnames != set(knob.weights.keys()):
             if verbose:
                 knob_weights = set(knob.weights.keys())
-                print(f"Model weghts `{depnames}` != knob weights `{knob_weights}`")
+                print(f"Model weights `{depnames}` != knob weights `{knob_weights}`")
             return False
         else:
             return True
 
-    def update_knobs(self, knobs, verbose=False, knobs_off=False):
-        for k, knob in knobs.items():
-            self.update_knob(knob, verbose=verbose, knobs_off=knobs_off)
+    def update_knobs(self, knobs, verbose=False, set_value=True):
+        for _, knob in knobs.items():
+            self.update_knob(knob, verbose=verbose, set_value=set_value)
 
-    def create_knobs(self, knobs, verbose=False):
-        for k, knob in knobs.items():
-            self.create_knob(knob, verbose=verbose)
+    def create_knobs(self, knobs, verbose=False, set_value=True):
+        for _, knob in knobs.items():
+            self.create_knob(knob, verbose=verbose, set_value=set_value)
 
-    def create_knob(self, knob, verbose=False):
-        self.delete_knob(knob.name,verbose=verbose,dry_run=False)
+    def create_knob(self, knob, verbose=False, set_value=True):
+        """
+        Create the knob in the model, deleting any previous definition.       
+        
+        """
+        self.delete_knob(knob.name, verbose=verbose, dry_run=False)
         knobname = knob.name
         for wtarget, value in knob.weights.items():
             wname = f"{wtarget}_from_{knobname}"
@@ -243,38 +248,37 @@ class LHCXsuiteModel:
                 print(f" Setting weight {wname} = {value:15.6g}")
             self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
             self[wname] = value
+        if set_value:
+            if verbose:
+                print(f" Setting knob {knobname} = {knob.value:15.6g}")
+            self[knobname] = knob.value
 
-    def update_knob(self, knob, verbose=False, knobs_off=False):
+    def update_knob(self, knob, verbose=False, set_value=True):
         """
-        Update the model with the knob
+        Update the model with the knob weight values
 
         Check that the knob exists, that is k has dependent targets.
         If it exists, check that has the same structure
         else raise an error.
-        If it does not exist, create it.
-        When  knob_check is False, skip the structure check and create a new knob
-        if the knob does not exist.
-        This is danagerous because it can break other knobs.
         """
         check = self.knob_check(knob)
         knobname = knob.name
 
         if check is False:
-            self.knob_check(knob, verbose=verbose)
+            self.knob_check(knob, verbose=True)
             raise ValueError(f"Knob {knobname} has different structure in {self}")
-        else: #update weight variables and expressions only if check is None
-            if not knobs_off:
+        else:  # update weight variables and expressions only if check is None
+            if set_value:
                 if verbose and knob.value != self[knobname]:
                     print(
                         f"Update {knobname} from {self[knobname]:15.6g} to {knob.value:15.6g}"
                     )
-                self[knobname] = knob.value
+                    self[knobname] = knob.value
             for wtarget, value in knob.weights.items():
                 wname = f"{wtarget}_from_{knobname}"
                 if verbose and wname in self and self[wname] != value:
                     print(f"Update {wname} from {self[wname]:15.6g} to {value:15.6g}")
                 self[wname] = value
-
 
     def get_knob(self, knob):
         value = self._var_values[knob.name]
@@ -529,7 +533,7 @@ class LHCXsuiteModel:
         else:
             return f"<LHCXsuiteModel {id(self)}>"
 
-    def delete_knob(self, knobname,verbose=False,dry_run=False):
+    def delete_knob(self, knobname, verbose=False, dry_run=False):
         direct_deps = list(self.mgr.rdeps.get(self.ref[knobname], {}))
         for dd in direct_deps:
             if verbose:
@@ -541,13 +545,12 @@ class LHCXsuiteModel:
                 print(f" New expr: {newexpr}")
             if not dry_run:
                 self.mgr.set_value(dd, newexpr)
-        direct_deps=list(self.mgr.rdeps.get(self.ref[knobname], {}))
-        if len(direct_deps)>0:
+        direct_deps = list(self.mgr.rdeps.get(self.ref[knobname], {}))
+        if len(direct_deps) > 0:
             print(f"After deletion, knob {knobname} still has dependencies:")
             for dd in direct_deps:
                 print(f" - {dd}")
             raise ValueError(f"Knob {knobname} still has dependencies after deletion")
-
 
     def plot_beamsize(
         self,

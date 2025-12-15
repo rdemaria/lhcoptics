@@ -1151,10 +1151,9 @@ class LHCOptics:
         src=None,
         full=True,
         verbose=False,
-        knobs_off=False,
         set_init=True,
-        knobs=True,
-        create_knobs=False,
+        knobs="create",
+        set_knob_values=False
     ):
         """
         Update model from an optics or a dict.
@@ -1177,24 +1176,31 @@ class LHCOptics:
                 ss.update_model(
                     src=src_ss,
                     verbose=verbose,
-                    knobs_off=knobs_off,
-                    create_knobs=create_knobs,
+                    knobs=knobs,
+                    set_knob_values=set_knob_values,
                 )
         # knobs must be updated after the strengths
-        if knobs:
+        if knobs=="create":
             if verbose:
                 print(f"Update knobs from {src}")
-            if create_knobs:
-                self.model.create_knobs(
+            self.model.create_knobs(
                     src.knobs,
                     verbose=verbose,
+                    set_value=set_knob_values,
                 )
-            else:
-                self.model.update_knobs(
+        elif knobs=="update":
+            if verbose:
+                print(f"Update knobs from {src}")
+            self.model.update_knobs(
                     src.knobs,
                     verbose=verbose,
-                    knobs_off=knobs_off,
+                    set_value=set_knob_values,
                 )
+        elif knobs==None or knobs==False:
+            pass
+        else:
+            raise ValueError(f"knobs must be 'create', 'update', None or False not {knobs!r}")
+            
         if "p0c" in self.params:
             self.model.p0c = self.params["p0c"]
         if set_init:
