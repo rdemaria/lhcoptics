@@ -178,7 +178,15 @@ class Knob:
                     print(f"Updating weight {wn} from {self.weights[wn]} to {value}")
             self.weights[wn] = model[wn + "_from_" + self.name]
         return self
-
+    
+    def update_model(self, model=None, create=True, set_value=False):
+        if model is None:
+            model = self.parent.model
+        if create:
+            model.create_knob(self, set_value=set_value)
+        else:
+            model.update_knob(self, set_value=set_value)
+        return self
 
 class IPKnob(Knob):
     _zero_init = [xt.TwissInit(), xt.TwissInit()]
@@ -415,6 +423,7 @@ class IPKnob(Knob):
             for bb in self.beams
         ]
 
+
         names=self.get_weight_knob_names()
         names=[k for k in names if self.weights[k.split("_from_")[0]] != 0]
         names=[k for k in names if not k in self.const]
@@ -437,6 +446,11 @@ class IPKnob(Knob):
             vary = varyb1
         elif self.beams[0] == "b2":
             vary = varyb2
+
+        if len(vary) == 0:
+            print(f"No weights to vary for knob {self.name!r}")
+            print("Assign values to weights different from zero.")
+            raise ValueError(f"No weights to vary for knob {self.name!r}")
 
         # assumes using all lines anyway
         # TODO use only the relevant lines
@@ -511,6 +525,22 @@ class IPKnob(Knob):
             for k in self.weights:
                 if k.startswith(f"acbx{self.hv}") or k.startswith(f"acbrd{self.hv}"):
                     self.weights[k] = 1e-7
+        elif self.kind in ["xip", "yip"]:
+            beam=self.beams[0]
+            for k in getattr(self.parent,"ir"+self.ip).strengths:
+                if re.match(rf"acb[ycrd]+{self.hv}[s5-6]4?\.[lr][15]b[{beam}]", k):
+                    print(f"Setting weight {k} to 1e-6 for knob {self.name!r}")
+                    self.weights[k] = 1e-6
+        self.update_model(create=True)
+        return self
+
+    def is_null(self):
+        ret=False
+        if len(self.weights)==0:
+            ret= True
+        elif all([v==0 for v in self.weights.values()]):
+            ret= True
+        return ret
 
     def __repr__(self):
         return f"<IPKnob {self.name!r} = {self.value}>"

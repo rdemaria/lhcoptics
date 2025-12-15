@@ -168,6 +168,10 @@ class LHCIR(LHCSection):
         return {k: v for k, v in self.strengths.items() if re.match("kt?q[^s]", k)}
 
     @property
+    def corrs(self):
+        return {k: v for k, v in self.strengths.items() if re.match("acb", k)}
+
+    @property
     def kqxl(self):
         return [k for k in self.quads if "l" in k and "x" in k]
 
