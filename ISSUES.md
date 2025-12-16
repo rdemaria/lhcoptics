@@ -7,13 +7,17 @@ Fixes:
 - add rx parameters for ATS optics
 - check proper ATS matching
 
-Features:
+- prepare lattice for tracking
+- replace LHC with LHCDev and update gitlab actions
 - remove twiss defaults, enforce correct options
+- add detuning knobs
+- add q'' knobs
+
+Features:
 - introduce multi i/k power converter for triplets
 - used named particles in json for correct energy
 - implement measured transfer functions for HL-LHC triplets
+- implement fringe fields in the triplets for beta-beating
 - rename mux34b1 (hllhc) in muxa34b1 (2025) or muxcell78b2 (2025 and hl)
-- add detuning knobs
-- add q'' knobs
+- redefine the voltages of H crab beam2 in the sequence
 - add rotation crabbing plane
-- redefine the voltages of H crab  beam2 in the sequence
