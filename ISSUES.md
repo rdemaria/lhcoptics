@@ -1,7 +1,6 @@
 # Issues
 
 Fixes:
-- fix ATS matching, betxip1b1 to be the squeezed value?
 - fix/add HL matching orbit knobs
 - check tune/chroma/coupling knobs
 - check 50cm strengths margins

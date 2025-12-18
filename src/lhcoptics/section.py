@@ -157,9 +157,12 @@ class LHCSection:
         else:
             return self.parent.circuits
 
-    def check_match(self):
+    def check_match(self, verbose=True):
         opt = self.match(verbose=False)
-        targets = opt.target_status()
+        opt._err(None,check_limits=False)
+        if verbose:
+            opt.target_status()
+        return opt._err.last_point_within_tol
 
     def copy(self):
         return self.__class__(
@@ -223,7 +226,7 @@ class LHCSection:
             plot.ax.set_title(figlabel)
             return plot
 
-    def set_params(self, mode="from_twiss"):
+    def set_params(self, mode="from_twiss_init"):
         """
         Copy all parameters from get_params() to self.params
         """

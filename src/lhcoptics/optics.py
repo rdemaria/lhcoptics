@@ -418,10 +418,15 @@ class LHCOptics:
             except Exception as e:
                 print(f"Error checking knob {knob.name}: {e}")
 
-    def check_match(self):
+    def check_match(self,verbose=False):
+        out={}
         for ss in self.irs + self.arcs:
-            res = ss.check_match()
-            print(f"{ss.name} {res}")
+            res = ss.check_match(verbose=verbose)
+            out[ss.name]=res
+        if verbose:
+            for k,v in out.items():
+                print(f" Section {k} match status: {v}")
+        return np.all(out.values())
 
     def check_quad_strengths(
         self,

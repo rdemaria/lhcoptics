@@ -98,13 +98,23 @@ def print_diff_dict_float(dct1, dct2, keys='union'):
         allk = set(dct1.keys()) & set(dct2.keys())
     else:
         allk = set(keys)
+    diffes=[]
     for k in sorted(allk):
         if k not in dct1:
             print(f"{k:20} {dct2[k]:15.6g} only in other")
         elif k not in dct2:
             print(f"{k:20} {dct1[k]:15.6g} only in self")
         elif dct1[k] != dct2[k]:
-            print(f"{k:20} {dct1[k]:15.6g} != {dct2[k]:15.6g}")
+            v1=dct1[k]
+            v2=dct2[k]
+            diffes.append( (abs(v1-v2),k,v1,v2) )
+            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1-v2:15.6g}")
+
+    if len(diffes)>0:
+        diffes.sort(reverse=True)
+        print("\nLargest differences:")
+        for diff,k,v1,v2 in diffes[:1]:
+            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1-v2:15.6g}")
 
 
 

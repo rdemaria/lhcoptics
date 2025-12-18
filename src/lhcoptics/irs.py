@@ -53,7 +53,7 @@ class LHCIR(LHCSection):
                 quads.remove("kqt5.r7")
         strength_names += sort_n(quads)
         strength_names += model.filter(f"kqs\\..*[lr]{irn}b[12]$")
-        crabs= model.filter(f"[lv]crab[ab]4[lr]{irn}\\.b[12]$")
+        crabs = model.filter(f"[lv]crab[ab]4[lr]{irn}\\.b[12]$")
         strength_names += sort_n(crabs)
         acb = model.filter(f"acbx.*[lr]{irn}$")
         acb += model.filter(f"acb.*[lr]{irn}b[12]$")
@@ -275,7 +275,7 @@ class LHCIR(LHCSection):
             params = self.get_params_from_variables()
         else:
             raise ValueError(
-                f"mode must be 'init', 'full' or 'from_variables' instead of {mode!r}"
+                f"mode must be 'from_twiss_init', 'from_twiss_full' or 'from_variables' instead of {mode!r}"
             )
         return {k: np.round(v, 8) for k, v in params.items()}
 
@@ -743,8 +743,10 @@ class LHCIR(LHCSection):
             dpx=self.params[f"dpx{self.ipname}b{beam}"],
         )
         return sequence.twiss(
-            start=self.startb12[beam - 1], end=self.endb12[beam - 1], init=init,
-            zero_at=self.ipname
+            start=self.startb12[beam - 1],
+            end=self.endb12[beam - 1],
+            init=init,
+            zero_at=self.ipname,
         )
 
     def twiss_full(self, beam, strengths=True):
