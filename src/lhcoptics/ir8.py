@@ -39,14 +39,12 @@ class LHCIR8(LHCIR):
             start=ds,
             end="ip1",
             init_at="ip1",
-            betx=ir1.params[f"betxip1b{beam}"],
-            bety=ir1.params[f"betyip1b{beam}"],
+            betx=ir1.params[f"betxip1b{beam}"]*self.parent.params["rx_ip1"],
+            bety=ir1.params[f"betyip1b{beam}"]*self.parent.params["ry_ip1"],
         )
         return -tw["mux", ds], -tw["muy", ds]
 
     def get_init_ats(self, beam):
-        rx = self.parent.params["rx_ip1"]
-        ry = self.parent.params["ry_ip1"]
         line = self.model.sequence[beam]
         ir1 = self.parent.ir1
         ds = f"e.ds.r8.b{beam}"
@@ -54,8 +52,8 @@ class LHCIR8(LHCIR):
             start=ds,
             end="ip1",
             init_at="ip1",
-            betx=ir1.params[f"betxip1b{beam}"] / rx,
-            bety=ir1.params[f"betyip1b{beam}"] / ry,
+            betx=ir1.params[f"betxip1b{beam}"],
+            bety=ir1.params[f"betyip1b{beam}"],
         )
         init = tw.get_twiss_init(ds)
         mux, muy = self.get_mux_ats(beam)
@@ -87,13 +85,11 @@ class LHCIR8(LHCIR):
     def twiss_ats_ip(self, beam):
         line = self.model.sequence[beam]
         ir1 = self.parent.ir1
-        rx = self.parent.params["rx_ip1"]
-        ry = self.parent.params["ry_ip1"]
         tw = line.twiss(
             start=f"s.ds.l8.b{beam}",
             end="ip1",
             init_at="ip1",
-            betx=ir1.params[f"betxip1b{beam}"] / rx,
-            bety=ir1.params[f"betyip1b{beam}"] / ry,
+            betx=ir1.params[f"betxip1b{beam}"],
+            bety=ir1.params[f"betyip1b{beam}"],
         )
         return tw

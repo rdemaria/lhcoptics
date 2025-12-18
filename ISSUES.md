@@ -1,19 +1,19 @@
 # Issues
 
 Fixes:
+- fix ATS matching, betxip1b1 to be the squeezed value?
 - fix/add HL matching orbit knobs
+- check tune/chroma/coupling knobs
 - check 50cm strengths margins
 - check apertures at injection
-- add rx parameters for ATS optics
 - check proper ATS matching
-
 - prepare lattice for tracking
-- replace LHC with LHCDev and update gitlab actions
 - remove twiss defaults, enforce correct options
 - add detuning knobs
 - add q'' knobs
 
 Features:
+- replace LHC with LHCDev and update gitlab actions
 - introduce multi i/k power converter for triplets
 - used named particles in json for correct energy
 - implement measured transfer functions for HL-LHC triplets

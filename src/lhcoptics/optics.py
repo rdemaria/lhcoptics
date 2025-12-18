@@ -673,7 +673,7 @@ class LHCOptics:
         }
         return out
 
-    def get_params(self, mode="from_twiss_init"):
+    def get_params(self, mode="from_twiss_init", full=False):
         """
         Get the parameters from the optics and its sections.
         """
@@ -684,13 +684,13 @@ class LHCOptics:
             tw2 = self.model.b2.twiss(
                 compute_chromatic_properties=True, strengths=False
             )
-            return self.get_params_from_twiss(tw1, tw2)
+            return self.get_params_from_twiss(tw1, tw2, full=full)
         elif mode == "from_variables":
-            return self.get_params_from_variables()
+            return self.get_params_from_variables(full=full)
         else:
             raise ValueError("mode must be 'from_twiss' or 'from_variables'")
 
-    def get_params_from_twiss(self, tw1, tw2):
+    def get_params_from_twiss(self, tw1, tw2, full=False):
         """
         Get the parameters from the twiss object.
         """
@@ -705,11 +705,13 @@ class LHCOptics:
             "qpxb2": tw2.dqx,
             "qpyb2": tw2.dqy,
         }
-        # for ss in self.irs + self.arcs:
-        #    params.update(ss.get_params_from_twiss(tw1, tw2))
+        if full:
+            for ss in self.irs + self.arcs:
+                pp=ss.get_params_from_twiss(tw1, tw2)
+                params.update(pp)
         return params
 
-    def get_params_from_variables(self):
+    def get_params_from_variables(self, full=False):
         """
         Get the parameters from the model variables.
         """
@@ -730,9 +732,21 @@ class LHCOptics:
             "qpxb2",
             "qpyb2",
         )
+        for irn in [1, 5]:
+            for plane in "xy":
+                bet0=f"bet{plane}0_ip{irn}"
+                if bet0 in self.model:
+                    params[f"r{plane}_ip{irn}"] = self.model[bet0]/self.model[f"bet{plane}_ip{irn}"]
+                else:
+                    params[f"r{plane}_ip{irn}"] = 1.0
+
         for var_name in var_names:
             if var_name in self.model:
                 params[var_name] = self.model[var_name]
+        if full:
+            for ss in self.irs + self.arcs:
+                pp = ss.get_params_from_variables()
+                params.update(pp)
         return params
 
     def get_phase_arcs(self):

@@ -216,6 +216,10 @@ class LHCIR(LHCSection):
     def get_params_from_twiss(self, tw1, tw2):
         ipname = self.ipname
         params = {}
+        if self.init_left is None:
+            self.set_init()
+        if self.init_right is None:
+            self.set_init()
         for param in "betx bety alfx alfy dx dpx".split():
             for beam, tw in zip([1, 2], [tw1, tw2]):
                 params[f"{param}{ipname}b{beam}"] = tw[param, ipname]
