@@ -266,7 +266,7 @@ class IPKnob(Knob):
                     ss = -1
                     match_value = 170
                 elif kind == "sep":
-                    if knob.variant.startswith("hl"):
+                    if knob.variant is not None and knob.variant.startswith("hl"):
                         dxy = 1e-3
                     else:
                         if (irn == "5" and hv == "h") or (
@@ -401,6 +401,9 @@ class IPKnob(Knob):
         needs to get limits in vary (limits will be check during the dry-run with currents)
         """
         model = self.parent.model
+        if len(self.weights) == 0:
+            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            self.preset_weights()
 
         xt = model._xt
         ir = getattr(self.parent, f"ir{self.ip}")
@@ -522,13 +525,14 @@ class IPKnob(Knob):
 
     def preset_weights(self):
         if self.kind in ["x", "a", 'xs', 'sep']:
-            for k in self.weights:
-                if k.startswith(f"acbx{self.hv}") or k.startswith(f"acbrd{self.hv}"):
-                    self.weights[k] = 1e-7
+           for k in self.weights:
+              if k.startswith(f"acbx{self.hv}") or k.startswith(f"acbrd{self.hv}"):
+                  self.weights[k] = 1e-7
         elif self.kind in ["xip", "yip"]:
+            # for ir2 and ir8 are not the same as used in 2025
             beam=self.beams[0]
             for k in getattr(self.parent,"ir"+self.ip).strengths:
-                if re.match(rf"acb[ycrd]+{self.hv}[s5-6]4?\.[lr][15]b[{beam}]", k):
+                if re.match(rf"acb[ycrd]+{self.hv}[s5-6]4?\.[lr][1258]b[{beam}]", k):
                     print(f"Setting weight {k} to 1e-6 for knob {self.name!r}")
                     self.weights[k] = 1e-6
         self.update_model(create=True)
@@ -1265,7 +1269,7 @@ class CrabKnob(Knob):
             ]
         ]
         vary = [
-            xt.Vary(wn, step=1e-5)
+            xt.Vary(wn, step=1e-6)
             for wn in self.get_weight_knob_names()
             if "vcrabb" not in wn
         ]

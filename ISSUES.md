@@ -1,15 +1,15 @@
 # Issues
 
 Fixes:
-- fix/add HL matching orbit knobs
 - check tune/chroma/coupling knobs
 - check 50cm strengths margins
 - check apertures at injection
-- check proper ATS matching
 - prepare lattice for tracking
 - remove twiss defaults, enforce correct options
 - add detuning knobs
 - add q'' knobs
+- check lumiscan knobs for 2 and 8 I am using different strengths
+- add verbose option in xdeps for matching
 
 Features:
 - replace LHC with LHCDev and update gitlab actions
