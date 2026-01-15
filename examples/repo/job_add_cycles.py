@@ -3,6 +3,21 @@ lhc=LHC()
 
 lsa=get_lsa()
 
+# 2026 - Proton Physics
+lhc.y2026.add_cycle(
+    name="pp",
+    label="Proton Physics 2026 (draft)",
+    particles=["proton","proton"],
+    charges=[1,1]
+)
+lhc.y2026.pp.refresh()
+lhc.y2026.pp.add_process("ramp","RAMP-SQUEEZE-ROTATE-6.8TeV-ATS-1.2m-2025_V1")
+lhc.y2026.pp.add_process("qchange","QCHANGE-6.8TeV-2025_V1")
+lhc.y2026.pp.add_process("physics","PHYSICS-6.8TeV-1.2m-2025_V1")
+lhc.y2026.pp.add_process("levelling","SQUEEZE-6.8TeV-1.2m-18cm-2025_V1")
+lhc.y2026.pp.set_data_from_lsa()
+lhc.y2026.pp.gen_repo_data()
+
 
 # 2025 - Proton Physics
 lhc.y2025.add_cycle(
