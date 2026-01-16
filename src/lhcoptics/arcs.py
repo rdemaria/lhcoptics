@@ -210,7 +210,19 @@ class LHCArc(LHCSection):
     @property
     def quads(self):
         """Get quads in the arc"""
-        return [k for k in self.strengths if "kq" in k]
+        return [k for k in self.strengths if "kqf" in k or "kqd" in k]
+
+    @property
+    def skew_quads(self):
+        """Get skew quads in the arc"""
+        return [k for k in self.strengths if "kqs" in k]
+
+    @property
+    def sexts(self):
+        """Get sextupoles in the arc"""
+        return [k for k in self.strengths if "ksf" in k or "ksd" in k]
+
+
 
     def get_match_targets(self, b1=True, b2=True):
         """Get match targets for the arc"""

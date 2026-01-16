@@ -2,18 +2,21 @@
 
 Fixes:
 - check tune/chroma/coupling knobs
+- add match w
 - check 50cm strengths margins
 - check apertures at injection
+- match injection transition
 - prepare lattice for tracking
 - remove twiss defaults, enforce correct options
 - add detuning knobs
 - add q'' knobs
 - check lumiscan knobs for 2 and 8 I am using different strengths
-- add verbose option in xdeps for matching
+- add verbose option in xdeps to silence matching
 
 Features:
 - replace LHC with LHCDev and update gitlab actions
 - introduce multi i/k power converter for triplets
+- match IR1/IR5 ats phase
 - used named particles in json for correct energy
 - implement measured transfer functions for HL-LHC triplets
 - implement fringe fields in the triplets for beta-beating
