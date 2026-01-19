@@ -1,17 +1,17 @@
 # Issues
 
 Fixes:
+- make on disp knobs
 - check tune/chroma/coupling knobs
+- prepare lattice for tracking
 - add match w
 - check 50cm strengths margins
 - check apertures at injection
 - match injection transition
-- prepare lattice for tracking
 - remove twiss defaults, enforce correct options
 - add detuning knobs
 - add q'' knobs
 - check lumiscan knobs for 2 and 8 I am using different strengths
-- add verbose option in xdeps to silence matching
 
 Features:
 - replace LHC with LHCDev and update gitlab actions
@@ -23,3 +23,6 @@ Features:
 - rename mux34b1 (hllhc) in muxa34b1 (2025) or muxcell78b2 (2025 and hl)
 - redefine the voltages of H crab beam2 in the sequence
 - add rotation crabbing plane
+- remove arc skew quads from irs
+- update logic coupling knobs in case one of ir1 or ir5 is not ats
+- add verbose option in xdeps to silence matching

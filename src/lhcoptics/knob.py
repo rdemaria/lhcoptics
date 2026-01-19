@@ -614,6 +614,7 @@ class TuneKnob(Knob):
         if len(self.weights) == 0:
             print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
+            self.parent.model.create_knob(self)
 
         xt = model._xt
         knob_start = model[self.name]
@@ -768,6 +769,7 @@ class ChromaKnob(Knob):
         if len(self.weights) == 0:
             print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
+            self.parent.model.create_knob(self)
 
         model = self.parent.model
         xt = model._xt
@@ -960,6 +962,7 @@ class CouplingKnob(Knob):
         if len(self.weights) == 0:
             print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
+            self.parent.model.create_knob(self)
 
         model = self.parent.model
         xt = model._xt
@@ -1040,18 +1043,16 @@ class CouplingKnob(Knob):
             ],
         }
         is_ats = self.parent.ir1.has_ats_phase() or self.parent.ir5.has_ats_phase()
-        for arc in self.parent.arcs:
-            for key in arc.skew_quads:
+        for ss in self.parent.arcs + self.parent.irs:
+            for key in ss.skew_quads:
                 if self.beam in key:
                     if (
-                        self.kind == "sq"
-                        or (self.kind == "op" and is_ats)
-                        and key in sq[self.beam]
-                    ):
+                        self.kind == "sq" or (self.kind == "op" and is_ats)
+                    ) and key in sq[self.beam]:
                         ww = 0
                     else:
                         ww = 1e-4
-                self.weights[key] = ww
+                    self.weights[key] = ww
         return self
 
     def __repr__(self):
@@ -1219,19 +1220,6 @@ class DispKnob(Knob):
         model.b1.twiss(start=start).rows[:end].plot(yl="x y")
         model.b2.twiss(start=start).rows[:end].plot(yl="x y")
         model[self.name] = aux
-
-    def set_mcbx_preset(self, vleft, vright=None):
-        if vright is None:
-            if self.kind == "x":
-                vright = -vleft
-            else:
-                vright = vleft
-        left = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.l", k)]
-        right = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.r", k)]
-        for k in left:
-            self.weights[k] = vleft / len(left)
-        for k in right:
-            self.weights[k] = vright / len(right)
 
     def __repr__(self):
         return f"<DispKnob {self.name!r} = {self.value}>"
