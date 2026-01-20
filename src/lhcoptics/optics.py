@@ -418,13 +418,13 @@ class LHCOptics:
             except Exception as e:
                 print(f"Error checking knob {knob.name}: {e}")
 
-    def check_match(self,verbose=False):
-        out={}
+    def check_match(self, verbose=False):
+        out = {}
         for ss in self.irs + self.arcs:
             res = ss.check_match(verbose=verbose)
-            out[ss.name]=res
+            out[ss.name] = res
         if verbose:
-            for k,v in out.items():
+            for k, v in out.items():
                 print(f" Section {k} match status: {v}")
         return np.all(out.values())
 
@@ -712,7 +712,7 @@ class LHCOptics:
         }
         if full:
             for ss in self.irs + self.arcs:
-                pp=ss.get_params_from_twiss(tw1, tw2)
+                pp = ss.get_params_from_twiss(tw1, tw2)
                 params.update(pp)
         return params
 
@@ -739,9 +739,11 @@ class LHCOptics:
         )
         for irn in [1, 5]:
             for plane in "xy":
-                bet0=f"bet{plane}0_ip{irn}"
+                bet0 = f"bet{plane}0_ip{irn}"
                 if bet0 in self.model:
-                    params[f"r{plane}_ip{irn}"] = self.model[bet0]/self.model[f"bet{plane}_ip{irn}"]
+                    params[f"r{plane}_ip{irn}"] = (
+                        self.model[bet0] / self.model[f"bet{plane}_ip{irn}"]
+                    )
                 else:
                     params[f"r{plane}_ip{irn}"] = 1.0
 
@@ -846,9 +848,16 @@ class LHCOptics:
             return mtc
 
     def match_knobs(self):
+        result = {}
         for knob in self.find_knobs():
             if hasattr(knob, "match"):
-                knob.match()
+                try:
+                    knob.match()
+                    result[knob.name] = "matched"
+                except Exception as e:
+                    print(f"Error matching knob {knob.name}: {e}")
+                    result[knob.name] = e
+        return result
 
     def match_phase_arcs(self, newphases):
         for arc in self.arcs:
@@ -1005,7 +1014,7 @@ class LHCOptics:
         self.update_model()
         return self
 
-    def set_params(self, full=True, mode="from_twiss"):
+    def set_params(self, full=True, mode="from_twiss_init"):
         """
         Copy all parameters from get_params() into params
         """
@@ -1172,7 +1181,7 @@ class LHCOptics:
         verbose=False,
         set_init=True,
         knobs="create",
-        set_knob_values=False
+        set_knob_values=False,
     ):
         """
         Update model from an optics or a dict.
@@ -1199,27 +1208,29 @@ class LHCOptics:
                     set_knob_values=set_knob_values,
                 )
         # knobs must be updated after the strengths
-        if knobs=="create":
+        if knobs == "create":
             if verbose:
                 print(f"Update knobs from {src}")
             self.model.create_knobs(
-                    src.knobs,
-                    verbose=verbose,
-                    set_value=set_knob_values,
-                )
-        elif knobs=="update":
+                src.knobs,
+                verbose=verbose,
+                set_value=set_knob_values,
+            )
+        elif knobs == "update":
             if verbose:
                 print(f"Update knobs from {src}")
             self.model.update_knobs(
-                    src.knobs,
-                    verbose=verbose,
-                    set_value=set_knob_values,
-                )
-        elif knobs==None or knobs==False:
+                src.knobs,
+                verbose=verbose,
+                set_value=set_knob_values,
+            )
+        elif knobs == None or knobs == False:
             pass
         else:
-            raise ValueError(f"knobs must be 'create', 'update', None or False not {knobs!r}")
-            
+            raise ValueError(
+                f"knobs must be 'create', 'update', None or False not {knobs!r}"
+            )
+
         if "p0c" in self.params:
             self.model.p0c = self.params["p0c"]
         if set_init:

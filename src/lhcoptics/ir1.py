@@ -29,4 +29,7 @@ class LHCIR1(LHCIR):
         else:
             return LHCIR.quads.__get__(self)
 
+    def has_ats_phase(self):
+        return self.params['betxip1b1']<=2.5
+
 

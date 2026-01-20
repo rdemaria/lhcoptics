@@ -15,8 +15,9 @@ opt = LHCOptics.from_xsuite(
     circuits="lhccircuits.json",
     params_mode="from_variables"
 )
-opt.ir1.set_params()
-opt.ir5.set_params()
+opt.check()
+opt.ir1.set_params() # set betxip1b1=0.5
+opt.ir5.set_params() # set betyip1b1=0.5
 opt.ir1.check_match()
 opt.ir1.match().solve()
 opt.ir2.match().solve()
@@ -26,8 +27,12 @@ opt.ir5.match().solve()
 opt.ir6.match().solve()
 opt.ir7.match().solve()
 opt.ir8.match().solve()
+for ir in opt.ir1,opt.ir2,opt.ir5,opt.ir8:
+   ir.match_knobs()
+
 opt.check()
-opt.update()
+opt.update() # uptate opt from model
+opt.update_model() # uptate model from opt
 opt.to_madx("opt_round_150_1500.madx")
 
 

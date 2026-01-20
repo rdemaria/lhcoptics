@@ -179,6 +179,10 @@ class LHCIR(LHCSection):
     def kqxr(self):
         return [k for k in self.quads if "r" in k and "x" in k]
 
+    @property
+    def skew_quads(self):
+        return {k: v for k, v in self.strengths.items() if re.match("kqs", k)}
+
     def check_quad_strengths(
         self,
         verbose=False,

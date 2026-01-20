@@ -236,21 +236,17 @@ class LHCXsuiteModel:
 
     def create_knob(self, knob, verbose=False, set_value=True):
         """
-        Create the knob in the model, deleting any previous definition.       
-        
+        Create the knob in the model, deleting any previous definition of this knob
         """
         self.delete_knob(knob.name, verbose=verbose, dry_run=False)
         knobname = knob.name
         for wtarget, value in knob.weights.items():
             wname = f"{wtarget}_from_{knobname}"
             if verbose:
-                print(f" Creating weight {wname} = {value:15.6g}")
-            self[wname] = value
-            if verbose:
+                print(f"Setting weight {wname} = {value:15.6g}")
                 print(f"Creating expression {wtarget} += {wname} * {knobname}")
-                print(f" Setting weight {wname} = {value:15.6g}")
-            self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
             self[wname] = value
+            self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
         if set_value:
             if verbose:
                 print(f" Setting knob {knobname} = {knob.value:15.6g}")
@@ -260,7 +256,7 @@ class LHCXsuiteModel:
         """
         Update the model with the knob weight values
 
-        Check that the knob exists, that is k has dependent targets.
+        Check that the knob exists.
         If it exists, check that has the same structure
         else raise an error.
         """

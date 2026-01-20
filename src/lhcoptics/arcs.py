@@ -189,7 +189,7 @@ class LHCArc(LHCSection):
         elif mode == "from_variables":
             return self.get_params_from_variables()
         else:
-            raise ValueError("mode must be 'from_twiss' or 'from_variables'")
+            raise ValueError("mode must start with 'from_twiss' or be 'from_variables'")
 
     def get_params_from_variables(self, model=None):
         """Get params from model variables"""
@@ -210,7 +210,17 @@ class LHCArc(LHCSection):
     @property
     def quads(self):
         """Get quads in the arc"""
-        return [k for k in self.strengths if "kq" in k]
+        return {k: v for k, v in self.strengths.items() if "kqf" in k or "kqd" in k}
+
+    @property
+    def skew_quads(self):
+        """Get skew quads in the arc"""
+        return {k: v for k, v in self.strengths.items() if "kqs" in k}
+
+    @property
+    def sexts(self):
+        """Get sextupoles in the arc"""
+        return {k: v for k, v in self.strengths.items() if "ksf" in k or "ksd" in k}
 
     def get_match_targets(self, b1=True, b2=True):
         """Get match targets for the arc"""

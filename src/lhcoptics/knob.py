@@ -8,10 +8,7 @@ from .utils import print_diff_dict_float
 
 
 def is_specialized(knob, cls):
-    return (
-        knob.__class__.__name__ == cls.__name__
-        or knob.__class__.__name__ != "Knob"
-    )
+    return knob.__class__.__name__ == cls.__name__ or knob.__class__.__name__ != "Knob"
 
 
 """Knobs for LHC optics.
@@ -65,11 +62,7 @@ class Knob:
 
     @classmethod
     def from_src(cls, src):
-        if (
-            hasattr(src, "name")
-            and hasattr(src, "value")
-            and hasattr(src, "weights")
-        ):
+        if hasattr(src, "name") and hasattr(src, "value") and hasattr(src, "weights"):
             return cls.from_dict(src.__dict__)
         else:
             return cls.from_dict(src)
@@ -97,22 +90,21 @@ class Knob:
 
     def check_structure(self):
         from lhcoptics.model_xsuite import termlist
-        model= self.parent.model
-        res= True
+
+        model = self.parent.model
+        res = True
         for name in self.get_weight_knob_names():
             if name not in model:
-                print(
-                    f"Weight {name!r} not found in model for knob {self.name!r}"
-                )
-                res= False
+                print(f"Weight {name!r} not found in model for knob {self.name!r}")
+                res = False
         for name in self.weights:
             if model.ref[name]._expr is None:
                 print(
                     f"Weight {name!r} has no expression in model for knob {self.name!r}"
                 )
-                res= False
+                res = False
             else:
-                terms= termlist(model.ref[name]._expr)
+                terms = termlist(model.ref[name]._expr)
                 print(terms)
         return res
 
@@ -139,7 +131,6 @@ class Knob:
             model = self.parent.model
         model.delete_knob(self.name)
 
-
     def to_dict(self):
         return {
             "name": self.name,
@@ -158,9 +149,7 @@ class Knob:
             print(f"Knob {self.name}  frpm {self.value} to  {other.value}")
         for key, value in self.weights.items():
             if key in other.weights and value != other.weights[key]:
-                print(
-                    f"Knob {self.name}: {key} from {value} to {other.weights[key]}"
-                )
+                print(f"Knob {self.name}: {key} from {value} to {other.weights[key]}")
 
     def get_weight_knob_names(self):
         return [f"{key}_from_{self.name}" for key in self.weights.keys()]
@@ -168,25 +157,26 @@ class Knob:
     def __repr__(self):
         return f"<Knob {self.name!r} = {self.value}>"
 
-    def update(self,model=None, verbose=False):
+    def update(self, model=None, verbose=False):
         if model is None:
             model = self.parent.model
         for wn in self.weights:
             if verbose:
-                value=model[wn + "_from_" + self.name]
+                value = model[wn + "_from_" + self.name]
                 if value != self.weights[wn]:
                     print(f"Updating weight {wn} from {self.weights[wn]} to {value}")
             self.weights[wn] = model[wn + "_from_" + self.name]
         return self
-    
-    def update_model(self, model=None, create=True, set_value=False):
+
+    def update_model(self, model=None, create=True, set_value=False, verbose=False):
         if model is None:
             model = self.parent.model
         if create:
-            model.create_knob(self, set_value=set_value)
+            model.create_knob(self, set_value=set_value, verbose=verbose)
         else:
-            model.update_knob(self, set_value=set_value)
+            model.update_knob(self, set_value=set_value, verbose=verbose)
         return self
+
 
 class IPKnob(Knob):
     _zero_init = [xt.TwissInit(), xt.TwissInit()]
@@ -253,9 +243,7 @@ class IPKnob(Knob):
                 elif kind == "o" and irn in "58":
                     hv = "h"
                 else:
-                    raise ValueError(
-                        f"Cannot determine plane for {knob.name!r}"
-                    )
+                    raise ValueError(f"Cannot determine plane for {knob.name!r}")
             xy = {"h": "x", "v": "y"}[hv]
             match_value = 1
             if kind in ["x", "sep", "oh", "ov", "a", "o"]:
@@ -269,9 +257,7 @@ class IPKnob(Knob):
                     if knob.variant is not None and knob.variant.startswith("hl"):
                         dxy = 1e-3
                     else:
-                        if (irn == "5" and hv == "h") or (
-                            irn == "1" and hv == "v"
-                        ):
+                        if (irn == "5" and hv == "h") or (irn == "1" and hv == "v"):
                             dxy = -1e-3
                         else:
                             dxy = 1e-3
@@ -292,9 +278,7 @@ class IPKnob(Knob):
                     f"p{xy}b1": dpxy,
                     f"p{xy}b2": ss * dpxy,
                 }
-                const = [
-                    k for k in knob.weights.keys() if re.match(f"acbx{hv}", k)
-                ]
+                const = [k for k in knob.weights.keys() if re.match(f"acbx{hv}", k)]
             elif kind == "xip" or kind == "yip":
                 specs = {kind[0] + beam: 1e-3, "p" + kind[0] + beam: 0.0}
                 const = []
@@ -327,9 +311,7 @@ class IPKnob(Knob):
         ipname = f"ip{self.ip}"
         if len(self.beams) == 2:
             tw1, tw2 = self.parent.twiss(strengths=False)
-            expected = {
-                (col, f"ip{ip}"): (0, 0) for ip in range(1, 9) for col in cols
-            }
+            expected = {(col, f"ip{ip}"): (0, 0) for ip in range(1, 9) for col in cols}
             if self.kind in ["x", "a"]:
                 pp = f"p{self.xy}"
             else:
@@ -346,12 +328,8 @@ class IPKnob(Knob):
                         )
         else:
             tw = self.parent.twiss(strengths=False, beam=int(self.beams[0][1]))
-            expected = {
-                (col, f"ip{ip}"): 0 for ip in range(1, 9) for col in cols
-            }
-            expected[self.xy, ipname] = (
-                self.specs[self.xy + self.beams[0]] * test_value
-            )
+            expected = {(col, f"ip{ip}"): 0 for ip in range(1, 9) for col in cols}
+            expected[self.xy, ipname] = self.specs[self.xy + self.beams[0]] * test_value
             for (col, ips), vv in expected.items():
                 if abs(tw[col, ips] - vv) > threshold:
                     msg.append(
@@ -419,25 +397,17 @@ class IPKnob(Knob):
             for bb in self.beams
         ]
         targets += [
-            xt.Target(
-                tt + self.xy, value=0, line=bb, at=xt.END, tol=self.tols[tt]
-            )
+            xt.Target(tt + self.xy, value=0, line=bb, at=xt.END, tol=self.tols[tt])
             for tt in ("", "p")
             for bb in self.beams
         ]
 
-
-        names=self.get_weight_knob_names()
-        names=[k for k in names if self.weights[k.split("_from_")[0]] != 0]
-        names=[k for k in names if not k in self.const]
-        names=[k for k in names if k.startswith(f"acb")]
-        varyb1 = [
-            xt.Vary(wn, step=self.step) 
-            for wn in names if "b1" in wn]
-        varyb2 = [
-            xt.Vary(wn, step=self.step)
-            for wn in names if "b2" in wn
-        ]
+        names = self.get_weight_knob_names()
+        names = [k for k in names if self.weights[k.split("_from_")[0]] != 0]
+        names = [k for k in names if not k in self.const]
+        names = [k for k in names if k.startswith(f"acb")]
+        varyb1 = [xt.Vary(wn, step=self.step) for wn in names if "b1" in wn]
+        varyb2 = [xt.Vary(wn, step=self.step) for wn in names if "b2" in wn]
         varycmn = [
             xt.Vary(wn, step=self.step)
             for wn in names
@@ -524,14 +494,14 @@ class IPKnob(Knob):
             self.weights[k] = vright / len(right)
 
     def preset_weights(self):
-        if self.kind in ["x", "a", 'xs', 'sep']:
-           for k in self.weights:
-              if k.startswith(f"acbx{self.hv}") or k.startswith(f"acbrd{self.hv}"):
-                  self.weights[k] = 1e-7
+        if self.kind in ["x", "a", "xs", "sep"]:
+            for k in self.weights:
+                if k.startswith(f"acbx{self.hv}") or k.startswith(f"acbrd{self.hv}"):
+                    self.weights[k] = 1e-7
         elif self.kind in ["xip", "yip"]:
             # for ir2 and ir8 are not the same as used in 2025
-            beam=self.beams[0]
-            for k in getattr(self.parent,"ir"+self.ip).strengths:
+            beam = self.beams[0]
+            for k in getattr(self.parent, "ir" + self.ip).strengths:
                 if re.match(rf"acb[ycrd]+{self.hv}[s5-6]4?\.[lr][1258]b[{beam}]", k):
                     print(f"Setting weight {k} to 1e-6 for knob {self.name!r}")
                     self.weights[k] = 1e-6
@@ -539,11 +509,11 @@ class IPKnob(Knob):
         return self
 
     def is_null(self):
-        ret=False
-        if len(self.weights)==0:
-            ret= True
-        elif all([v==0 for v in self.weights.values()]):
-            ret= True
+        ret = False
+        if len(self.weights) == 0:
+            ret = True
+        elif all([v == 0 for v in self.weights.values()]):
+            ret = True
         return ret
 
     def __repr__(self):
@@ -640,6 +610,12 @@ class TuneKnob(Knob):
 
     def match(self, solve=True):
         model = self.parent.model
+
+        if len(self.weights) == 0:
+            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            self.preset_weights()
+            self.parent.model.create_knob(self)
+
         xt = model._xt
         knob_start = model[self.name]
         line = getattr(model, self.beam)
@@ -681,6 +657,23 @@ class TuneKnob(Knob):
         model.get_knob(self).diff(self)
         return mtc
 
+    def preset_weights(self):
+        self.weights = {}
+        for fam, ss in [("kqtf", 1), ("kqtd", -1)]:
+            for arc in self.parent.arcs:
+                ww = 1e-6
+                key = f"{fam}.{arc.name}{self.beam}"
+                if self.kind == "op":
+                    if "1" in arc.name and self.parent.ir1.has_ats_phase():
+                        ww = 0
+                    elif "5" in arc.name and self.parent.ir5.has_ats_phase():
+                        ww = 0
+                elif self.kind == "sq":
+                    if "1" in arc.name or "5" in arc.name:
+                        ww = 0
+                self.weights[key] = ss * ww
+        return self
+
     def __repr__(self):
         return f"TuneKnob({self.name!r}, {self.value})"
 
@@ -711,14 +704,10 @@ class ChromaKnob(Knob):
         model = self.parent.model
         old_value = model[self.name]
         model[self.name] = 0
-        tw = self.parent.twiss(
-            strengths=False, chrom=True, beam=int(self.beam[1])
-        )
+        tw = self.parent.twiss(strengths=False, chrom=True, beam=int(self.beam[1]))
         zero_dqxy = tw.dqx, tw.dqy
         model[self.name] = test_value
-        tw = self.parent.twiss(
-            strengths=False, chrom=True, beam=int(self.beam[1])
-        )
+        tw = self.parent.twiss(strengths=False, chrom=True, beam=int(self.beam[1]))
         delta = tw.dqx - zero_dqxy[0], tw.dqy - zero_dqxy[1]
         if self.xy == "x":
             expected = (test_value, 0)
@@ -777,6 +766,11 @@ class ChromaKnob(Knob):
             )
 
     def match(self):
+        if len(self.weights) == 0:
+            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            self.preset_weights()
+            self.parent.model.create_knob(self)
+
         model = self.parent.model
         xt = model._xt
         knob_start = model[self.name]
@@ -827,6 +821,24 @@ class ChromaKnob(Knob):
                 model.ref[wn] = model[wn]
         model.get_knob(self).diff(self)
         return mtc
+
+    def preset_weights(self):
+        self.weights = {}
+        for fam, ss in [("ksf", 1), ("ksd", -1)]:
+            for fma12 in "12":
+                for arc in self.parent.arcs:
+                    ww = 1e-5
+                    key = f"{fam}{fma12}.{arc.name}{self.beam}"
+                    if self.kind == "op":
+                        if "1" in arc.name and self.parent.ir1.has_ats_phase():
+                            ww = 0
+                        elif "5" in arc.name and self.parent.ir5.has_ats_phase():
+                            ww = 0
+                    elif self.kind == "sq":
+                        if "1" in arc.name or "5" in arc.name:
+                            ww = 0
+                    self.weights[key] = ww * ss
+        return self
 
     def __repr__(self):
         return f"ChromaKnob({self.name!r}, {self.value})"
@@ -947,6 +959,11 @@ class CouplingKnob(Knob):
             )
 
     def match(self, limit=0.1, weights={}, reset=True):
+        if len(self.weights) == 0:
+            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            self.preset_weights()
+            self.parent.model.create_knob(self)
+
         model = self.parent.model
         xt = model._xt
 
@@ -978,9 +995,7 @@ class CouplingKnob(Knob):
         knob_start = model[self.name]
         model[self.name] = 0
         q0 = {"r": act_cmin.run()["r"], "i": act_cmin.run()["i"]}
-        targets = [
-            act_cmin.target(ri, value=q0[ri] + dq[ri], tol=1e-8) for ri in "ri"
-        ]
+        targets = [act_cmin.target(ri, value=q0[ri] + dq[ri], tol=1e-8) for ri in "ri"]
         model[self.name] = self.match_value
         mtc = line.match(
             solve=False,
@@ -1006,6 +1021,39 @@ class CouplingKnob(Knob):
         model.get_knob(self).diff(self)
         # line.cycle("ip1", inplace=True)
         return mtc
+
+    def preset_weights(self):
+        self.weights = {}
+        sq = {  # disabled
+            "b1": [
+                "kqs.a45b1",
+                "kqs.a81b1",
+                "kqs.l2b1",
+                "kqs.l6b1",
+                "kqs.r1b1",
+                "kqs.r5b1",
+            ],
+            "b2": [
+                "kqs.a12b2",
+                "kqs.a56b2",
+                "kqs.l1b2",
+                "kqs.l5b2",
+                "kqs.r4b2",
+                "kqs.r8b2",
+            ],
+        }
+        is_ats = self.parent.ir1.has_ats_phase() or self.parent.ir5.has_ats_phase()
+        for ss in self.parent.arcs + self.parent.irs:
+            for key in ss.skew_quads:
+                if self.beam in key:
+                    if (
+                        self.kind == "sq" or (self.kind == "op" and is_ats)
+                    ) and key in sq[self.beam]:
+                        ww = 0
+                    else:
+                        ww = 1e-4
+                    self.weights[key] = ww
+        return self
 
     def __repr__(self):
         return f"CouplingKnob({self.name!r}, {self.value})"
@@ -1118,9 +1166,7 @@ class DispKnob(Knob):
             for at in (self.ipname, e_arc_right)
         ]
         targets += [
-            xt.Target(
-                f"d{tt}{self.xy}", value=0, at=self.ipname, tol=self.tols[tt]
-            )
+            xt.Target(f"d{tt}{self.xy}", value=0, at=self.ipname, tol=self.tols[tt])
             for tt in ("", "p")
         ]
         vary = [
@@ -1175,19 +1221,6 @@ class DispKnob(Knob):
         model.b2.twiss(start=start).rows[:end].plot(yl="x y")
         model[self.name] = aux
 
-    def set_mcbx_preset(self, vleft, vright=None):
-        if vright is None:
-            if self.kind == "x":
-                vright = -vleft
-            else:
-                vright = vleft
-        left = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.l", k)]
-        right = [k for k in self.weights if re.match(f"acbx{self.hv}\\d.r", k)]
-        for k in left:
-            self.weights[k] = vleft / len(left)
-        for k in right:
-            self.weights[k] = vright / len(right)
-
     def __repr__(self):
         return f"<DispKnob {self.name!r} = {self.value}>"
 
@@ -1195,9 +1228,7 @@ class DispKnob(Knob):
 class CrabKnob(Knob):
     reorb = re.compile("on_crab[15]")
 
-    def __init__(
-        self, name, value=0, weights=None, parent=None, ip=None, variant=None
-    ):
+    def __init__(self, name, value=0, weights=None, parent=None, ip=None, variant=None):
         if len(weights) == 0:
             weights = {
                 f"vcrab{ab}4{rl}{ip}.b{beam}": 0
@@ -1289,41 +1320,35 @@ class CrabKnob(Knob):
             # add offsets
             for val, tt in zip(mtc._err.last_res_values, mtc.targets):
                 tt.value += val
-                #print(f"adding val to target {tt.tag}: new value = {tt.value}")
+                # print(f"adding val to target {tt.tag}: new value = {tt.value}")
             # update definitions, potentially mismatched
             model.update_knob(self)
             # set crab cavity voltages equal for a and b
             for wn in self.get_weight_knob_names():
                 if "vcrabb" in wn:
                     model.ref[wn] = model.ref[wn.replace("vcrabb", "vcraba")]
-                    #print(f"Setting {wn} := {model.ref[wn]._expr};")
+                    # print(f"Setting {wn} := {model.ref[wn]._expr};")
             # add offset in the knobs
             model[self.name] = match_value
-            #mtc.target_status()
+            # mtc.target_status()
             mtc.vary_status()
             mtc.solve()
-            #mtc.target_status()
-            #mtc.vary_status()
+            # mtc.target_status()
+            # mtc.vary_status()
         except Exception as ex:
             mtc.vary_status()
             print(f"Failed to match {self.name}")
             model.update_knob(self)
             raise (ex)
         model[self.name] = knob_start
-        max_voltage = max(
-            [abs(model[wn]) for wn in self.get_weight_knob_names()]
-        )
+        max_voltage = max([abs(model[wn]) for wn in self.get_weight_knob_names()])
         max_crabbing = 3.4 / max_voltage
-        print(
-            f"Maximum crabbing angle achieved: {max_crabbing:.3f} urad"
-        )
+        print(f"Maximum crabbing angle achieved: {max_crabbing:.3f} urad")
         return mtc
 
     def get_crabbing_angle(self, voltage=3.4e6):
-        max_voltage = max(
-            [abs(v) for v in self.weights.values()]
-        )
-        crabbing = voltage/1e6 / max_voltage
+        max_voltage = max([abs(v) for v in self.weights.values()])
+        crabbing = voltage / 1e6 / max_voltage
         return crabbing
 
     def plot(self, value=None):
