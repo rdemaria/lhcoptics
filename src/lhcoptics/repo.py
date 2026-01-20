@@ -242,8 +242,8 @@ class LHCRepo:
             particles = ["proton", "proton"]
         if charges is None:
             charges = [1, 1]
-        if masses is None and particles == ("proton", "proton"):
-            masses = (P_MASS, P_MASS)
+        if masses is None and particles == ["proton", "proton"]:
+            masses = [P_MASS, P_MASS]
         cycle.particles = particles
         cycle.charges = charges
         cycle.masses = masses

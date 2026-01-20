@@ -9,7 +9,7 @@ Fixes:
 - add detuning knobs
 - add q'' knobs
 - check lumiscan knobs for 2 and 8 I am using different strengths
-- add verbose option in xdeps for matching
+- check web site generation
 
 Features:
 - replace LHC with LHCDev and update gitlab actions
@@ -20,3 +20,4 @@ Features:
 - rename mux34b1 (hllhc) in muxa34b1 (2025) or muxcell78b2 (2025 and hl)
 - redefine the voltages of H crab beam2 in the sequence
 - add rotation crabbing plane
+- add verbose option in xdeps for matching
