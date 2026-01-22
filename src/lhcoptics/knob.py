@@ -223,7 +223,7 @@ class IPKnob(Knob):
             return knob
         else:
             kind, irn, hv, kind2, beam = mtc.groups()
-            if kind in ["xx", "ssep", "dx", "dsep"]:
+            if kind in ["xx", "ssep", "dx", "dsep"]: # not IP knobs
                 return knob
             if hv is None:
                 if kind.startswith("x"):
@@ -1060,8 +1060,8 @@ class CouplingKnob(Knob):
 
 
 class DispKnob(Knob):
-    reorb = re.compile("on_([A-z]+)([0-9])_?([hv])?")
-    match_value = {"xx": 170, "ssep": 1, "dx": 170, "dsep": 1}
+    reorb = re.compile("on_(d[a-z]+)([1-8])([hv])([sl])?")
+    match_value = {"dx": 170, "dsep": 1}
     hv = {"h": "x", "v": "y"}
 
     def __init__(
@@ -1076,6 +1076,7 @@ class DispKnob(Knob):
         match_value=1,
         beams=["b1", "b2"],
         kind=None,
+        sl=None,
         variant=None,
     ):
         super().__init__(name, value, weights, parent, variant=variant)
@@ -1089,6 +1090,7 @@ class DispKnob(Knob):
         self.beams = beams
         self.match_value = match_value
         self.kind = kind
+        self.sl = sl
 
     @classmethod
     def specialize(cls, knob):
@@ -1101,7 +1103,7 @@ class DispKnob(Knob):
         if mtc is None:
             return knob
         else:
-            kind, irn, hv = mtc.groups()
+            kind, irn, hv, sl = mtc.groups()
             if kind not in cls.match_value:
                 return knob
             else:
@@ -1115,6 +1117,7 @@ class DispKnob(Knob):
                     xy=xy,
                     beams=["b1", "b2"],
                     kind=kind,
+                    sl=sl,
                     match_value=cls.match_value[kind],
                     variant=knob.variant,
                 )
