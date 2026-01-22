@@ -12,6 +12,7 @@ Fixes:
 - add detuning knobs
 - add q'' knobs
 - check lumiscan knobs for 2 and 8 I am using different strengths
+- add per-arc dispersion knobs
 
 Features:
 - replace LHC with LHCDev and update gitlab actions
