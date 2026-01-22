@@ -17,6 +17,11 @@ lhc.y2026.pp.add_process("physics","PHYSICS-6.8TeV-1.2m-2025_V1")
 lhc.y2026.pp.add_process("levelling","SQUEEZE-6.8TeV-1.2m-18cm-2025_V1")
 lhc.y2026.pp.set_data_from_lsa()
 lhc.y2026.pp.gen_repo_data()
+lhc.y2026.pp.ramp.label="Ramp to 6.8 TeV and squeeze to 1.2 m"
+lhc.y2026.pp.qchange.label="Change to physics tune"
+lhc.y2026.pp.physics.label="Proton Physics at 1.2 m"
+lhc.y2026.pp.levelling.label="Squeeze to 18 cm"
+lhc.y2026.pp.save_data(level=1)
 
 
 # 2025 - Proton Physics
