@@ -1,6 +1,8 @@
 import re
 
 import numpy as np
+import matplotlib.pyplot as plt
+
 import xtrack as xt
 
 
@@ -223,7 +225,7 @@ class IPKnob(Knob):
             return knob
         else:
             kind, irn, hv, kind2, beam = mtc.groups()
-            if kind in ["xx", "ssep", "dx", "dsep"]: # not IP knobs
+            if kind in ["xx", "ssep", "dx", "dsep"]:  # not IP knobs
                 return knob
             if hv is None:
                 if kind.startswith("x"):
@@ -1084,13 +1086,16 @@ class DispKnob(Knob):
         self.xy = xy
         self.hv = "h" if xy == "x" else "v"
         self.ipname = f"ip{ip}"
-        self.tols = {"": 1e-8, "p": 1e-10}
-        self.step = 1e-9
+        self.tols = {"": 1e-8, "p": 1e-10, "d": 1e-6, "dp": 1e-8}
+        self.step = 1e-11
         self.specs = specs
         self.beams = beams
         self.match_value = match_value
         self.kind = kind
         self.sl = sl
+        self.ipknobname = f"on_{self.kind[1:]}{self.ip}{self.hv}{self.sl or ''}"
+        self.ipl = f"ip{(self.ip - 2) % 8 + 1}"
+        self.ipr = f"ip{(self.ip) % 8 + 1}"
 
     @classmethod
     def specialize(cls, knob):
@@ -1113,7 +1118,7 @@ class DispKnob(Knob):
                     value=knob.value,
                     weights=knob.weights,
                     parent=knob.parent,
-                    ip=irn,
+                    ip=int(irn),
                     xy=xy,
                     beams=["b1", "b2"],
                     kind=kind,
@@ -1137,7 +1142,27 @@ class DispKnob(Knob):
             variant=self.variant,
         )
 
-    def match(self, beam=1):
+    def info(self):
+        print(f"Dispersion knob {self.name!r}:")
+        print(f"  Correcting for {self.ipknobname!r}")
+        print(f"  Match value: {self.match_value}")
+        print(f"  Boundaries: {self.st_left}, {self.st_right}")
+        print(f"  Weights:")
+        for k, v in self.weights.items():
+            if v != 0:
+                print(f"    {k}: {v}")
+
+    def get_inits(self, beam=1):
+        model = self.parent.model
+        tw = getattr(model, f"b{beam}").twiss(
+            strengths=False, compute_chromatic_properties=False
+        )
+        initl, initr = [
+            tw.get_twiss_init(ii) for ii in (self.ipl, self.ipr)
+        ]
+        return initl, initr
+
+    def match(self, beam=1, verbose=True):
         model = self.parent.model
         """
         In general the problem is to find
@@ -1154,40 +1179,78 @@ class DispKnob(Knob):
         """
 
         xt = model._xt
-        ipname = f"ip{self.ip}"
 
-        e_arc_right = self.irs[self.ip].get_e_arc_right(beam=beam)
+        bumps=self.parent.get_bumps()
+        self.parent.set_bumps_off()
+
+        initl, initr = self.get_inits(beam=beam)
+        self.parent.model[self.ipknobname] = self.match_value
+        self.parent.model[self.name] = self.match_value
+
         targets = [
             xt.Target(
                 tt + self.xy,
                 value=0,
-                at=at,
+                at=att,
                 tol=self.tols[tt],
             )
             for tt in ("", "p")
-            for at in (self.ipname, e_arc_right)
+            for att in [f"e.ds.l{self.ip}.b{beam}", f"e.ds.l{(self.ip) % 8 + 1}.b{beam}"]
         ]
-        targets += [
-            xt.Target(f"d{tt}{self.xy}", value=0, at=ipname, tol=self.tols[tt])
-            for tt in ("", "p")
-        ]
+        targets.append(
+            xt.Target(
+                "d" + self.xy,
+                value=0,
+                at=self.ipname,
+                tol=self.tols["d"],
+            ))
+        targets.append(
+            xt.Target(
+                "d" + self.xy,
+                value=getattr(initr, "d" + self.xy),
+                at=self.ipr,
+                tol=self.tols["d"],))
+        if verbose:
+            print("Targets:", targets)
         vary = [
             xt.Vary(wn, step=self.step)
-            for wn in self.get_weight_knob_names(beam)
-            if "b1" in wn and self.weights[wn.split("_from_")[0]] != 0
+            for wn in self.get_weight_knob_names()
+            if f"b{beam}" in wn and self.weights[wn.split("_from_")[0]] != 0
         ]
 
         line = getattr(model, "b" + str(beam))
+
+        ipknob_start = model[self.ipknobname]
+        knob_start = model[self.name]
+        if verbose:
+            print(f"Saving knob {self.ipknobname!r} start value: {ipknob_start}")
+            print(f"Saving knob {self.name!r} start value: {knob_start}")
 
         mtc = line.match(
             solve=False,
             vary=vary,
             targets=targets,
+            start=self.ipl,
+            end=self.ipr,
+            init=initl,
             strengths=False,
             compute_chromatic_properties=False,
         )
 
-        knob_start = model[self.name]
+        model.update_knob(self)
+        try:
+            mtc.target_status()
+            mtc.vary_status()
+            mtc.solve()
+            mtc.vary_status()
+            mtc.target_status()
+        except Exception as ex:
+            print(f"Failed to match {self.name}")
+            model.update_knob(self)
+            #raise (ex)
+        self.parent.set_bumps(bumps)
+
+        return mtc
         try:
             model[self.name] = 0
             # get present target values
@@ -1211,17 +1274,25 @@ class DispKnob(Knob):
 
     def plot(self, value=None):
         model = self.parent.model
-        aux = self.value
+        ipknob_start = model[self.ipknobname]
+        knob_start = model[self.name]
         if value is None:
             value = self.value
+        model[self.name] = 0
+        model[self.ipknobname] = 0
+        init1,_=self.get_inits(beam=1)
+        init2,_=self.get_inits(beam=2)
         model[self.name] = value
-        if self.ip == "1":
-            start, end = "ip8", "ip2"
-        elif self.ip == "5":
-            start, end = "ip2", "ip8"
-        model.b1.twiss(start=start).rows[:end].plot(yl="x y")
-        model.b2.twiss(start=start).rows[:end].plot(yl="x y")
-        model[self.name] = aux
+        model[self.ipknobname] = value
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), num=self.name)
+        model.b1.twiss(
+            start=self.ipl, init=init1, end=self.ipr
+        ).plot(yl=self.xy, yr="d" + self.xy, ax=ax1)
+        model.b2.twiss(
+            start=self.ipl, init=init2, end=self.ipr
+        ).plot(yl=self.xy, yr="d" + self.xy, ax=ax2)
+        model[self.name] = knob_start
+        model[self.ipknobname] = ipknob_start
 
     def __repr__(self):
         return f"<DispKnob {self.name!r} = {self.value}>"

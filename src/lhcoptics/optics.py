@@ -606,6 +606,19 @@ class LHCOptics:
             line.cycle("ip1", inplace=True)
         return cmin.real, cmin.imag
 
+    def get_bumps(self):
+        """Return the orbit bumps values from model."""
+        out = {}
+        for ss in self.irs:
+            for k, v in ss.knobs.items():
+                if re.match(r"on_(sep|x|o|a)", k):
+                    out[k] = v.value
+        for ss in self.knobs:
+            if re.match(r"on_d(sep|x|o|a)", ss):
+                out[ss] = self.model[ss]
+        return out
+
+
     def get_knob_structure(self):
         """Return the names and locations of the knobs in the optics."""
         out = {}
@@ -980,9 +993,22 @@ class LHCOptics:
         for k, v in self.params.items():
             self.params[k] = round(v, 6)
 
+    def set_bumps(self, bumps):
+        """Set the bump parameters."""
+        for k, v in bumps.items():
+            if k in self.knobs:
+                self.knobs[k].value = v
+            else:
+                for ss in self.irs:
+                    if k in ss.knobs:
+                        ss.knobs[k].value = v
+
     def set_bumps_off(self):
         for ir in self.irs:
             ir.set_bumps_off()
+        for k in self.knobs:
+            if re.match(r"on_d(sep|x|o|a)", k):
+                self.model[k] = 0
 
     def set_circuits(self, circuits):
         if isinstance(circuits, str) or isinstance(circuits, Path):

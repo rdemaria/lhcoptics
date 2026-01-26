@@ -28,3 +28,4 @@ Features:
 - remove arc skew quads from irs
 - update logic coupling knobs in case one of ir1 or ir5 is not ats
 - add verbose option in xdeps to silence matching
+- verify disp knobs closeness with coupling
