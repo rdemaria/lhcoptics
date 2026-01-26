@@ -1137,7 +1137,7 @@ class DispKnob(Knob):
             variant=self.variant,
         )
 
-    def match(self, beam):
+    def match(self, beam=1):
         model = self.parent.model
         """
         In general the problem is to find
@@ -1154,10 +1154,9 @@ class DispKnob(Knob):
         """
 
         xt = model._xt
-        if self.ip == "1":
-            e_arc_right = f"e.ds.r2.b{beam}"
-        elif self.ip == "5":
-            e_arc_right = f"e.ds.r1.b{beam}"
+        ipname = f"ip{self.ip}"
+
+        e_arc_right = self.irs[self.ip].get_e_arc_right(beam=beam)
         targets = [
             xt.Target(
                 tt + self.xy,
@@ -1169,7 +1168,7 @@ class DispKnob(Knob):
             for at in (self.ipname, e_arc_right)
         ]
         targets += [
-            xt.Target(f"d{tt}{self.xy}", value=0, at=self.ipname, tol=self.tols[tt])
+            xt.Target(f"d{tt}{self.xy}", value=0, at=ipname, tol=self.tols[tt])
             for tt in ("", "p")
         ]
         vary = [
@@ -1178,7 +1177,7 @@ class DispKnob(Knob):
             if "b1" in wn and self.weights[wn.split("_from_")[0]] != 0
         ]
 
-        line = getattr(model, "b" + beam)
+        line = getattr(model, "b" + str(beam))
 
         mtc = line.match(
             solve=False,
