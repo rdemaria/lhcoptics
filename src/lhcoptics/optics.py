@@ -411,13 +411,37 @@ class LHCOptics:
         """Compute twiss and print orbit at IPs, tunes and chromaticity"""
         self.twissip()
 
-    def check_knobs(self):
+    def check_knobs(self, fail=False, verbose=True):
+        report=[]
         for knob in self.find_knobs():
+            if not hasattr(knob, "check"):
+                msg=f"Knob {knob.name} has no check method, skipping"
+                if verbose:
+                   print(msg)
+                report.append(msg)
+                continue
             try:
-                knob.check()
+                res=knob.check(verbose=verbose)
+                if res:
+                    msg=f"Knob {knob.name} OK"
+                else:
+                    msg=f"Knob {knob.name} FAILED"
             except Exception as e:
-                print(f"Error checking knob {knob.name}: {e}")
-
+                msg=f"Knob {knob.name} RAISED EXCEPTION: {e}"
+                res=False
+                if verbose:
+                    print(f"Knob {knob.name} raised {e}")
+                if fail:
+                    raise e
+            if verbose:
+                print(msg)
+            if fail and not res:
+                raise ValueError(f"Knob {knob.name} failed the check")
+            report.append(msg)
+        if verbose:
+            print("Knob check report:")
+            print("\n".join(report))
+        return self
     def check_match(self, verbose=False):
         out = {}
         for ss in self.irs + self.arcs:
@@ -582,6 +606,11 @@ class LHCOptics:
                 if k in ss:
                     return ss[k]
         return default
+
+    def get_knobs_active(self):
+        """Return the active knobs in the optics."""
+        model=self.model
+        return {k:v for k in self.find_knobs() if (v:=model[k.name])!= 0}
 
     def get_cmin(self, beam=None, pos="ip1"):
         """Compute the c-minus at a given position."""
@@ -993,15 +1022,14 @@ class LHCOptics:
         for k, v in self.params.items():
             self.params[k] = round(v, 6)
 
-    def set_bumps(self, bumps):
+    def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""
+        model=self.model
         for k, v in bumps.items():
-            if k in self.knobs:
-                self.knobs[k].value = v
-            else:
-                for ss in self.irs:
-                    if k in ss.knobs:
-                        ss.knobs[k].value = v
+            if verbose:
+                if k in model and model[k] != v:
+                    print(f"Set bump {k} from {model[k]} to {v}")
+            model[k] = v
 
     def set_bumps_off(self):
         for ir in self.irs:

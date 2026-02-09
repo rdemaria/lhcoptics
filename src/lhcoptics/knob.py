@@ -1,4 +1,5 @@
 import re
+from tabnanny import verbose
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -86,9 +87,6 @@ class Knob:
 
     def from_madx(self, madx, redefine_weights=False):
         raise NotImplementedError
-
-    def check(self, threshold=1e-10, test_value=1):
-        print(f"Warning knob {self.name!r} check not implemented")
 
     def check_structure(self):
         from lhcoptics.model_xsuite import termlist
@@ -254,7 +252,10 @@ class IPKnob(Knob):
                     dxy = 0
                     dpxy = 1e-6
                     ss = -1
-                    match_value = 170
+                    if knob.variant == "hl":
+                        match_value = 250
+                    else:
+                        match_value = 170
                 elif kind == "sep":
                     if knob.variant is not None and knob.variant.startswith("hl"):
                         dxy = 1e-3
@@ -303,10 +304,15 @@ class IPKnob(Knob):
                 variant=knob.variant,
             )
 
-    def check(self, threshold=1e-9, test_value=1):
-        print(f"Checking knob {self.name!r}")
+    def check(self, threshold=1e-8, test_value=None, verbose=False):
+        if test_value is None:
+            test_value = self.match_value
+        if verbose:
+            print(f"Checking knob {self.name!r} with test value {test_value}")
         model = self.parent.model
         old_value = model[self.name]
+        if verbose:
+            print(f"Setting knob {self.name!r} to {test_value}")
         model[self.name] = test_value
         msg = []
         cols = ["x", "y", "px", "py"]
@@ -322,6 +328,10 @@ class IPKnob(Knob):
                 self.specs[pp + "b1"] * test_value,
                 self.specs[pp + "b2"] * test_value,
             )
+            if verbose:
+                print("Expected values at IPs:")
+                for (col, ips), (v1, v2) in expected.items():
+                    print(f"  {col:2} {ips}: b1 = {v1:23.15g}, b2 = {v2:23.15g}")
             for (col, ips), (v1, v2) in expected.items():
                 for tw, vv, b12 in zip([tw1, tw2], [v1, v2], ["b1", "b2"]):
                     if abs(tw[col, ips] - vv) > threshold:
@@ -333,15 +343,20 @@ class IPKnob(Knob):
             expected = {(col, f"ip{ip}"): 0 for ip in range(1, 9) for col in cols}
             expected[self.xy, ipname] = self.specs[self.xy + self.beams[0]] * test_value
             for (col, ips), vv in expected.items():
+                xpx_threshold = threshold if col in ["x", "y"] else threshold / 100
                 if abs(tw[col, ips] - vv) > threshold:
                     msg.append(
                         f"Error: {col} at {ips} = {tw[col, ips]:23.15g} != {vv:23.15g}"
                     )
-
+        if verbose:
+            print(f"Restoring knob {self.name!r} to {old_value}")
         model[self.name] = old_value
         if len(msg) > 0:
-            print("\n".join(msg))
-            raise ValueError(f"Knob {self.name!r} failed the check")
+            if verbose:
+                print("\n".join(msg))
+            return False
+        else:
+            return True
 
     def copy(self):
         return IPKnob(
@@ -459,8 +474,9 @@ class IPKnob(Knob):
             model.update_knob(self)
             # add offset in the knobs
             model[self.name] = self.match_value
-            mtc.target_status()
             mtc.solve()
+            mtc.target_status()
+            mtc.vary_status()
         except Exception as ex:
             mtc.vary_status()
             print(f"Failed to match {self.name}")
@@ -471,7 +487,7 @@ class IPKnob(Knob):
 
     def plot(self, value=None):
         model = self.parent.model
-        aux = self.value
+        aux = model[self.name]
         if value is None:
             value = self.value
         model[self.name] = value
@@ -566,8 +582,9 @@ class TuneKnob(Knob):
                 variant=knob.variant,
             )
 
-    def check(self, threshold=1e-9, test_value=0.01):
-        print(f"Checking knob {self.name!r}")
+    def check(self, threshold=1e-9, test_value=0.01, verbose=False):
+        if verbose:
+            print(f"Checking knob {self.name!r}")
         model = self.parent.model
         old_value = model[self.name]
         model[self.name] = 0
@@ -587,15 +604,15 @@ class TuneKnob(Knob):
             )
         if abs(delta[1] - expected[1]) > threshold:
             msg.append(
-                f"Error: qy = {tw.qy:23.15g}, delta = {delta[0]:23.15g} != {expected[1]:23.15g}"
+                f"Error: qy = {tw.qy:23.15g}, delta = {delta[1]:23.15g} != {expected[1]:23.15g}"
             )
         model[self.name] = old_value
         if len(msg) > 0:
-            print("\n".join(msg))
-            raise ValueError(f"Knob {self.name!r} failed the check")
-        if len(msg) > 0:
-            print("\n".join(msg))
-            raise ValueError(f"Knob {self.name!r} failed the check")
+            if verbose:
+                print("\n".join(msg))
+            return False
+        else:
+            return True
 
     def copy(self):
         return TuneKnob(
@@ -701,8 +718,9 @@ class ChromaKnob(Knob):
         self.kind = kind
         self.match_value = match_value
 
-    def check(self, threshold=1e-4, test_value=1):
-        print(f"Checking knob {self.name!r}")
+    def check(self, threshold=1e-4, test_value=1, verbose=False):
+        if verbose:
+            print(f"Checking knob {self.name!r}")
         model = self.parent.model
         old_value = model[self.name]
         model[self.name] = 0
@@ -722,15 +740,15 @@ class ChromaKnob(Knob):
             )
         if abs(delta[1] - expected[1]) > threshold:
             msg.append(
-                f"Error: dqy = {tw.dqy:23.15g}, delta = {delta[0]:23.15g} != {expected[1]:23.15g}"
+                f"Error: dqy = {tw.dqy:23.15g}, delta = {delta[1]:23.15g} != {expected[1]:23.15g}"
             )
         model[self.name] = old_value
         if len(msg) > 0:
-            print("\n".join(msg))
-            raise ValueError(f"Knob {self.name!r} failed the check")
-        if len(msg) > 0:
-            print("\n".join(msg))
-            raise ValueError(f"Knob {self.name!r} failed the check")
+            if verbose:
+                print("\n".join(msg))
+            return False
+        else:
+            return True
 
     def copy(self):
         return ChromaKnob(
@@ -908,8 +926,9 @@ class CouplingKnob(Knob):
             variant=self.variant,
         )
 
-    def check(self, threshold=1e-3, test_value=0.0001):
-        print(f"Checking knob {self.name!r}")
+    def check(self, threshold=1e-3, test_value=0.0001, verbose=False):
+        if verbose:
+            print(f"Checking knob {self.name!r}")
         model = self.parent.model
         old_value = model[self.name]
         model[self.name] = 0
@@ -928,15 +947,15 @@ class CouplingKnob(Knob):
             )
         if abs(delta[1] - expected[1]) > threshold:
             msg.append(
-                f"Error: cmin_im = {new_cmin:23.15g}, delta = {delta[0]:23.15g} != {expected[1]:23.15g}"
+                f"Error: cmin_im = {new_cmin[1]:23.15g}, delta = {delta[1]:23.15g} != {expected[1]:23.15g}"
             )
         model[self.name] = old_value
         if len(msg) > 0:
-            print("\n".join(msg))
-            raise ValueError(f"Knob {self.name!r} failed the check")
-        if len(msg) > 0:
-            print("\n".join(msg))
-            raise ValueError(f"Knob {self.name!r} failed the check")
+            if verbose:
+                print("\n".join(msg))
+            return False
+        else:
+            return True
 
     @classmethod
     def specialize(cls, knob):
@@ -1127,6 +1146,24 @@ class DispKnob(Knob):
                     variant=knob.variant,
                 )
 
+    def check(self, threshold=1e-3, test_value=None, verbose=False):
+        if verbose:
+            print(f"Checking knob {self.name!r}")
+
+        model = self.parent.model
+        if test_value is None:
+            test_value = self.match_value
+
+        bumps = self.parent.get_bumps()
+        self.parent.set_bumps_off()
+
+        model[self.ipknobname] = self.match_value
+        model[self.name] = self.match_value
+
+        self.parent.set_bumps(bumps, verbose=verbose)
+        return True
+
+
     def copy(self):
         return IPKnob(
             name=self.name,
@@ -1157,13 +1194,10 @@ class DispKnob(Knob):
         tw = getattr(model, f"b{beam}").twiss(
             strengths=False, compute_chromatic_properties=False
         )
-        initl, initr = [
-            tw.get_twiss_init(ii) for ii in (self.ipl, self.ipr)
-        ]
+        initl, initr = [tw.get_twiss_init(ii) for ii in (self.ipl, self.ipr)]
         return initl, initr
 
-    def match(self, beam=1, verbose=True):
-        model = self.parent.model
+    def match(self,  verbose=True):
         """
         In general the problem is to find
 
@@ -1178,99 +1212,90 @@ class DispKnob(Knob):
         needs to get limits in vary (limits will be check during the dry-run with currents)
         """
 
+        model = self.parent.model
         xt = model._xt
 
-        bumps=self.parent.get_bumps()
+        bumps = self.parent.get_bumps()
         self.parent.set_bumps_off()
-
-        initl, initr = self.get_inits(beam=beam)
-        self.parent.model[self.ipknobname] = self.match_value
-        self.parent.model[self.name] = self.match_value
-
-        targets = [
-            xt.Target(
-                tt + self.xy,
-                value=0,
-                at=att,
-                tol=self.tols[tt],
-            )
-            for tt in ("", "p")
-            for att in [f"e.ds.l{self.ip}.b{beam}", f"e.ds.l{(self.ip) % 8 + 1}.b{beam}"]
-        ]
-        targets.append(
-            xt.Target(
-                "d" + self.xy,
-                value=0,
-                at=self.ipname,
-                tol=self.tols["d"],
-            ))
-        targets.append(
-            xt.Target(
-                "d" + self.xy,
-                value=getattr(initr, "d" + self.xy),
-                at=self.ipr,
-                tol=self.tols["d"],))
-        if verbose:
-            print("Targets:", targets)
-        vary = [
-            xt.Vary(wn, step=self.step)
-            for wn in self.get_weight_knob_names()
-            if f"b{beam}" in wn and self.weights[wn.split("_from_")[0]] != 0
-        ]
-
-        line = getattr(model, "b" + str(beam))
-
-        ipknob_start = model[self.ipknobname]
-        knob_start = model[self.name]
-        if verbose:
-            print(f"Saving knob {self.ipknobname!r} start value: {ipknob_start}")
-            print(f"Saving knob {self.name!r} start value: {knob_start}")
-
-        mtc = line.match(
-            solve=False,
-            vary=vary,
-            targets=targets,
-            start=self.ipl,
-            end=self.ipr,
-            init=initl,
-            strengths=False,
-            compute_chromatic_properties=False,
-        )
+            
+        model[self.ipknobname] = self.match_value
+        model[self.name] = self.match_value
 
         model.update_knob(self)
-        try:
-            mtc.target_status()
-            mtc.vary_status()
-            mtc.solve()
-            mtc.vary_status()
-            mtc.target_status()
-        except Exception as ex:
-            print(f"Failed to match {self.name}")
-            model.update_knob(self)
-            #raise (ex)
-        self.parent.set_bumps(bumps)
+        for beam in [1, 2]:
 
-        return mtc
-        try:
-            model[self.name] = 0
-            # get present target values
-            mtc._err(None, check_limits=False)
-            # add offsets
-            for val, tt in zip(mtc._err.last_res_values, mtc.targets):
-                tt.value += val
-            # update definitions, potentially mismatched
-            model.update_knob(self)
-            # add offset in the knobs
-            model[self.name] = self.match_value
-            mtc.target_status()
-            mtc.solve()
-            mtc.vary_status()
-        except Exception as ex:
-            print(f"Failed to match {self.name}")
-            model.update_knob(self)
-            raise (ex)
-        model[self.name] = knob_start
-        return mtc
+            initl, initr = self.get_inits(beam=beam)
+
+            targets = [
+                xt.Target(
+                    tt + self.xy,
+                    value=0,
+                    at=att,
+                    tol=self.tols[tt],
+                )
+                for tt in ("", "p")
+                for att in [
+                    f"e.ds.l{self.ip}.b{beam}",
+                    f"e.ds.l{(self.ip) % 8 + 1}.b{beam}",
+                ]
+            ]
+            targets.append(
+                xt.Target(
+                    "d" + self.xy,
+                    value=0,
+                    at=self.ipname,
+                    tol=self.tols["d"],
+                )
+            )
+            targets.append(
+                xt.Target(
+                    "d" + self.xy,
+                    value=getattr(initr, "d" + self.xy),
+                    at=self.ipr,
+                    tol=self.tols["d"],
+                )
+            )
+            if verbose:
+                print("Targets:", targets)
+            vary = [
+                xt.Vary(wn, step=self.step)
+                for wn in self.get_weight_knob_names()
+                if f"b{beam}" in wn and self.weights[wn.split("_from_")[0]] != 0
+            ]
+
+            line = getattr(model, "b" + str(beam))
+
+            if verbose:
+                for k, v in bumps.items():
+                    if v != 0:
+                        print(f"Saving Bump {k}: {v}")
+
+            mtc = line.match(
+                solve=False,
+                vary=vary,
+                targets=targets,
+                start=self.ipl,
+                end=self.ipr,
+                init=initl,
+                strengths=False,
+                compute_chromatic_properties=False,
+            )
+
+            try:
+                mtc.target_status()
+                mtc.vary_status()
+                mtc.solve()
+                mtc.vary_status()
+                mtc.target_status()
+            except Exception as ex:
+                print(f"Failed to match {self.name}")
+                model.update_knob(self)
+                # raise (ex)
+            print("restoreing bumps")
+            self.parent.set_bumps(bumps, verbose=verbose)
+
+            return mtc
+
 
     def plot(self, value=None):
         model = self.parent.model
@@ -1280,17 +1305,17 @@ class DispKnob(Knob):
             value = self.value
         model[self.name] = 0
         model[self.ipknobname] = 0
-        init1,_=self.get_inits(beam=1)
-        init2,_=self.get_inits(beam=2)
+        init1, _ = self.get_inits(beam=1)
+        init2, _ = self.get_inits(beam=2)
         model[self.name] = value
         model[self.ipknobname] = value
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), num=self.name)
-        model.b1.twiss(
-            start=self.ipl, init=init1, end=self.ipr
-        ).plot(yl=self.xy, yr="d" + self.xy, ax=ax1)
-        model.b2.twiss(
-            start=self.ipl, init=init2, end=self.ipr
-        ).plot(yl=self.xy, yr="d" + self.xy, ax=ax2)
+        model.b1.twiss(start=self.ipl, init=init1, end=self.ipr).plot(
+            yl=self.xy, yr="d" + self.xy, ax=ax1
+        )
+        model.b2.twiss(start=self.ipl, init=init2, end=self.ipr).plot(
+            yl=self.xy, yr="d" + self.xy, ax=ax2
+        )
         model[self.name] = knob_start
         model[self.ipknobname] = ipknob_start
 
@@ -1335,6 +1360,50 @@ class CrabKnob(Knob):
 
     def __repr__(self):
         return f"<CrabKnob {self.name!r} = {self.value}>"
+
+    def check(self, threshold=1e-9, test_value=190, verbose=False):
+        print(f"Checking knob {self.name!r}")
+        model = self.parent.model
+        old_value = model[self.name]
+        model[self.name] = test_value
+        ipn = f"ip{self.ip}"
+        if self.ip == "1":
+            cxy = "dx_zeta"
+            cpxy = "dpx_zeta"
+        elif self.ip == "5":
+            cxy = "dy_zeta"
+            cpxy = "dpy_zeta"
+        expected_values = {
+            "b1": {
+                (ipn, cxy): 1e-6 * test_value,
+                (ipn, cpxy): 0,
+            },
+            "b2": {
+                (ipn, cxy): -1e-6 * test_value,
+                (ipn, cpxy): 0,
+            },
+        }
+        msg = []
+        for beam, e_v in expected_values.items():
+            tw = getattr(model, beam).twiss(strengths=False)
+            for (at, tt), expected in e_v.items():
+                actual = tw[tt, at]
+                delta = actual - expected
+                if verbose:
+                    print(
+                        f"Check: {tt:8} at {at} = {actual:23.15g}, expected = {expected:23.15g}, delta = {delta:23.15g}"
+                    )
+                if abs(delta) > threshold:
+                    msg.append(
+                        f"Error: {tt} at {at} = {actual:23.15g}, delta = {delta:23.15g} != {expected:23.15g}"
+                    )
+        model[self.name] = old_value
+        if len(msg) > 0:
+            if verbose:
+                print("\n".join(msg))
+            return False
+        else:
+            return True
 
     def copy(self):
         return CrabKnob(
