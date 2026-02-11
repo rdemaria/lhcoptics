@@ -1,0 +1,7 @@
+
+# do not consider symbolic links
+
+acc-model-*
+acc-models-*
+
+
