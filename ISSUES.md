@@ -1,10 +1,12 @@
 # Issues
 
 Fixes:
-- make on disp knobs
-- check tune/chroma/coupling knobs
 - prepare lattice for tracking
-- add match w
+  - add match w
+  - check tune/chroma/coupling knobs
+  - check on disp knobs
+  - make full matching
+  - make thin optics
 - check 50cm strengths margins
 - check apertures at injection
 - match injection transition
