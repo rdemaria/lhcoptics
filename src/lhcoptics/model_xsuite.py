@@ -387,23 +387,22 @@ class LHCXsuiteModel:
         if hasattr(src, "knobs"):
             self.update_knobs(src.knobs, knobs_check=knobs_check)
 
-    def twiss_open(self, start, end, init, beam, strengths=True):
+    def twiss_open(self, start, end, init, beam, strengths=True, chrom=False):
         # line=self.sequence[beam]
         # aux=line.element_names[0]
         # line.cycle(init.element_name)
         tw = self.sequence[beam].twiss(
-            start=start, end=end, init=init, strengths=strengths
-        )
+            start=start, end=end, init=init, strengths=strengths, compute_chromatic_properties=chrom)
         # line.cycle(aux)
         return tw
 
-    def twiss_init(self, start, end, init_at, beam):
+    def twiss_init(self, start, end, init_at, beam, chrom=False, strengths=True):
         # line=self.sequence[beam]
         # aux=line.element_names[0]
         # self.sequence[beam].cycle(init_at)
         init = (
             self.sequence[beam]
-            .twiss(start=start, end=end, init="periodic")
+            .twiss(start=start, end=end, init="periodic", strengths=strengths, compute_chromatic_properties=chrom)
             .get_twiss_init(init_at)
         )
         # line.cycle(aux)
@@ -460,9 +459,8 @@ class LHCXsuiteModel:
         else:
             line_start = self.sequence[beam].element_names[-1]
             line_end = self.sequence[beam].element_names[0]
-        if start is None:
+        if start is None and end is None:
             start = line_start
-        if end is None:
             end = line_end
         if full:
             boundary_start = line_start
@@ -473,11 +471,11 @@ class LHCXsuiteModel:
         if init is None:
             if init_at is None:
                 init_at = start
-            init = self.twiss_init(boundary_start, boundary_end, init_at, beam)
+            init = self.twiss_init(boundary_start, boundary_end, init_at, beam, chrom=chrom, strengths=strengths)
             init.s = 0
             init.mux = 0
             init.muy = 0
-        return self.twiss_open(start, end, init, beam, strengths=strengths)
+        return self.twiss_open(start, end, init, beam, strengths=strengths, chrom=chrom)
 
     def copy(self):
         return self.__class__(
@@ -734,6 +732,85 @@ class LHCXsuiteModel:
         tw["ap_x"] = ap_x
         tw["ap_xmarg"] = ap_xmarg
         return tw.rows[ap.profile != -1]
+
+    
+    def match_w(self,beam=1,ix=200, k2max=0.42):
+        """
+        Docstring for match_w
+        
+        
+        K2max=1.280/0.017^2/23348.89927*2*600/550; !=0.4138703096
+        """
+        line = getattr(self, f"b{beam}")
+        if beam == 1:
+           ix1,iy1,ix5,iy5=ix,-ix,ix,-ix
+           vary=xt.VaryList(["ksf1.a81b1","ksd2.a81b1","ksf1.a12b1","ksd2.a12b1",
+                        "ksf1.a45b1","ksd2.a45b1","ksf1.a56b1","ksd2.a56b1"])
+        else:
+           ix1,iy1,ix5,iy5=-ix,ix,-ix,ix
+           vary=xt.VaryList(["ksf2.a81b2","ksd1.a81b2","ksf2.a12b2","ksd1.a12b2",
+                        "ksf2.a45b2","ksd1.a45b2","ksf2.a56b2","ksd1.a56b2"])
+
+        targets=[xt.TargetSet(bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-3, at="ip3"),
+                 xt.TargetSet(bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-3, at="ip7"),
+                 xt.TargetSet(bx_chrom=0, ax_chrom=ix1, by_chrom=0, ay_chrom=iy1, tol=1e-6, at="ip1"),
+                 xt.TargetSet(bx_chrom=0, ax_chrom=ix5, by_chrom=0, ay_chrom=iy5, tol=1e-6, at="ip5")]
+        
+        mtc=line.match(
+            solve=False,
+            vary=vary,
+            targets=targets,
+            strengths=False,
+            compute_chromatic_properties=True,
+        )
+        mtc.vary_status()
+        mtc.target_status()
+        mtc.step(10)
+        mtc.vary_status()
+        mtc.target_status()
+
+
+    def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="all", solve=True):
+        """
+        Match the chromaticity of the optics.
+
+        NB: breaks knobs and restore them
+        """
+        if beam is None:
+            for beam in [1, 2]:
+                self.match_chroma(beam, dqx, dqy, arcs, solve=solve)
+        else:
+            model = self
+            xt = model._xt
+            beam = f"b{beam}"
+            line = getattr(model, beam)
+            for fd in "fd":
+                for ks in self.search(f"ks[sd][12]\\.a..b{beam}"):
+                    model.ref[ks] = model[ks]  # reset otherwise error in knobs
+                    if arcs == "weak":
+                        if "a81" in ks or "a12" in ks or "a45" in ks or "a56" in ks:
+                            continue
+                    if arcs == "strong":
+                        if "a23" in ks or "a34" in ks or "a67" in ks or "a78" in ks:
+                            continue
+                    tmp = f"ks{fd}_{beam}"
+                    model[tmp] = model[ks]
+                    print(f"Set {tmp} from {ks} to {model[tmp]}")
+                    model.ref[ks] = model.ref[tmp]  # expr
+                    print(model.ref[ks]._expr)
+            mtc = line.match(
+                solve=solve,
+                vary=[xt.VaryList([f"ksf_{beam}", f"ksd_{beam}"], step=1e-9)],
+                targets=[xt.TargetSet(dqx=dqx, dqy=dqy, tol=1e-6)],
+                strengths=False,
+                compute_chromatic_properties=True,
+                n_steps_max=50,
+            )
+            mtc.target_status()
+            mtc.vary_status()
+            for knob in self.find_knobs(f"dqp.*{beam}"):
+                model.update_knob(knob)
+            return mtc
 
 
 def test_coupling_knobs(collider):

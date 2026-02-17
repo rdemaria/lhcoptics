@@ -32,6 +32,13 @@ from .utils import (
 _opl = ["_op", "_sq", ""]
 
 
+def set_ip_labels(ax, tw):
+    ips = tw.rows["ip[1-8]"].s
+    lbl = [s.upper() for s in tw.rows["ip[1-8]"].name]
+    ax.set_xticks(ips, labels=lbl)
+    ax.set_xlabel(None)
+
+
 class LHCOptics:
     """
     Optics containts global knobs, global parameters and sections
@@ -412,23 +419,23 @@ class LHCOptics:
         self.twissip()
 
     def check_knobs(self, fail=False, verbose=True):
-        report=[]
+        report = []
         for knob in self.find_knobs():
             if not hasattr(knob, "check"):
-                msg=f"Knob {knob.name} has no check method, skipping"
+                msg = f"Knob {knob.name} has no check method, skipping"
                 if verbose:
-                   print(msg)
+                    print(msg)
                 report.append(msg)
                 continue
             try:
-                res=knob.check(verbose=verbose)
+                res = knob.check(verbose=verbose)
                 if res:
-                    msg=f"Knob {knob.name} OK"
+                    msg = f"Knob {knob.name} OK"
                 else:
-                    msg=f"Knob {knob.name} FAILED"
+                    msg = f"Knob {knob.name} FAILED"
             except Exception as e:
-                msg=f"Knob {knob.name} RAISED EXCEPTION: {e}"
-                res=False
+                msg = f"Knob {knob.name} RAISED EXCEPTION: {e}"
+                res = False
                 if verbose:
                     print(f"Knob {knob.name} raised {e}")
                 if fail:
@@ -442,6 +449,7 @@ class LHCOptics:
             print("Knob check report:")
             print("\n".join(report))
         return self
+
     def check_match(self, verbose=False):
         out = {}
         for ss in self.irs + self.arcs:
@@ -609,8 +617,8 @@ class LHCOptics:
 
     def get_knobs_active(self):
         """Return the active knobs in the optics."""
-        model=self.model
-        return {k:v for k in self.find_knobs() if (v:=model[k.name])!= 0}
+        model = self.model
+        return {k: v for k in self.find_knobs() if (v := model[k.name]) != 0}
 
     def get_cmin(self, beam=None, pos="ip1"):
         """Compute the c-minus at a given position."""
@@ -646,7 +654,6 @@ class LHCOptics:
             if re.match(r"on_d(sep|x|o|a)", ss):
                 out[ss] = self.model[ss]
         return out
-
 
     def get_knob_structure(self):
         """Return the names and locations of the knobs in the optics."""
@@ -847,47 +854,15 @@ class LHCOptics:
             or self.params.get("ry_ip5", 1) != 1
         )
 
-    def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="all", solve=True):
+    def match_chroma(self, sext="weak"):
         """
-        Match the chromaticity of the optics.
-
-        NB: breaks knobs and restore them
+        - match chroma weak
+        - regenerate knobs
         """
-        if beam is None:
-            for beam in [1, 2]:
-                self.match_chroma(beam, dqx, dqy, arcs, solve=solve)
-        else:
-            model = self.model
-            xt = model._xt
-            beam = f"b{beam}"
-            line = getattr(model, beam)
-            for fd in "fd":
-                for ks in self.find_strengths(f"ks{fd}.*{beam}"):
-                    model.ref[ks] = model[ks]  # reset otherwise error in knobs
-                    if arcs == "weak":
-                        if "a81" in ks or "a12" in ks or "a45" in ks or "a56" in ks:
-                            continue
-                    if arcs == "strong":
-                        if "a23" in ks or "a34" in ks or "a67" in ks or "a78" in ks:
-                            continue
-                    tmp = f"ks{fd}_{beam}"
-                    model[tmp] = model[ks]
-                    print(f"Set {tmp} from {ks} to {model[tmp]}")
-                    model.ref[ks] = model.ref[tmp]  # expr
-                    print(model.ref[ks]._expr)
-            mtc = line.match(
-                solve=solve,
-                vary=[xt.VaryList([f"ksf_{beam}", f"ksd_{beam}"], step=1e-9)],
-                targets=[xt.TargetSet(dqx=dqx, dqy=dqy, tol=1e-6)],
-                strengths=False,
-                compute_chromatic_properties=True,
-                n_steps_max=50,
-            )
-            mtc.target_status()
-            mtc.vary_status()
-            for knob in self.find_knobs(f"dqp.*{beam}"):
-                model.update_knob(knob)
-            return mtc
+        self.model.match_chroma(sext=sext, beam=1)
+        self.model.match_chroma(sext=sext, beam=2)
+        for knob in self.find_knobs(f"dqp.*"):
+            self.model.update_knob(knob)
 
     def match_knobs(self):
         result = {}
@@ -1015,6 +990,17 @@ class LHCOptics:
                 )
         return ax
 
+    def plot_w(self, beam=None):
+        if beam is None:
+            return self.plot_w(beam=1), self.plot_w(beam=2)
+        else:
+            fig, ax = plt.subplots(
+                figsize=(8, 4), num=f"LHCOptics {self.name} W B{beam}"
+            )
+            tw = self.model.twiss(beam=beam, strengths=False, chrom=True, start="ip3")
+            tw.plot("wx_chrom wy_chrom", ax=ax)
+            set_ip_labels(ax, tw)
+
     def round_params(self, full=False):
         if full:
             for ss in self.irs + self.arcs:
@@ -1024,7 +1010,7 @@ class LHCOptics:
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""
-        model=self.model
+        model = self.model
         for k, v in bumps.items():
             if verbose:
                 if k in model and model[k] != v:
