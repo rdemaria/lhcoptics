@@ -997,6 +997,7 @@ class LHCOptics:
             fig, ax = plt.subplots(
                 figsize=(8, 4), num=f"LHCOptics {self.name} W B{beam}"
             )
+            fig.clear()
             tw = self.model.twiss(beam=beam, strengths=False, chrom=True, start="ip3")
             tw.plot("wx_chrom wy_chrom", ax=ax)
             set_ip_labels(ax, tw)

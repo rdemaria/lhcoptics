@@ -392,7 +392,12 @@ class LHCXsuiteModel:
         # aux=line.element_names[0]
         # line.cycle(init.element_name)
         tw = self.sequence[beam].twiss(
-            start=start, end=end, init=init, strengths=strengths, compute_chromatic_properties=chrom)
+            start=start,
+            end=end,
+            init=init,
+            strengths=strengths,
+            compute_chromatic_properties=chrom,
+        )
         # line.cycle(aux)
         return tw
 
@@ -402,7 +407,13 @@ class LHCXsuiteModel:
         # self.sequence[beam].cycle(init_at)
         init = (
             self.sequence[beam]
-            .twiss(start=start, end=end, init="periodic", strengths=strengths, compute_chromatic_properties=chrom)
+            .twiss(
+                start=start,
+                end=end,
+                init="periodic",
+                strengths=strengths,
+                compute_chromatic_properties=chrom,
+            )
             .get_twiss_init(init_at)
         )
         # line.cycle(aux)
@@ -471,7 +482,14 @@ class LHCXsuiteModel:
         if init is None:
             if init_at is None:
                 init_at = start
-            init = self.twiss_init(boundary_start, boundary_end, init_at, beam, chrom=chrom, strengths=strengths)
+            init = self.twiss_init(
+                boundary_start,
+                boundary_end,
+                init_at,
+                beam,
+                chrom=chrom,
+                strengths=strengths,
+            )
             init.s = 0
             init.mux = 0
             init.muy = 0
@@ -733,30 +751,88 @@ class LHCXsuiteModel:
         tw["ap_xmarg"] = ap_xmarg
         return tw.rows[ap.profile != -1]
 
-    
-    def match_w(self,beam=1,ix=200, k2max=0.42):
+    def get_triplet_chrom(self, beam=1):
+        line=self.sequence[beam]
+        tw=line.twiss(strengths=False, compute_chromatic_properties=False)
+        betxip1 = tw["betx", "ip1"]
+        betyip1 = tw["bety", "ip1"]
+        betxip5 = tw["betx", "ip5"]
+        betyip5 = tw["bety", "ip5"]
+        ip1left = line.twiss(init_at="ip1.l1",betx=betxip1,bety=betyip1,start="ms.10l1.b1",end="ip1.l1",compute_chromatic_properties=True)
+        wxip1l = ip1left.wx_chrom[1]
+        wyip1l = ip1left.wy_chrom[1]
+        ip1right = line.twiss(init_at="ip1",betx=betxip1,bety=betyip1,start="ip1",end="ms.10r1.b1",compute_chromatic_properties=True)
+        wxip1r = ip1right.wx_chrom[-2]
+        wyip1r = ip1right.wy_chrom[-2]
+        ip5left = line.twiss(init_at="ip5",betx=betxip5,bety=betyip5,start="ms.10l5.b1",end="ip5",compute_chromatic_properties=True)
+        wxip5l = ip5left.wx_chrom[1]
+        wyip5l = ip5left.wy_chrom[1]
+        ip5right = line.twiss(init_at="ip5",betx=betxip5,bety=betyip5,start="ip5",end="ms.10r5.b1",compute_chromatic_properties=True)
+        wxip5r = ip5right.wx_chrom[-2]
+        wyip5r = ip5right.wy_chrom[-2]
+        print(f"ip1: left wx={wxip1l} wy={wyip1l} right wx={wxip1r} wy={wyip1r}")
+        print(f"ip5: left wx={wxip5l} wy={wyip5l} right wx={wxip5r} wy={wyip5r}")
+        dwx1=(wxip1r-wxip1l)/2
+        dwy1=(wyip1r-wyip1l)/2
+        dwx5=(wxip5r-wxip5l)/2
+        dwy5=(wyip5r-wyip5l)/2
+        return dwx1, dwy1, dwx5, dwy5
+
+        tw=line.twiss(betx=0.15,bety=0.15,start="ip5",end="ms.10r5.b1",compute_chromatic_properties=True)
+
+    def match_w(self, beam=1, ix=0, k2max=0.42):
         """
         Docstring for match_w
-        
-        
+
         K2max=1.280/0.017^2/23348.89927*2*600/550; !=0.4138703096
         """
+
         line = getattr(self, f"b{beam}")
         if beam == 1:
-           ix1,iy1,ix5,iy5=ix,-ix,ix,-ix
-           vary=xt.VaryList(["ksf1.a81b1","ksd2.a81b1","ksf1.a12b1","ksd2.a12b1",
-                        "ksf1.a45b1","ksd2.a45b1","ksf1.a56b1","ksd2.a56b1"])
+            strong_f = [f"ksf1.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
+            strong_d = [f"ksd2.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
+            weak_f = [f"ksf2.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
+            weak_d = [f"ksd1.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
+            ix1, iy1, ix5, iy5 = ix, -ix, ix, -ix
         else:
-           ix1,iy1,ix5,iy5=-ix,ix,-ix,ix
-           vary=xt.VaryList(["ksf2.a81b2","ksd1.a81b2","ksf2.a12b2","ksd1.a12b2",
-                        "ksf2.a45b2","ksd1.a45b2","ksf2.a56b2","ksd1.a56b2"])
+            ix1, iy1, ix5, iy5 = -ix, ix, -ix, ix
+            strong_f = [f"ksf2.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
+            strong_d = [f"ksd1.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
+            weak_f = [f"ksf1.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
+            weak_d = [f"ksd2.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
 
-        targets=[xt.TargetSet(bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-3, at="ip3"),
-                 xt.TargetSet(bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-3, at="ip7"),
-                 xt.TargetSet(bx_chrom=0, ax_chrom=ix1, by_chrom=0, ay_chrom=iy1, tol=1e-6, at="ip1"),
-                 xt.TargetSet(bx_chrom=0, ax_chrom=ix5, by_chrom=0, ay_chrom=iy5, tol=1e-6, at="ip5")]
-        
-        mtc=line.match(
+        vary = xt.VaryList(strong_f + strong_d, step=1e-3, limits=(-k2max, k2max))
+        for kk in weak_f:
+            line.vars[kk] = 0.06
+        for kk in weak_d:
+            line.vars[kk] = -0.099
+
+        targets = [
+            xt.TargetSet(
+                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip3"
+            ),
+            xt.TargetSet(
+                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip7"
+            ),
+            xt.TargetSet(
+                bx_chrom=0, ax_chrom=ix1, by_chrom=0, ay_chrom=iy1, tol=1e-6, at="ip1"
+            ),
+            xt.TargetSet(
+                bx_chrom=0, ax_chrom=ix5, by_chrom=0, ay_chrom=iy5, tol=1e-6, at="ip5"
+            ),
+        ]
+        targets = [
+            xt.Target(lambda tw: tw.wx_chrom.max(), value=700),
+            xt.Target(lambda tw: tw.wy_chrom.max(), value=700),
+            xt.TargetSet(
+                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip3"
+            ),
+            xt.TargetSet(
+                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip7"
+            ),
+        ]
+
+        mtc = line.match(
             solve=False,
             vary=vary,
             targets=targets,
@@ -768,7 +844,7 @@ class LHCXsuiteModel:
         mtc.step(10)
         mtc.vary_status()
         mtc.target_status()
-
+        return mtc
 
     def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="all", solve=True):
         """
@@ -781,11 +857,10 @@ class LHCXsuiteModel:
                 self.match_chroma(beam, dqx, dqy, arcs, solve=solve)
         else:
             model = self
-            xt = model._xt
             beam = f"b{beam}"
             line = getattr(model, beam)
             for fd in "fd":
-                for ks in self.search(f"ks[sd][12]\\.a..b{beam}"):
+                for ks in self.search(f"ks{fd}[12]\\.a..{beam}"):
                     model.ref[ks] = model[ks]  # reset otherwise error in knobs
                     if arcs == "weak":
                         if "a81" in ks or "a12" in ks or "a45" in ks or "a56" in ks:
@@ -808,8 +883,6 @@ class LHCXsuiteModel:
             )
             mtc.target_status()
             mtc.vary_status()
-            for knob in self.find_knobs(f"dqp.*{beam}"):
-                model.update_knob(knob)
             return mtc
 
 
