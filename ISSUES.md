@@ -2,9 +2,6 @@
 
 Fixes:
 - prepare lattice for tracking
-  - add match w
-  - check tune/chroma/coupling knobs
-  - check on disp knobs
   - make full matching
   - make thin optics
 - check 50cm strengths margins
@@ -31,3 +28,4 @@ Features:
 - update logic coupling knobs in case one of ir1 or ir5 is not ats
 - add verbose option in xdeps to silence matching
 - verify disp knobs closeness with coupling
+- improve max_chrom target in global_w chrom for flat optics

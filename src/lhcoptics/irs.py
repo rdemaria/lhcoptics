@@ -283,6 +283,14 @@ class LHCIR(LHCSection):
             )
         return {k: np.round(v, 8) for k, v in params.items()}
 
+    def get_phase(self):
+        phases={}
+        for xy in "xy":
+            for beam in "12":
+                nn=f"mu{xy}{self.ipname}b{beam}"
+                phases[nn]=self.params[nn]
+        return phases
+
     def get_extra_match_targets(self):
         return []
 
@@ -662,6 +670,25 @@ class LHCIR(LHCSection):
             if filename is not None:
                 plot.savefig(filename.format(figlabel=figlabel))
             return plot
+
+    def round_params(self, verbose=False, dryrun=False):
+        if dryrun:
+            verbose = True
+        for k in self.params:
+            new_value = np.round(self.params[k], 4)
+            if verbose and new_value != self.params[k]:
+                print(f"Round {k} from {self.params[k]} to {new_value}")
+            if not dryrun:
+                self.params[k] = new_value
+        for xy in "xy":
+            for beam in "12":
+                k_l=f"mu{xy}{self.ipname}b{beam}_l"
+                k_r=f"mu{xy}{self.ipname}b{beam}_r"
+                k=f"mu{xy}{self.ipname}b{beam}"
+                if verbose and self.params[k] != self.params[k_l] + self.params[k_r]:
+                    print(f"Adjust {k} from {self.params[k]} to {self.params[k_l] + self.params[k_r]} to be consistent with {k_l} + {k_r}")
+                if not dryrun:
+                    self.params[k_r] = self.params[k] - self.params[k_l]
 
     def set_bumps_off(self):
         for k, knob in self.knobs.items():

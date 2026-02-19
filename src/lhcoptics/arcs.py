@@ -1,7 +1,10 @@
+import numpy as np
+
 import xtrack as xt
 
 from .model_xsuite import LHCMadxModel
 from .section import LHCSection
+
 
 
 class ActionArcPhaseAdvance(xt.Action):
@@ -315,6 +318,16 @@ class LHCArc(LHCSection):
     def get_phase(self):
         params = self.get_params()
         return {k: params[k] for k in self.phase_names}
+
+    def round_params(self, verbose=False, dryrun=False):
+        if dryrun:
+            verbose = True
+        for k in self.params:
+            new_value = np.round(self.params[k], 9)
+            if verbose and new_value != self.params[k]:
+                print(f"Parameter {k} rounded to {new_value}")
+            if not dryrun:
+                self.params[k] = new_value
 
     def to_table(self, *rows):
         from .opttable import LHCArcTable

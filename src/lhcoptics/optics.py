@@ -460,6 +460,39 @@ class LHCOptics:
                 print(f" Section {k} match status: {v}")
         return np.all(out.values())
 
+    def check_phase_params(self,   verbose=False, tol=1e-9, fail=False, correct=False):
+        ret=True
+        for xy in 'xy':
+            for beam in '12':
+                data={}
+                for arc in self.arcs:
+                    nn=f'mu{xy}{arc.name}b{beam}'
+                    data[nn]=arc.params[nn]
+                for ir in self.irs:
+                    nn=f'mu{xy}ip{ir.irn}b{beam}'
+                    data[nn]=ir.params[nn]
+                sum=0
+                for k, v in data.items():
+                    sum+=v
+                qq=self.params[f'q{xy}b{beam}']
+                if abs(sum-qq) > tol:
+                    if verbose:
+                        print(f"mu{xy}b{beam}: Sum={sum} Q={qq} Diff={sum-qq} > tol={tol} FAIL")
+                    ret=False
+                    if fail:
+                        raise ValueError(f"Phase parameter mu{xy}b{beam} check failed: Sum={sum}, Q={qq}")
+                nn=f'mu{xy}a34b{beam}'
+                if correct and abs(sum-qq) > tol:
+                    old=data[nn]
+                    new=old+qq-sum
+                    if verbose:
+                        print(f"Correcting {nn} from {old} to {new} to enforce sum of phases equal to Q")
+                    self.arcs[2].params[nn]=new
+        return ret
+
+
+
+
     def check_quad_strengths(
         self,
         verbose=False,
@@ -814,6 +847,15 @@ class LHCOptics:
             phases.update(arc.get_phase())
         return phases
 
+    def get_phase_irs(self):
+        """
+        Get the phase advances from the IRs.
+        """
+        phases = {}
+        for ir in self.irs:
+            phases.update(ir.get_phase())
+        return phases
+
     def get_quad_max_ratio(self, verbose=False, ratio=1.5):
         """
         Get the maximum ratio of the quadrupole strengths in the IRs.
@@ -1002,12 +1044,39 @@ class LHCOptics:
             tw.plot("wx_chrom wy_chrom", ax=ax)
             set_ip_labels(ax, tw)
 
-    def round_params(self, full=False):
+    def round_params(self, full=True, verbose=True, dryrun=False, qx=62.31, qy=60.32, qp=0.0):
+        if dryrun:
+            verbose = True
         if full:
             for ss in self.irs + self.arcs:
-                ss.round_params()
-        for k, v in self.params.items():
-            self.params[k] = round(v, 6)
+                ss.round_params(verbose=verbose, dryrun=dryrun)
+        for xy in "xy":
+            for beam in [1, 2]:
+                if verbose:
+                    if self.params[f"q{xy}b{beam}"] != (qx if xy == "x" else qy):
+                        print(
+                            f"Round q{xy}b{beam} from {self.params[f'q{xy}b{beam}']} to {qx if xy == 'x' else qy}"
+                        )
+                    if self.params[f"qp{xy}b{beam}"] != qp:
+                        print(
+                            f"Round qp{xy}b{beam} from {self.params[f'qp{xy}b{beam}']} to {qp}"
+                        )
+                if not dryrun:
+                    self.params[f"q{xy}b{beam}"] = qx if xy == "x" else qy
+                    self.params[f"qp{xy}b{beam}"] = qp
+
+    def rematch(self,verbose=True):
+        """
+        Rematch the entire optics
+        """
+        if not self.check_phase_params(verbose=verbose):
+            raise ValueError("Phase parameters do not sum up to the tunes, correct them first or set correct=True in check_phase_params()")
+        for aa in self.arcs:
+            aa.match().solve()
+        for ir in self.irs:
+            ir.match().solve()
+
+
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""

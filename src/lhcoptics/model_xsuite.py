@@ -751,36 +751,63 @@ class LHCXsuiteModel:
         tw["ap_xmarg"] = ap_xmarg
         return tw.rows[ap.profile != -1]
 
-    def get_triplet_chrom(self, beam=1):
-        line=self.sequence[beam]
-        tw=line.twiss(strengths=False, compute_chromatic_properties=False)
+    def get_triplet_chrom(self, beam=1, verbose=False):
+        line = self.sequence[beam]
+        tw = line.twiss(strengths=False, compute_chromatic_properties=False)
         betxip1 = tw["betx", "ip1"]
         betyip1 = tw["bety", "ip1"]
         betxip5 = tw["betx", "ip5"]
         betyip5 = tw["bety", "ip5"]
-        ip1left = line.twiss(init_at="ip1.l1",betx=betxip1,bety=betyip1,start="ms.10l1.b1",end="ip1.l1",compute_chromatic_properties=True)
+        ip1left = line.twiss(
+            init_at="ip1.l1",
+            betx=betxip1,
+            bety=betyip1,
+            start=f"ms.10l1.b{beam}",
+            end="ip1.l1",
+            compute_chromatic_properties=True,
+        )
         wxip1l = ip1left.wx_chrom[1]
         wyip1l = ip1left.wy_chrom[1]
-        ip1right = line.twiss(init_at="ip1",betx=betxip1,bety=betyip1,start="ip1",end="ms.10r1.b1",compute_chromatic_properties=True)
+        ip1right = line.twiss(
+            init_at="ip1",
+            betx=betxip1,
+            bety=betyip1,
+            start="ip1",
+            end=f"ms.10r1.b{beam}",
+            compute_chromatic_properties=True,
+        )
         wxip1r = ip1right.wx_chrom[-2]
         wyip1r = ip1right.wy_chrom[-2]
-        ip5left = line.twiss(init_at="ip5",betx=betxip5,bety=betyip5,start="ms.10l5.b1",end="ip5",compute_chromatic_properties=True)
+        ip5left = line.twiss(
+            init_at="ip5",
+            betx=betxip5,
+            bety=betyip5,
+            start=f"ms.10l5.b{beam}",
+            end="ip5",
+            compute_chromatic_properties=True,
+        )
         wxip5l = ip5left.wx_chrom[1]
         wyip5l = ip5left.wy_chrom[1]
-        ip5right = line.twiss(init_at="ip5",betx=betxip5,bety=betyip5,start="ip5",end="ms.10r5.b1",compute_chromatic_properties=True)
+        ip5right = line.twiss(
+            init_at="ip5",
+            betx=betxip5,
+            bety=betyip5,
+            start="ip5",
+            end=f"ms.10r5.b{beam}",
+            compute_chromatic_properties=True,
+        )
         wxip5r = ip5right.wx_chrom[-2]
         wyip5r = ip5right.wy_chrom[-2]
-        print(f"ip1: left wx={wxip1l} wy={wyip1l} right wx={wxip1r} wy={wyip1r}")
-        print(f"ip5: left wx={wxip5l} wy={wyip5l} right wx={wxip5r} wy={wyip5r}")
-        dwx1=(wxip1r-wxip1l)/2
-        dwy1=(wyip1r-wyip1l)/2
-        dwx5=(wxip5r-wxip5l)/2
-        dwy5=(wyip5r-wyip5l)/2
+        if verbose:
+            print(f"ip1: left wx={wxip1l} wy={wyip1l} right wx={wxip1r} wy={wyip1r}")
+            print(f"ip5: left wx={wxip5l} wy={wyip5l} right wx={wxip5r} wy={wyip5r}")
+        dwx1 = (wxip1r - wxip1l) / 2
+        dwy1 = (wyip1r - wyip1l) / 2
+        dwx5 = (wxip5r - wxip5l) / 2
+        dwy5 = (wyip5r - wyip5l) / 2
         return dwx1, dwy1, dwx5, dwy5
 
-        tw=line.twiss(betx=0.15,bety=0.15,start="ip5",end="ms.10r5.b1",compute_chromatic_properties=True)
-
-    def match_w(self, beam=1, ix=0, k2max=0.42):
+    def match_w(self, beam=1, target="triplet", k2max=0.42):
         """
         Docstring for match_w
 
@@ -793,9 +820,7 @@ class LHCXsuiteModel:
             strong_d = [f"ksd2.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
             weak_f = [f"ksf2.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
             weak_d = [f"ksd1.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
-            ix1, iy1, ix5, iy5 = ix, -ix, ix, -ix
         else:
-            ix1, iy1, ix5, iy5 = -ix, ix, -ix, ix
             strong_f = [f"ksf2.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
             strong_d = [f"ksd1.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
             weak_f = [f"ksf1.a{aa}b{beam}" for aa in [81, 12, 45, 56]]
@@ -807,30 +832,43 @@ class LHCXsuiteModel:
         for kk in weak_d:
             line.vars[kk] = -0.099
 
-        targets = [
-            xt.TargetSet(
-                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip3"
-            ),
-            xt.TargetSet(
-                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip7"
-            ),
-            xt.TargetSet(
-                bx_chrom=0, ax_chrom=ix1, by_chrom=0, ay_chrom=iy1, tol=1e-6, at="ip1"
-            ),
-            xt.TargetSet(
-                bx_chrom=0, ax_chrom=ix5, by_chrom=0, ay_chrom=iy5, tol=1e-6, at="ip5"
-            ),
-        ]
-        targets = [
-            xt.Target(lambda tw: tw.wx_chrom.max(), value=700),
-            xt.Target(lambda tw: tw.wy_chrom.max(), value=700),
-            xt.TargetSet(
-                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip3"
-            ),
-            xt.TargetSet(
-                bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip7"
-            ),
-        ]
+        if target == "triplet":
+            ix1, iy1, ix5, iy5 = self.get_triplet_chrom(beam=beam)
+            targets = [
+                xt.TargetSet(
+                    bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip3"
+                ),
+                xt.TargetSet(
+                    bx_chrom=0, ax_chrom=0, by_chrom=0, ay_chrom=0, tol=1e-6, at="ip7"
+                ),
+                xt.TargetSet(
+                    bx_chrom=0,
+                    ax_chrom=-ix1,
+                    by_chrom=0,
+                    ay_chrom=-iy1,
+                    tol=1e-6,
+                    at="ip1",
+                ),
+                xt.TargetSet(
+                    bx_chrom=0,
+                    ax_chrom=-ix5,
+                    by_chrom=0,
+                    ay_chrom=-iy5,
+                    tol=1e-6,
+                    at="ip5",
+                ),
+            ]
+        elif target == "max_chrom":
+            targets = [
+                xt.TargetSet(wx_chrom=0, wy_chrom=0, at="ip3"),
+                xt.TargetSet(wx_chrom=0, wy_chrom=0, at="ip7"),
+                xt.Target(lambda tw: tw.wx_chrom.max(), value=700),
+                xt.Target(lambda tw: tw.wy_chrom.max(), value=700),
+            ]
+        else:
+            raise ValueError(
+                f"target can be only 'triplet' or 'max_chrom', not {target!r}"
+            )
 
         mtc = line.match(
             solve=False,
@@ -841,7 +879,10 @@ class LHCXsuiteModel:
         )
         mtc.vary_status()
         mtc.target_status()
-        mtc.step(10)
+        if target == "triplet":
+            mtc.run_jacobian(n_steps=10)
+        elif target == "max_chrom":
+            mtc.run_simplex(n_steps=50)
         mtc.vary_status()
         mtc.target_status()
         return mtc
