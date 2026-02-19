@@ -163,6 +163,26 @@ class LHCSection:
         if verbose:
             opt.target_status()
         return opt._err.last_point_within_tol
+    
+
+    def check_params(self, verbose=False, fail=False, tol=1e-6, params=None):
+        if params is None:
+            params = self.get_params()
+        ret = True
+        for k, v in self.params.items():
+            if k in params:
+                vtw = params[k]
+                if abs(v - vtw) > tol:
+                    if verbose:
+                        print(
+                            f"Param {k}: Optics={v} Twiss={vtw} Diff={v - vtw} > tol={tol} FAIL"
+                        )
+                    ret = False
+                    if fail:
+                        raise ValueError(
+                            f"Parameter {k} check failed: Optics={v}, Twiss={vtw}"
+                        )
+        return ret
 
     def copy(self):
         return self.__class__(

@@ -102,6 +102,7 @@ class LHCArc(LHCSection):
         else:
             return f"<LHCArc {self.name} in {self.parent.name!r}>"
 
+
     def get_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
         tw = self.twiss(beam, strengths=False)

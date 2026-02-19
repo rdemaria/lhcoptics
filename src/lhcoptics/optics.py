@@ -1,4 +1,5 @@
 import json
+from pprint import pp
 import re
 from pathlib import Path
 import gzip
@@ -460,38 +461,65 @@ class LHCOptics:
                 print(f" Section {k} match status: {v}")
         return np.all(out.values())
 
-    def check_phase_params(self,   verbose=False, tol=1e-9, fail=False, correct=False):
-        ret=True
-        for xy in 'xy':
-            for beam in '12':
-                data={}
+    def check_phase_params(self, verbose=False, tol=1e-9, fail=False, correct=False):
+        ret = True
+        for xy in "xy":
+            for beam in "12":
+                data = {}
                 for arc in self.arcs:
-                    nn=f'mu{xy}{arc.name}b{beam}'
-                    data[nn]=arc.params[nn]
+                    nn = f"mu{xy}{arc.name}b{beam}"
+                    data[nn] = arc.params[nn]
                 for ir in self.irs:
-                    nn=f'mu{xy}ip{ir.irn}b{beam}'
-                    data[nn]=ir.params[nn]
-                sum=0
+                    nn = f"mu{xy}ip{ir.irn}b{beam}"
+                    data[nn] = ir.params[nn]
+                sum = 0
                 for k, v in data.items():
-                    sum+=v
-                qq=self.params[f'q{xy}b{beam}']
-                if abs(sum-qq) > tol:
+                    sum += v
+                qq = self.params[f"q{xy}b{beam}"]
+                if abs(sum - qq) > tol:
                     if verbose:
-                        print(f"mu{xy}b{beam}: Sum={sum} Q={qq} Diff={sum-qq} > tol={tol} FAIL")
-                    ret=False
+                        print(
+                            f"mu{xy}b{beam}: Sum={sum} Q={qq} Diff={sum - qq} > tol={tol} FAIL"
+                        )
+                    ret = False
                     if fail:
-                        raise ValueError(f"Phase parameter mu{xy}b{beam} check failed: Sum={sum}, Q={qq}")
-                nn=f'mu{xy}a34b{beam}'
-                if correct and abs(sum-qq) > tol:
-                    old=data[nn]
-                    new=old+qq-sum
+                        raise ValueError(
+                            f"Phase parameter mu{xy}b{beam} check failed: Sum={sum}, Q={qq}"
+                        )
+                nn = f"mu{xy}a34b{beam}"
+                if correct and abs(sum - qq) > tol:
+                    old = data[nn]
+                    new = old + qq - sum
                     if verbose:
-                        print(f"Correcting {nn} from {old} to {new} to enforce sum of phases equal to Q")
-                    self.arcs[2].params[nn]=new
+                        print(
+                            f"Correcting {nn} from {old} to {new} to enforce sum of phases equal to Q"
+                        )
+                    self.arcs[2].params[nn] = new
+                    ret = True
         return ret
 
-
-
+    def check_params(self, verbose=True, tol=1e-9, fail=False):
+        ret = True
+        tw1, tw2 = self.twiss(strengths=False, chrom=True)
+        params=self.get_params_from_twiss(tw1, tw2)
+        for k, v in self.params.items():
+            if k in params:
+                vtw = params[k]
+                if abs(v - vtw) > tol:
+                    if verbose:
+                        print(
+                            f"Param {k}: Optics={v} Twiss={vtw} Diff={v - vtw} > tol={tol} FAIL"
+                        )
+                    ret = False
+                    if fail:
+                        raise ValueError(
+                            f"Parameter {k} check failed: Optics={v}, Twiss={vtw}"
+                        )
+        for ss in self.irs + self.arcs:
+            res = ss.check_params(verbose=verbose, tol=tol, fail=fail)
+            if not res:
+                ret = False
+        return ret
 
     def check_quad_strengths(
         self,
@@ -760,11 +788,11 @@ class LHCOptics:
         }
         return out
 
-    def get_params(self, mode="from_twiss_init", full=False):
+    def get_params(self, mode="from_twiss", full=False):
         """
         Get the parameters from the optics and its sections.
         """
-        if mode.startswith("from_twiss"):
+        if mode == "from_twiss":
             tw1 = self.model.b1.twiss(
                 compute_chromatic_properties=True, strengths=False
             )
@@ -772,6 +800,13 @@ class LHCOptics:
                 compute_chromatic_properties=True, strengths=False
             )
             return self.get_params_from_twiss(tw1, tw2, full=full)
+        elif mode == "from_twiss_init":
+            tw1 = self.ir1.twiss_from_params(1)
+            tw2 = self.ir1.twiss_from_params(2)
+            ret = self.get_params_from_twiss(tw1, tw2, full=False)
+            for ss in self.irs + self.arcs:
+                retss = ss.get_params(mode="from_twiss_init")
+                ret = ret and retss
         elif mode == "from_variables":
             return self.get_params_from_variables(full=full)
         else:
@@ -1044,7 +1079,9 @@ class LHCOptics:
             tw.plot("wx_chrom wy_chrom", ax=ax)
             set_ip_labels(ax, tw)
 
-    def round_params(self, full=True, verbose=True, dryrun=False, qx=62.31, qy=60.32, qp=0.0):
+    def round_params(
+        self, full=True, verbose=True, dryrun=False, qx=62.31, qy=60.32, qp=0.0
+    ):
         if dryrun:
             verbose = True
         if full:
@@ -1065,18 +1102,18 @@ class LHCOptics:
                     self.params[f"q{xy}b{beam}"] = qx if xy == "x" else qy
                     self.params[f"qp{xy}b{beam}"] = qp
 
-    def rematch(self,verbose=True):
+    def rematch(self, verbose=True):
         """
         Rematch the entire optics
         """
         if not self.check_phase_params(verbose=verbose):
-            raise ValueError("Phase parameters do not sum up to the tunes, correct them first or set correct=True in check_phase_params()")
+            raise ValueError(
+                "Phase parameters do not sum up to the tunes, correct them first or set correct=True in check_phase_params()"
+            )
         for aa in self.arcs:
             aa.match().solve()
         for ir in self.irs:
             ir.match().solve()
-
-
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""
