@@ -195,6 +195,30 @@ class LHCXsuiteModel:
         self.env.b1.particle_ref.p0c = value
         self.env.b2.particle_ref.p0c = value
 
+
+    def get_cmin(self, beam=None, pos="ip1"):
+        """Compute the c-minus at a given position."""
+        if beam is None:
+            return [
+                self.get_cmin(beam=1, pos=pos),
+                self.get_cmin(beam=2, pos=pos),
+            ]
+        line = self.model.sequence[beam]
+        if line.element_names[0] != pos:
+            line.cycle(pos, inplace=True)
+        tw = line.twiss(compute_chromatic_properties=False, strengths=True)
+        # print(tw.name)
+        k1sl = tw["k1sl"]
+        pi2 = 2 * np.pi
+        j2pi = 1j * pi2
+        cmin = (
+            np.sum(k1sl * np.sqrt(tw.betx * tw.bety) * np.exp(j2pi * (tw.mux - tw.muy)))
+            / pi2
+        )
+        if line.element_names[0] != "ip1":
+            line.cycle("ip1", inplace=True)
+        return cmin.real, cmin.imag
+
     def update_vars(self, strengths, verbose=False):
         for k, v in strengths.items():
             if verbose:

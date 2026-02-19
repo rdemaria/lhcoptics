@@ -4,7 +4,7 @@ import xtrack as xt
 
 from .model_xsuite import LHCMadxModel
 from .section import LHCSection
-
+from .utils import match_compare_log
 
 
 class ActionArcPhaseAdvance(xt.Action):
@@ -101,7 +101,6 @@ class LHCArc(LHCSection):
             return f"<LHCArc {self.name}>"
         else:
             return f"<LHCArc {self.name} in {self.parent.name!r}>"
-
 
     def get_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
@@ -201,8 +200,8 @@ class LHCArc(LHCSection):
             model = self.model
         params = {}
         for pr in ["a", "cell"]:
-             for xy in "xy":
-              for beam in [1, 2]:
+            for xy in "xy":
+                for beam in [1, 2]:
                     key = f"mu{xy}{pr}{self.name[1:]}b{beam}"
                     if self.parent.variant.startswith("hl"):
                         key2 = key.replace("a", "")
@@ -241,7 +240,7 @@ class LHCArc(LHCSection):
                         action=ActionArcPhaseAdvance(self, beam),
                         tar=mu,
                         value=self.params[f"{mu}{self.name}b{beam}"],
-                        tag=mu,
+                        tag=f"b{beam}",
                     )
                 )
         return targets
@@ -256,14 +255,10 @@ class LHCArc(LHCSection):
         limits[0] *= 1 + kmax_marg
         limits[1] *= 1 - kmax_marg
         tag = beam if beam else "common"
-        return xt.Vary(name=kname, limits=limits, step=1e-8, tag=tag)
+        return xt.Vary(name=kname, limits=limits, step=1e-10, tag=tag)
 
-    def match(self, b1=True, b2=True, verbose=False):
+    def match(self, b1=True, b2=True, verbose=False, solve=True, tol=1e-11, fail=True):
         lhc = self.parent.model.env
-        if lhc.b1.tracker is None:
-            lhc.b1.build_tracker()
-        if lhc.b2.tracker is None:
-            lhc.b2.build_tracker()
         """Match the arc"""
         targets = self.get_match_targets(b1=b1, b2=b2)
         varylst = []
@@ -279,19 +274,37 @@ class LHCArc(LHCSection):
             elif b2:
                 varylst.append(self.get_match_kq_vary(fd), "b2")
 
-        opt = lhc.match(
+        mtc = lhc.match(
             solve=False,
-            default_tol={None: 5e-8},
+            default_tol={None: tol},
             solver_options=dict(max_rel_penalty_increase=2.0),
             targets=targets,
             vary=varylst,
             check_limits=False,
             strengths=False,
         )
-        if verbose:
-            opt.vary_status()
-            opt.target_status()
-        return opt
+        if solve:
+            if verbose:
+                print(f"Matching phase of Arc {self.name}")
+            try:
+                mtc.solve(n_steps=10)
+                params = self.get_params()
+                cc = f"cell{self.name[1:]}"
+                for beam in [1, 2]:
+                    for xy in "xy":
+                        nn=f"mu{xy}{cc}b{beam}"
+                        if verbose:
+                            print(
+                                f"Update {nn}: from {self.params[nn]:.6f} to {params[nn]:.6f} diff {params[nn] - self.params[nn]:.2f}")
+                        self.params[nn] = params[nn]
+                if verbose:
+                   match_compare_log(mtc)
+            except Exception as e:
+                if verbose:
+                    print(f"Matching failed for Arc {self.name} with error: {e}")
+                if fail:
+                    raise ValueError(f"Matching failed for Arc {self.name} with error: {e}")
+        return mtc
 
     def get_close_irs(self):
         ira = getattr(self.parent, f"ir{self.i1}")

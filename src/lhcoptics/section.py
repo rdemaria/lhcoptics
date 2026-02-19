@@ -159,30 +159,37 @@ class LHCSection:
 
     def check_match(self, verbose=True):
         opt = self.match(verbose=False)
-        opt._err(None,check_limits=False)
+        opt._err(None, check_limits=False)
         if verbose:
             opt.target_status()
         return opt._err.last_point_within_tol
-    
 
-    def check_params(self, verbose=False, fail=False, tol=1e-6, params=None):
+    def get_param_mismatches(self, tol=1e-6, params=None):
         if params is None:
             params = self.get_params()
-        ret = True
+        out = []
         for k, v in self.params.items():
             if k in params:
                 vtw = params[k]
-                if abs(v - vtw) > tol:
-                    if verbose:
-                        print(
-                            f"Param {k}: Optics={v} Twiss={vtw} Diff={v - vtw} > tol={tol} FAIL"
-                        )
-                    ret = False
-                    if fail:
-                        raise ValueError(
-                            f"Parameter {k} check failed: Optics={v}, Twiss={vtw}"
-                        )
-        return ret
+                diff = v - vtw
+                if abs(diff) > tol:
+                    out.append((k, v, vtw, diff))
+        return out
+
+    def check_params(self, verbose=True, fail=False, tol=1e-6, params=None):
+        mismatches = self.get_param_mismatches(tol=tol, params=params)
+        if verbose and mismatches:
+            print(
+                f"{'Section':8s} {'Param':20s} {'Optics':>18s} {'Twiss':>18s} {'Diff':>12s} {'Tol':>10s} {'Status':>6s}"
+            )
+            for k, v, vtw, diff in mismatches:
+                print(
+                    f"{self.name:8s} {k:20s} {v:18.10g} {vtw:18.10g} {diff:12.3e} {tol:10.1e} {'FAIL':>6s}"
+                )
+        if fail and mismatches:
+            k, v, vtw, _ = mismatches[0]
+            raise ValueError(f"Parameter {k} check failed: Optics={v}, Twiss={vtw}")
+        return len(mismatches) == 0
 
     def copy(self):
         return self.__class__(
@@ -195,7 +202,7 @@ class LHCSection:
             parent=self.parent,
             filename=self.filename,
         )
- 
+
     def create_knobs(self, verbose=False):
         """Create knobs in the model from the optics knobs."""
         self.model.create_knobs(self.knobs, verbose=verbose)
@@ -375,13 +382,19 @@ class LHCSection:
         else:
             knob_dict = {}
         if knobs == "create":
-            self.model.create_knobs(knob_dict, verbose=verbose, set_value=set_knob_values)
+            self.model.create_knobs(
+                knob_dict, verbose=verbose, set_value=set_knob_values
+            )
         elif knobs == "update":
-            self.model.update_knobs(knob_dict, verbose=verbose, set_value=set_knob_values)
+            self.model.update_knobs(
+                knob_dict, verbose=verbose, set_value=set_knob_values
+            )
         elif knobs is False or None:
             pass
         else:
-            raise ValueError(f"knobs must be 'create', 'update', False or None not {knobs!r}")
+            raise ValueError(
+                f"knobs must be 'create', 'update', False or None not {knobs!r}"
+            )
         return self
 
     def update_strengths(

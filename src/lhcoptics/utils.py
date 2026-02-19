@@ -434,5 +434,23 @@ def find_comparable_values(a, b, tol=1e-6):
     return np.array(indices_a), np.array(indices_b)
 
 
+def match_compare_log(mtc,entry1=0,entry2=-1):
+    log=mtc.log()
+    print(f"{'Parameter':<35} {'Value['+str(entry1)+']':>18} {'Value['+str(entry2)+']':>18} {'Diff':>18}")
+    for iv,vary in enumerate(mtc.vary):
+        value1=log.vary[entry1,iv]
+        value2=log.vary[entry2,iv]
+        diff=value1-value2
+        print(f"{vary.name:<35} {value1:18.9g} {value2:18.9g} {diff:18.9g}")
+    print(f"{'-'*35} {'-'*18} {'-'*18} {'-'*18}")
+    for it,target in enumerate(mtc.targets):
+        value1=log.targets[entry1,it]
+        value2=log.targets[entry2,it]
+        diff=value1-value2
+        name=f"{target.tag} {target.tar}"
+        print(f"{name:<35} {value1:18.9g} {value2:18.9g} {diff:18.9g}")
+
+
+
 
 

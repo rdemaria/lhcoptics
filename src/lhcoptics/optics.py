@@ -500,25 +500,39 @@ class LHCOptics:
 
     def check_params(self, verbose=True, tol=1e-9, fail=False):
         ret = True
+        rows = []
         tw1, tw2 = self.twiss(strengths=False, chrom=True)
-        params=self.get_params_from_twiss(tw1, tw2)
+        params = self.get_params_from_twiss(tw1, tw2)
         for k, v in self.params.items():
             if k in params:
                 vtw = params[k]
-                if abs(v - vtw) > tol:
-                    if verbose:
-                        print(
-                            f"Param {k}: Optics={v} Twiss={vtw} Diff={v - vtw} > tol={tol} FAIL"
-                        )
+                diff = v - vtw
+                if abs(diff) > tol:
+                    rows.append(("global", k, v, vtw, diff))
                     ret = False
                     if fail:
                         raise ValueError(
                             f"Parameter {k} check failed: Optics={v}, Twiss={vtw}"
                         )
         for ss in self.irs + self.arcs:
-            res = ss.check_params(verbose=verbose, tol=tol, fail=fail)
-            if not res:
+            mismatches = ss.get_param_mismatches(tol=tol)
+            if mismatches:
                 ret = False
+                for k, v, vtw, diff in mismatches:
+                    rows.append((ss.name, k, v, vtw, diff))
+                if fail:
+                    k, v, vtw, _ = mismatches[0]
+                    raise ValueError(
+                        f"Parameter {k} check failed: Optics={v}, Twiss={vtw}"
+                    )
+        if verbose and rows:
+            print(
+                f"{'Section':8s} {'Param':20s} {'Optics':>18s} {'Twiss':>18s} {'Diff':>12s} {'Tol':>10s} {'Status':>6s}"
+            )
+            for section, k, v, vtw, diff in rows:
+                print(
+                    f"{section:8s} {k:20s} {v:18.10g} {vtw:18.10g} {diff:12.3e} {tol:10.1e} {'FAIL':>6s}"
+                )
         return ret
 
     def check_quad_strengths(
@@ -677,32 +691,9 @@ class LHCOptics:
         return default
 
     def get_knobs_active(self):
-        """Return the active knobs in the optics."""
+        """Return the active knobs in the model."""
         model = self.model
         return {k: v for k in self.find_knobs() if (v := model[k.name]) != 0}
-
-    def get_cmin(self, beam=None, pos="ip1"):
-        """Compute the c-minus at a given position."""
-        if beam is None:
-            return [
-                self.get_cmin(beam=1, pos=pos),
-                self.get_cmin(beam=2, pos=pos),
-            ]
-        line = self.model.sequence[beam]
-        if line.element_names[0] != pos:
-            line.cycle(pos, inplace=True)
-        tw = line.twiss(compute_chromatic_properties=False, strengths=True)
-        # print(tw.name)
-        k1sl = tw["k1sl"]
-        pi2 = 2 * np.pi
-        j2pi = 1j * pi2
-        cmin = (
-            np.sum(k1sl * np.sqrt(tw.betx * tw.bety) * np.exp(j2pi * (tw.mux - tw.muy)))
-            / pi2
-        )
-        if line.element_names[0] != "ip1":
-            line.cycle("ip1", inplace=True)
-        return cmin.real, cmin.imag
 
     def get_bumps(self):
         """Return the orbit bumps values from model."""
@@ -827,10 +818,25 @@ class LHCOptics:
             "qpxb2": tw2.dqx,
             "qpyb2": tw2.dqy,
         }
+        temp = {}
         if full:
             for ss in self.irs + self.arcs:
                 pp = ss.get_params_from_twiss(tw1, tw2)
                 params.update(pp)
+            temp.update(params)
+        else:
+            temp.update(self.ir1.get_params())
+            temp.update(self.ir5.get_params())
+        for irn in [1, 5]:
+            for xy in "xy":
+                rname = f"r{xy}_ip{irn}"
+                rr_ipb1 = temp[f"bet{xy}ip{irn}b1"] / tw1[f"bet{xy}", f"ip{irn}"]
+                rr_ibb2 = temp[f"bet{xy}ip{irn}b2"] / tw2[f"bet{xy}", f"ip{irn}"]
+                params[rname] = (rr_ipb1 + rr_ibb2) / 2
+                if abs(rr_ipb1 - rr_ibb2) > 0.00001:
+                    print(
+                        f"Warning: r{xy}_ip{irn} from beam 1 and beam 2 differ by more than 0.00001: {rr_ipb1} vs {rr_ibb2}"
+                    )
         return params
 
     def get_params_from_variables(self, full=False):
@@ -931,13 +937,13 @@ class LHCOptics:
             or self.params.get("ry_ip5", 1) != 1
         )
 
-    def match_chroma(self, sext="weak"):
+    def match_chroma(self, arcs="weak"):
         """
         - match chroma weak
         - regenerate knobs
         """
-        self.model.match_chroma(sext=sext, beam=1)
-        self.model.match_chroma(sext=sext, beam=2)
+        self.model.match_chroma(arcs=arcs, beam=1)
+        self.model.match_chroma(arcs=arcs, beam=2)
         for knob in self.find_knobs(f"dqp.*"):
             self.model.update_knob(knob)
 
@@ -1114,6 +1120,10 @@ class LHCOptics:
             aa.match().solve()
         for ir in self.irs:
             ir.match().solve()
+
+        self.model.match_chroma(arcs="weak")
+        self.check_params(verbose=verbose)
+
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""

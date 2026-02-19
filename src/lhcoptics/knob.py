@@ -932,9 +932,9 @@ class CouplingKnob(Knob):
         model = self.parent.model
         old_value = model[self.name]
         model[self.name] = 0
-        zero_cmin = self.parent.get_cmin(beam=int(self.beam[1]))
+        zero_cmin = model.get_cmin(beam=int(self.beam[1]))
         model[self.name] = test_value
-        new_cmin = self.parent.get_cmin(beam=int(self.beam[1]))
+        new_cmin = model.get_cmin(beam=int(self.beam[1]))
         delta = zero_cmin[0] - new_cmin[0], zero_cmin[1] - new_cmin[1]
         if self.ri == "r":
             expected = (test_value, 0)

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from .model_madx import LHCMadxModel
 from .section import LHCSection, lhcprev, lhcsucc, sort_n
+from .utils import match_compare_log
 
 
 def is_hllhc(variant):
@@ -284,11 +285,11 @@ class LHCIR(LHCSection):
         return {k: np.round(v, 8) for k, v in params.items()}
 
     def get_phase(self):
-        phases={}
+        phases = {}
         for xy in "xy":
             for beam in "12":
-                nn=f"mu{xy}{self.ipname}b{beam}"
-                phases[nn]=self.params[nn]
+                nn = f"mu{xy}{self.ipname}b{beam}"
+                phases[nn] = self.params[nn]
         return phases
 
     def get_extra_match_targets(self):
@@ -459,6 +460,8 @@ class LHCIR(LHCSection):
         vary_ratio=None,
         ratio_threshold=1.5,
         verbose=True,
+        solve=True,
+        fail=True,
     ):
         if self.parent.model is None:
             raise ValueError(f"Model not set for {self}")
@@ -613,10 +616,31 @@ class LHCIR(LHCSection):
         if self.name == "ir6":
             match.disable(vary_name="kq4.l6b1")
             match.disable(vary_name="kq4.r6b2")
-        self.optimizer = match
-        if verbose:
-            match.vary_status()
-            match.target_status()
+        if solve:
+            try:
+                match.solve(n_steps=15)
+                if self.name not in ["ir5", "ir1"]:
+                    params = self.get_params(mode="from_twiss_init")
+                    for beam in "12":
+                        for param in "mux muy".split():
+                            k = f"{param}{self.ipname}b{beam}"
+                            kl = f"{k}_l"
+                            kr = f"{k}_r"
+                            if verbose:
+                                print(
+                                    f"Set {kl} from {self.params[kl]} to {params[kl]}"
+                                )
+                                print(
+                                    f"Set {kr} from {self.params[kr]} to {params[kr]}"
+                                )
+                            self.params[kl] = params[kl]
+                            self.params[kr] = params[kr]
+                if verbose:
+                    match_compare_log(match)
+            except Exception as e:
+                print(f"Matching failed for {self.name} with error: {e}")
+                if fail:
+                    raise ValueError(f"Matching failed for {self.name} with error: {e}")
         return match
 
     def match_knobs(self, **kwargs):
@@ -682,11 +706,13 @@ class LHCIR(LHCSection):
                 self.params[k] = new_value
         for xy in "xy":
             for beam in "12":
-                k_l=f"mu{xy}{self.ipname}b{beam}_l"
-                k_r=f"mu{xy}{self.ipname}b{beam}_r"
-                k=f"mu{xy}{self.ipname}b{beam}"
+                k_l = f"mu{xy}{self.ipname}b{beam}_l"
+                k_r = f"mu{xy}{self.ipname}b{beam}_r"
+                k = f"mu{xy}{self.ipname}b{beam}"
                 if verbose and self.params[k] != self.params[k_l] + self.params[k_r]:
-                    print(f"Adjust {k} from {self.params[k]} to {self.params[k_l] + self.params[k_r]} to be consistent with {k_l} + {k_r}")
+                    print(
+                        f"Adjust {k} from {self.params[k]} to {self.params[k_l] + self.params[k_r]} to be consistent with {k_l} + {k_r}"
+                    )
                 if not dryrun:
                     self.params[k_r] = self.params[k] - self.params[k_l]
 
