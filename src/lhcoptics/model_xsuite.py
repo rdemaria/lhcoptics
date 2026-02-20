@@ -7,7 +7,7 @@ import xtrack as xt
 
 from .knob import Knob
 from .model_madx import LHCMadxModel
-from .utils import read_yaml, read_json, read_knob_structure
+from .utils import read_yaml, read_json, read_knob_structure, match_compare_log
 
 import matplotlib.pyplot as plt
 
@@ -831,7 +831,7 @@ class LHCXsuiteModel:
         dwy5 = (wyip5r - wyip5l) / 2
         return dwx1, dwy1, dwx5, dwy5
 
-    def match_w(self, beam=1, target="triplet", k2max=0.42):
+    def match_w(self, beam=1, target="triplet", k2max=0.42, verbose=False):
         """
         Docstring for match_w
 
@@ -901,17 +901,17 @@ class LHCXsuiteModel:
             strengths=False,
             compute_chromatic_properties=True,
         )
-        mtc.vary_status()
-        mtc.target_status()
+        if not verbose:
+            mtc._err.show_call_counter = False
         if target == "triplet":
             mtc.run_jacobian(n_steps=10)
         elif target == "max_chrom":
             mtc.run_simplex(n_steps=50)
-        mtc.vary_status()
-        mtc.target_status()
+        if verbose:
+            match_compare_log(mtc)
         return mtc
 
-    def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="all", solve=True):
+    def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="weak", solve=True, verbose=False):
         """
         Match the chromaticity of the optics.
 
@@ -935,19 +935,24 @@ class LHCXsuiteModel:
                             continue
                     tmp = f"ks{fd}_{beam}"
                     model[tmp] = model[ks]
-                    print(f"Set {tmp} from {ks} to {model[tmp]}")
+                    if verbose:
+                        print(f"Set {tmp} from {ks} to {model[tmp]}")
                     model.ref[ks] = model.ref[tmp]  # expr
-                    print(model.ref[ks]._expr)
             mtc = line.match(
-                solve=solve,
+                solve=False,
                 vary=[xt.VaryList([f"ksf_{beam}", f"ksd_{beam}"], step=1e-9)],
                 targets=[xt.TargetSet(dqx=dqx, dqy=dqy, tol=1e-6)],
                 strengths=False,
                 compute_chromatic_properties=True,
                 n_steps_max=50,
+                verbose=verbose,
             )
-            mtc.target_status()
-            mtc.vary_status()
+            if not verbose:
+                mtc._err.show_call_counter = False
+            if solve:
+                mtc.solve()
+            if verbose:
+                match_compare_log(mtc)
             return mtc
 
 

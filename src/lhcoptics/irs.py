@@ -555,7 +555,7 @@ class LHCIR(LHCSection):
 
         match = lhc.match(
             solve=False,
-            default_tol={None: 5e-8},
+            default_tol={None: 1e-8},
             solver_options=dict(max_rel_penalty_increase=2.0),
             lines=["b1", "b2"],
             start=self.startb12,
@@ -566,6 +566,8 @@ class LHCIR(LHCSection):
             check_limits=False,
             strengths=False,
         )
+        if not verbose:
+            match._err.show_call_counter = False
 
         if lrphase is False:
             match.disable(target="mu.*_l")
@@ -620,21 +622,7 @@ class LHCIR(LHCSection):
             try:
                 match.solve(n_steps=15)
                 if self.name not in ["ir5", "ir1"]:
-                    params = self.get_params(mode="from_twiss_init")
-                    for beam in "12":
-                        for param in "mux muy".split():
-                            k = f"{param}{self.ipname}b{beam}"
-                            kl = f"{k}_l"
-                            kr = f"{k}_r"
-                            if verbose:
-                                print(
-                                    f"Set {kl} from {self.params[kl]} to {params[kl]}"
-                                )
-                                print(
-                                    f"Set {kr} from {self.params[kr]} to {params[kr]}"
-                                )
-                            self.params[kl] = params[kl]
-                            self.params[kr] = params[kr]
+                    self.update_params_lrphase(verbose=verbose)
                 if verbose:
                     match_compare_log(match)
             except Exception as e:
@@ -817,3 +805,20 @@ class LHCIR(LHCSection):
         end = self.endb12[beam - 1]
         init = sequence.twiss(strengths=strengths).get_twiss_init(start)
         return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
+
+    def update_params_lrphase(self, verbose=True):
+        params = self.get_params(mode="from_twiss_init")
+        for beam in "12":
+            for param in "mux muy".split():
+                k = f"{param}{self.ipname}b{beam}"
+                kl = f"{k}_l"
+                kr = f"{k}_r"
+                if verbose:
+                    print(
+                        f"Set {kl} from {self.params[kl]} to {params[kl]}"
+                    )
+                    print(
+                        f"Set {kr} from {self.params[kr]} to {params[kr]}"
+                    )
+                self.params[kl] = params[kl]
+                self.params[kr] = params[kr]

@@ -5,6 +5,8 @@ Fixes:
   - make full matching
   - make thin optics
 - check 50cm strengths margins
+- add dp_trim knobs
+- change rx_ip definition to have round numbers
 - check apertures at injection
 - match injection transition
 - remove twiss defaults, enforce correct options

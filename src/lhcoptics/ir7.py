@@ -1,6 +1,7 @@
+from pytest import fail
 import xtrack as xt
 
-from .irs import LHCIR
+from .irs import LHCIR, match_compare_log
 from .model_xsuite import SinglePassDispersion
 
 
@@ -107,6 +108,8 @@ class LHCIR7(LHCIR):
         common=True,
         hold_init=False,
         verbose=True,
+        solve=True,
+        fail=True,
     ):
         if self.parent.model is None:
             raise ValueError("Model not set for {self)")
@@ -194,8 +197,16 @@ class LHCIR7(LHCIR):
         opt.disable(target="coll")
         opt.disable(target="spdx")
         opt.disable(target="mu.*_l")
-        self.optmizer = opt
-        if verbose:
-            opt.vary_status()
-            opt.target_status()
+        if not verbose:
+            opt._err.show_call_counter = False
+        if solve:
+          try:
+            opt.solve()
+            self.update_params_lrphase(verbose=verbose)
+            if verbose:
+                match_compare_log(opt)
+          except Exception as e:
+              print(f"Matching failed for {self.name} with error: {e}")
+              if fail:
+                 raise ValueError(f"Matching failed for {self.name} with error: {e}")
         return opt

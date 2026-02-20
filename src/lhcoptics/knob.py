@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import xtrack as xt
 
 
-from .utils import print_diff_dict_float
+from .utils import print_diff_dict_float, match_compare_log
 
 
 def is_specialized(knob, cls):
@@ -381,7 +381,7 @@ class IPKnob(Knob):
         vright = sum([self.weights[k] for k in right])
         return vleft, vright
 
-    def match(self, return_match=False):
+    def match(self, return_match=False, verbose=True):
         """
         In general the problem is to find
 
@@ -397,7 +397,8 @@ class IPKnob(Knob):
         """
         model = self.parent.model
         if len(self.weights) == 0:
-            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            if verbose:
+                print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
 
         xt = model._xt
@@ -438,8 +439,9 @@ class IPKnob(Knob):
             vary = varyb2
 
         if len(vary) == 0:
-            print(f"No weights to vary for knob {self.name!r}")
-            print("Assign values to weights different from zero.")
+            if verbose:
+                print(f"No weights to vary for knob {self.name!r}")
+                print("Assign values to weights different from zero.")
             raise ValueError(f"No weights to vary for knob {self.name!r}")
 
         # assumes using all lines anyway
@@ -475,10 +477,9 @@ class IPKnob(Knob):
             # add offset in the knobs
             model[self.name] = self.match_value
             mtc.solve()
-            mtc.target_status()
-            mtc.vary_status()
+            if verbose:
+                match_compare_log(mtc)
         except Exception as ex:
-            mtc.vary_status()
             print(f"Failed to match {self.name}")
             model.update_knob(self)
             raise (ex)
@@ -627,11 +628,12 @@ class TuneKnob(Knob):
             variant=self.variant,
         )
 
-    def match(self, solve=True):
+    def match(self, solve=True, verbose=True):
         model = self.parent.model
 
         if len(self.weights) == 0:
-            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            if verbose:
+                print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
             self.parent.model.create_knob(self)
 
@@ -668,10 +670,10 @@ class TuneKnob(Knob):
             strengths=False,
             compute_chromatic_properties=False,
         )
-        mtc.target_status()
-        mtc.vary_status()
         if solve:
             mtc.solve()
+            if verbose:
+                match_compare_log(mtc)
         model[self.name] = knob_start
         model.get_knob(self).diff(self)
         return mtc
@@ -785,9 +787,10 @@ class ChromaKnob(Knob):
                 variant=knob.variant,
             )
 
-    def match(self):
+    def match(self, verbose=True):
         if len(self.weights) == 0:
-            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            if verbose:
+                print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
             self.parent.model.create_knob(self)
 
@@ -801,7 +804,8 @@ class ChromaKnob(Knob):
                 tmp = f"ks{family}_temp"
                 model[tmp] = model[wn]
                 model.ref[wn] = model.ref[tmp]
-                print(f"Setting {wn} := {tmp};")
+                if verbose:
+                    print(f"Setting {wn} := {tmp};")
 
         vary = [xt.VaryList(["ksf_temp", "ksd_temp"], step=1e-9)]
         if self.xy == "x":
@@ -830,10 +834,10 @@ class ChromaKnob(Knob):
             compute_chromatic_properties=True,
             n_steps_max=50,
         )
-        mtc.target_status()
-        mtc.vary_status()
         mtc.step(20)
         mtc.solve()
+        if verbose:
+            match_compare_log(mtc)
         model[self.name] = knob_start
         # reset weights
         for wn in self.get_weight_knob_names():
@@ -979,9 +983,10 @@ class CouplingKnob(Knob):
                 variant=knob.variant,
             )
 
-    def match(self, limit=0.1, weights={}, reset=True):
+    def match(self, limit=0.1, weights={}, reset=True, verbose=True):
         if len(self.weights) == 0:
-            print(f"Knob {self.name!r} has no weights, pre-setting default weights")
+            if verbose:
+                print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
             self.parent.model.create_knob(self)
 
@@ -1033,13 +1038,13 @@ class CouplingKnob(Knob):
                 if vv.name.startswith(kk):
                     vv.weight = val
 
-        mtc.target_status()
-        mtc.vary_status()
         mtc.solve()
-        mtc.vary_status()
+        if verbose:
+            match_compare_log(mtc)
         model[self.name] = knob_start
-        print("Knob new vs old")
-        model.get_knob(self).diff(self)
+        if verbose:
+            print("Knob new vs old")
+            model.get_knob(self).diff(self)
         # line.cycle("ip1", inplace=True)
         return mtc
 
@@ -1282,16 +1287,15 @@ class DispKnob(Knob):
             )
 
             try:
-                mtc.target_status()
-                mtc.vary_status()
                 mtc.solve()
-                mtc.vary_status()
-                mtc.target_status()
+                if verbose:
+                    match_compare_log(mtc)
             except Exception as ex:
                 print(f"Failed to match {self.name}")
                 model.update_knob(self)
-                # raise (ex)
-            print("restoreing bumps")
+                raise (ex)
+            if verbose:
+                print("restoring bumps")
             self.parent.set_bumps(bumps, verbose=verbose)
 
             return mtc
@@ -1415,8 +1419,7 @@ class CrabKnob(Knob):
             variant=self.variant,
         )
 
-    def match(self):
-        match_value = 190  # in urad used for the matching
+    def match(self, verbose=True, match_value=190):
         model = self.parent.model
         xt = model._xt
         ipn = f"ip{self.ip}"
@@ -1472,20 +1475,19 @@ class CrabKnob(Knob):
                     # print(f"Setting {wn} := {model.ref[wn]._expr};")
             # add offset in the knobs
             model[self.name] = match_value
-            # mtc.target_status()
-            mtc.vary_status()
             mtc.solve()
-            # mtc.target_status()
-            # mtc.vary_status()
+            if verbose:
+                match_compare_log(mtc)
         except Exception as ex:
-            mtc.vary_status()
-            print(f"Failed to match {self.name}")
+            if verbose:
+                print(f"Failed to match {self.name}")
             model.update_knob(self)
             raise (ex)
         model[self.name] = knob_start
         max_voltage = max([abs(model[wn]) for wn in self.get_weight_knob_names()])
         max_crabbing = 3.4 / max_voltage
-        print(f"Maximum crabbing angle achieved: {max_crabbing:.3f} urad")
+        if verbose:
+            print(f"Maximum crabbing angle achieved: {max_crabbing:.3f} urad")
         return mtc
 
     def get_crabbing_angle(self, voltage=3.4e6):

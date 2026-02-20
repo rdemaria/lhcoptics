@@ -498,7 +498,7 @@ class LHCOptics:
                     ret = True
         return ret
 
-    def check_params(self, verbose=True, tol=1e-9, fail=False):
+    def check_params(self, verbose=True, tol=5e-8, fail=False):
         ret = True
         rows = []
         tw1, tw2 = self.twiss(strengths=False, chrom=True)
@@ -862,13 +862,7 @@ class LHCOptics:
         )
         for irn in [1, 5]:
             for plane in "xy":
-                bet0 = f"bet{plane}0_ip{irn}"
-                if bet0 in self.model:
-                    params[f"r{plane}_ip{irn}"] = (
-                        self.model[bet0] / self.model[f"bet{plane}_ip{irn}"]
-                    )
-                else:
-                    params[f"r{plane}_ip{irn}"] = 1.0
+                params[f"r{plane}_ip{irn}"] = self.model.get(f"r{plane}_ip{irn}", 1)
 
         for var_name in var_names:
             if var_name in self.model:
@@ -937,22 +931,49 @@ class LHCOptics:
             or self.params.get("ry_ip5", 1) != 1
         )
 
-    def match_chroma(self, arcs="weak"):
+    def match(self, verbose=False):
         """
-        - match chroma weak
-        - regenerate knobs
+        Rematch the entire optics
         """
-        self.model.match_chroma(arcs=arcs, beam=1)
-        self.model.match_chroma(arcs=arcs, beam=2)
+        if not self.check_phase_params(verbose=verbose):
+            raise ValueError(
+                "Phase parameters do not sum up to the tunes, correct them first or set correct=True in check_phase_params()"
+            )
+        print("Match LHC optics")
+        for aa in self.arcs:
+            print(f"Match {aa.name.upper()}")
+            aa.match(verbose=verbose)
+        for ir in self.irs:
+            print(f"Match {ir.name.upper()}")
+            ir.match(verbose=verbose)
+
+        print("Match chroma")
+        self.model.match_chroma(arcs="weak", verbose=verbose)
+        print("Match w")
+        self.model.match_w(verbose=verbose)
+        print("Match chroma")
+        self.model.match_chroma(arcs="weak", verbose=verbose)
+        self.check_params(verbose=verbose)
+        self.match_knobs(verbose=verbose)
+        self.check()
+
+    def match_chroma(self, arcs="weak", verbose=False):
+        """
+        match chroma and regenerate knobs
+
+        arcs: weak, strong, all
+        """
+        self.model.match_chroma(arcs=arcs, beam=1, verbose=verbose, solve=True)
+        self.model.match_chroma(arcs=arcs, beam=2, verbose=verbose, solve=True)
         for knob in self.find_knobs(f"dqp.*"):
             self.model.update_knob(knob)
 
-    def match_knobs(self):
+    def match_knobs(self, verbose=True):
         result = {}
         for knob in self.find_knobs():
             if hasattr(knob, "match"):
                 try:
-                    knob.match()
+                    knob.match(verbose=verbose)
                     result[knob.name] = "matched"
                 except Exception as e:
                     print(f"Error matching knob {knob.name}: {e}")
@@ -1107,23 +1128,29 @@ class LHCOptics:
                 if not dryrun:
                     self.params[f"q{xy}b{beam}"] = qx if xy == "x" else qy
                     self.params[f"qp{xy}b{beam}"] = qp
-
-    def rematch(self, verbose=True):
-        """
-        Rematch the entire optics
-        """
-        if not self.check_phase_params(verbose=verbose):
-            raise ValueError(
-                "Phase parameters do not sum up to the tunes, correct them first or set correct=True in check_phase_params()"
-            )
-        for aa in self.arcs:
-            aa.match().solve()
-        for ir in self.irs:
-            ir.match().solve()
-
-        self.model.match_chroma(arcs="weak")
-        self.check_params(verbose=verbose)
-
+        ## round ATS factors is not straightforward because they are computed from the 
+        ## ratio of the beta functions at the IPs, so we need to compute them from the 
+        ## twiss and check that the values from beam 1 and beam 2 are consistent
+        ## also the value cannot be rounded as 1/3 is common 
+        # for xy in "xy":
+        #     for irn in [1, 5]:
+        #         rname = f"r{xy}_ip{irn}"
+        #         tw1 = self.twiss(1, strengths=False, chrom=False)
+        #         tw2 = self.twiss(2, strengths=False, chrom=False)
+        #         rr_ipb1 = self.irs[irn - 1][f"bet{xy}ip{irn}b1"] / np.round(
+        #             tw1[f"bet{xy}", f"ip{irn}"], 8
+        #         )
+        #         rr_ibb2 = self.irs[irn - 1][f"bet{xy}ip{irn}b2"] / np.round(
+        #             tw2[f"bet{xy}", f"ip{irn}"], 8
+        #         )
+        #         if abs(rr_ipb1 - rr_ibb2) > 0.00001:
+        #             raise ValueError(
+        #                 f"Cannot round r{xy}_ip{irn} to 1.0 because beam 1 and beam 2 values differ by more than 0.00001: {rr_ipb1} vs {rr_ibb2}"
+        #             )
+        #         if verbose:
+        #             print(f"Round {rname} from {self.params[rname]} to {rr_ipb1}")
+        #         if not dryrun:
+        #             self.params[rname] = rr_ipb1
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""
@@ -1271,7 +1298,16 @@ class LHCOptics:
             compute_chromatic_properties=chrom, strengths=strengths
         )
 
-    def update(self, src=None, verbose=False, full=True, add_params=True):
+    def update(
+        self,
+        src=None,
+        verbose=False,
+        full=True,
+        add_params=True,
+        knobs=True,
+        params=True,
+        strengths=True,
+    ):
         if isinstance(src, str) or isinstance(src, Path):
             src = self.from_json(src)
         if full:
@@ -1279,21 +1315,44 @@ class LHCOptics:
                 if verbose:
                     print(f"Update {self} from model")
                 for ss in self.irs + self.arcs:
-                    ss.update(src, verbose=verbose, add_params=add_params)
+                    ss.update(
+                        src,
+                        verbose=verbose,
+                        add_params=add_params,
+                        knobs=knobs,
+                        params=params,
+                        strengths=strengths,
+                    )
             else:
                 for ss in self.irs + self.arcs:
                     if hasattr(src, ss.name):
                         src_ss = getattr(src, ss.name)
                         if verbose:
                             print(f"Update {ss.name} from {src}.{ss.name}")
-                        ss.update(src=src_ss, verbose=verbose, add_params=add_params)
+                        ss.update(
+                            src=src_ss,
+                            verbose=verbose,
+                            add_params=add_params,
+                            knobs=knobs,
+                            params=params,
+                            strengths=strengths,
+                        )
                     elif ss.name in src:
                         src_ss = src[ss.name]
                         if verbose:
                             print(f"Update {ss.name} from {src}[{ss.name}]")
-                        ss.update(src=src_ss, verbose=verbose, add_params=add_params)
-        self.update_params(src, verbose=verbose, full=False, add=True)
-        self.update_knobs(src, verbose=verbose, full=False)
+                        ss.update(
+                            src=src_ss,
+                            verbose=verbose,
+                            add_params=add_params,
+                            knobs=knobs,
+                            params=params,
+                            strengths=strengths,
+                        )
+        if params:
+            self.update_params(src, verbose=verbose, full=False, add=True)
+        if knobs:
+            self.update_knobs(src, verbose=verbose, full=False)
         return self
 
     def update_knobs(self, src=None, full=True, verbose=False):

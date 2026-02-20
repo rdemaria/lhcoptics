@@ -283,6 +283,8 @@ class LHCArc(LHCSection):
             check_limits=False,
             strengths=False,
         )
+        if not verbose:
+            mtc._err.show_call_counter = False
         if solve:
             if verbose:
                 print(f"Matching phase of Arc {self.name}")
