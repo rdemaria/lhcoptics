@@ -699,7 +699,7 @@ class LHCIR(LHCSection):
                 k = f"mu{xy}{self.ipname}b{beam}"
                 if verbose and self.params[k] != self.params[k_l] + self.params[k_r]:
                     print(
-                        f"Adjust {k} from {self.params[k]} to {self.params[k_l] + self.params[k_r]} to be consistent with {k_l} + {k_r}"
+                        f"Adjust {k_r} from {self.params[k_r]} to {self.params[k] - self.params[k_l]} to be consistent with {k}"
                     )
                 if not dryrun:
                     self.params[k_r] = self.params[k] - self.params[k_l]

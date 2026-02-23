@@ -460,6 +460,8 @@ class IPKnob(Knob):
             strengths=False,
             compute_chromatic_properties=False,
         )
+        if not verbose:
+            mtc._err.show_call_counter = False
 
         mtc.disable(vary_name=self.const)
         if return_match:
@@ -669,13 +671,17 @@ class TuneKnob(Knob):
             targets=targets,
             strengths=False,
             compute_chromatic_properties=False,
+            verbose=verbose,
         )
+        if not verbose:
+            mtc._err.show_call_counter = False
         if solve:
             mtc.solve()
             if verbose:
                 match_compare_log(mtc)
         model[self.name] = knob_start
-        model.get_knob(self).diff(self)
+        if verbose:
+            model.get_knob(self).diff(self)
         return mtc
 
     def preset_weights(self):
@@ -833,7 +839,10 @@ class ChromaKnob(Knob):
             strengths=False,
             compute_chromatic_properties=True,
             n_steps_max=50,
+            verbose=verbose,
         )
+        if not verbose:
+            mtc._err.show_call_counter = False
         mtc.step(20)
         mtc.solve()
         if verbose:
@@ -843,7 +852,8 @@ class ChromaKnob(Knob):
         for wn in self.get_weight_knob_names():
             if self.weights[wn.split("_from_")[0]] != 0:
                 model.ref[wn] = model[wn]
-        model.get_knob(self).diff(self)
+        if verbose:
+            model.get_knob(self).diff(self)
         return mtc
 
     def preset_weights(self):
@@ -1032,7 +1042,10 @@ class CouplingKnob(Knob):
             targets=targets,
             check_limits=False,
             compute_chromatic_properties=False,
+            verbose=verbose,
         )
+        if not verbose:
+            mtc._err.show_call_counter = False
         for kk, val in weights.items():
             for vv in mtc.vary:
                 if vv.name.startswith(kk):
@@ -1168,7 +1181,6 @@ class DispKnob(Knob):
         self.parent.set_bumps(bumps, verbose=verbose)
         return True
 
-
     def copy(self):
         return IPKnob(
             name=self.name,
@@ -1202,7 +1214,7 @@ class DispKnob(Knob):
         initl, initr = [tw.get_twiss_init(ii) for ii in (self.ipl, self.ipr)]
         return initl, initr
 
-    def match(self,  verbose=True):
+    def match(self, verbose=True):
         """
         In general the problem is to find
 
@@ -1222,13 +1234,12 @@ class DispKnob(Knob):
 
         bumps = self.parent.get_bumps()
         self.parent.set_bumps_off()
-            
+
         model[self.ipknobname] = self.match_value
         model[self.name] = self.match_value
 
         model.update_knob(self)
         for beam in [1, 2]:
-
             initl, initr = self.get_inits(beam=beam)
 
             targets = [
@@ -1285,6 +1296,8 @@ class DispKnob(Knob):
                 strengths=False,
                 compute_chromatic_properties=False,
             )
+            if not verbose:
+                mtc._err.show_call_counter = False
 
             try:
                 mtc.solve()
@@ -1299,7 +1312,6 @@ class DispKnob(Knob):
             self.parent.set_bumps(bumps, verbose=verbose)
 
             return mtc
-
 
     def plot(self, value=None):
         model = self.parent.model
@@ -1456,6 +1468,8 @@ class CrabKnob(Knob):
             strengths=False,
             compute_chromatic_properties=False,
         )
+        if not verbose:
+            mtc._err.show_call_counter = False
 
         knob_start = model[self.name]
         try:

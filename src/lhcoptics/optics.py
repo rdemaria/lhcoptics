@@ -973,7 +973,10 @@ class LHCOptics:
         for knob in self.find_knobs():
             if hasattr(knob, "match"):
                 try:
+                    print(f"Match knob {knob.name}", end="")
                     knob.match(verbose=verbose)
+                    if not verbose:
+                         print(" - done")
                     result[knob.name] = "matched"
                 except Exception as e:
                     print(f"Error matching knob {knob.name}: {e}")
@@ -1151,6 +1154,36 @@ class LHCOptics:
         #             print(f"Round {rname} from {self.params[rname]} to {rr_ipb1}")
         #         if not dryrun:
         #             self.params[rname] = rr_ipb1
+
+    def set_ats_params(self, bet_cross, bet_sep=None, flat="hv", verbose=True):
+        """
+        Set the ATS parameters from the beta functions at the IPs.
+        """
+        if bet_sep is None:
+            bet_sep = bet_cross
+        if flat[0]=="h":
+            self.params["rx_ip1"] = self.ir1.params['betxip1b1'] / bet_cross
+            self.params["ry_ip1"] = self.ir1.params['betxip1b1'] / bet_sep
+        elif flat[0]=="v":
+            self.params["rx_ip1"] = self.ir1.params['betxip1b1'] / bet_sep
+            self.params["ry_ip1"] = self.ir1.params['betxip1b1'] / bet_cross
+        else:
+            raise ValueError("Flat an only be 'h' or 'v'")
+        if flat[1]=="v":
+            self.params["rx_ip5"] = self.ir5.params['betxip5b1'] / bet_sep
+            self.params["ry_ip5"] = self.ir5.params['betxip5b1'] / bet_cross
+        elif flat[1]=="h":
+            self.params["rx_ip5"] = self.ir5.params['betxip5b1'] / bet_cross
+            self.params["ry_ip5"] = self.ir5.params['betxip5b1'] / bet_sep
+        else:
+            raise ValueError("Flat an only be 'h' or 'v'")
+        if verbose:
+            print(
+                f"Set rx_ip1={self.params['rx_ip1']}, ry_ip1={self.params['ry_ip1']}, rx_ip5={self.params['rx_ip5']}, ry_ip5={self.params['ry_ip5']}"
+            )
+
+
+
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""
