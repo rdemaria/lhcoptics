@@ -1,9 +1,9 @@
 # Issues
 
 Fixes:
-- prepare lattice for tracking
-  - make full matching
-  - make thin optics
+- make thin optics
+- check cycle_v2 optics
+- make transition examples
 - check 50cm strengths margins
 - add dp_trim knobs
 - change rx_ip definition to have round numbers
