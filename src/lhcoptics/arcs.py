@@ -184,8 +184,10 @@ class LHCArc(LHCSection):
         }
         return params
 
-    def get_params(self, mode="from_twiss"):
+    def get_params(self, mode="from_twiss", verbose=False):
         """Get params from model"""
+        if verbose:
+            print(f"Getting parameters for Arc {self.name} using mode '{mode}'")    
         if mode.startswith("from_twiss"):
             tw1, tw2 = self.twiss(strengths=False)
             return self.get_params_from_twiss(tw1, tw2)
@@ -194,10 +196,12 @@ class LHCArc(LHCSection):
         else:
             raise ValueError("mode must start with 'from_twiss' or be 'from_variables'")
 
-    def get_params_from_variables(self, model=None):
+    def get_params_from_variables(self, model=None, verbose=False):
         """Get params from model variables"""
         if model is None:
             model = self.model
+        if verbose:
+            print(f"Getting parameters for Arc {self.name} from variables")
         params = {}
         for pr in ["a", "cell"]:
             for xy in "xy":

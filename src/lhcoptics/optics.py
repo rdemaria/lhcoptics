@@ -270,7 +270,7 @@ class LHCOptics:
         if circuits is not None:
             self.set_circuits(circuits)
         self.create_knobs(verbose=verbose)
-        self.set_params(mode=params_mode)
+        self.set_params(mode=params_mode, full=True)
         for k, knob in knobs.items():
             xsuite_model[k] = knob.value
         return self
@@ -779,10 +779,12 @@ class LHCOptics:
         }
         return out
 
-    def get_params(self, mode="from_twiss", full=False):
+    def get_params(self, mode="from_twiss", full=False, verbose=False):
         """
         Get the parameters from the optics and its sections.
         """
+        if verbose:
+            print(f"Getting parameters from mode {mode} with full={full}")
         if mode == "from_twiss":
             tw1 = self.model.b1.twiss(
                 compute_chromatic_properties=True, strengths=False
@@ -839,7 +841,7 @@ class LHCOptics:
                     )
         return params
 
-    def get_params_from_variables(self, full=False):
+    def get_params_from_variables(self, full=False, verbose=False):
         """
         Get the parameters from the model variables.
         """
@@ -868,8 +870,11 @@ class LHCOptics:
             if var_name in self.model:
                 params[var_name] = self.model[var_name]
         if full:
+            if verbose:
+                print("Getting parameters from variables:")
             for ss in self.irs + self.arcs:
-                pp = ss.get_params_from_variables()
+                pp = ss.get_params_from_variables(verbose=verbose)
+                print(len(pp))
                 params.update(pp)
         return params
 
@@ -1231,14 +1236,16 @@ class LHCOptics:
         self.update_model()
         return self
 
-    def set_params(self, full=True, mode="from_twiss_init"):
+    def set_params(self, full=True, mode="from_twiss_init", verbose=False):
         """
         Copy all parameters from get_params() into params
         """
-        self.params.update(self.get_params(mode=mode))
+        if verbose:
+            print(f"Setting parameters from mode {mode} with full={full}")
+        self.params.update(self.get_params(mode=mode, verbose=verbose))
         if full:
             for ss in self.irs + self.arcs:
-                ss.set_params(mode=mode)
+                ss.set_params(mode=mode, verbose=verbose)
         return self
 
     def set_xsuite_model(self, model, verbose=False):

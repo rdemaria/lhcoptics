@@ -249,7 +249,9 @@ class LHCIR(LHCSection):
                 )
         return params
 
-    def get_params_from_variables(self, model=None):
+    def get_params_from_variables(self, model=None, verbose=False):
+        if verbose:
+            print(f"Getting parameters for {self} from variables")
         if model is None:
             model = self.parent.model
 
@@ -267,7 +269,9 @@ class LHCIR(LHCSection):
                         params[ppname] = model[ppname]
         return params
 
-    def get_params(self, mode="from_twiss_init"):
+    def get_params(self, mode="from_twiss_init", verbose=False):
+        if verbose:
+            print(f"Getting parameters for {self} using mode '{mode}'")
         if mode == "from_twiss_init":
             tw1 = self.twiss_from_init(1, strengths=False)
             tw2 = self.twiss_from_init(2, strengths=False)

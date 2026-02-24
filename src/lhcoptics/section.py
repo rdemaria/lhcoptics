@@ -257,8 +257,10 @@ class LHCSection:
         """
         Copy all parameters from get_params() to self.params
         """
-        src=self.get_params(mode=mode)
-        self.update_params(src,verbose=verbose)
+        src=self.get_params(mode=mode, verbose=verbose)
+        if verbose:
+            print(f"Setting parameters from mode {mode} with full=True")
+        self.params.update(src)
         return self
 
     def set_bumps_off(self):
@@ -458,7 +460,6 @@ class LHCSection:
                                 f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}"
                             )
                     self.params[k] = src[k]
-
         else:
             for k in self.params:
                 if k in src and filter(k):
