@@ -207,10 +207,11 @@ class LHCArc(LHCSection):
             for xy in "xy":
                 for beam in [1, 2]:
                     key = f"mu{xy}{pr}{self.name[1:]}b{beam}"
-                    if self.parent.variant.startswith("hl"):
-                        key2 = key.replace("a", "")
-                    else:
+                    if key in model:
                         key2 = key
+                    # fall back in case of old HL optics
+                    elif self.parent.variant.startswith("hl"):
+                        key2 = key.replace("a", "")
                     params[key] = model[key2]
         return params
 

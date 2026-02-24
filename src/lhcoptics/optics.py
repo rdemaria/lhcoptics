@@ -946,11 +946,13 @@ class LHCOptics:
             )
         print("Match LHC optics")
         for aa in self.arcs:
-            print(f"Match {aa.name.upper()}")
+            print(f"Match {aa.name.upper()}", end="")
             aa.match(verbose=verbose)
+            print(" - done")
         for ir in self.irs:
-            print(f"Match {ir.name.upper()}")
+            print(f"Match {ir.name.upper()}", end="")
             ir.match(verbose=verbose)
+            print(" - done")
 
         print("Match chroma")
         self.model.match_chroma(arcs="weak", verbose=verbose)

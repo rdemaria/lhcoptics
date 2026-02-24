@@ -900,6 +900,7 @@ class LHCXsuiteModel:
             targets=targets,
             strengths=False,
             compute_chromatic_properties=True,
+            verbose=verbose,
         )
         if not verbose:
             mtc._err.show_call_counter = False
