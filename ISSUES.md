@@ -17,6 +17,7 @@ Fixes:
 - check web site generation
 
 Features:
+- Make sure to use model.create_knob (that deletes and recreate the knob) before matching in all knobs
 - replace LHC with LHCDev and update gitlab actions
 - introduce multi i/k power converter for triplets
 - match IR1/IR5 ats phase

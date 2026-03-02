@@ -945,14 +945,8 @@ class LHCOptics:
                 "Phase parameters do not sum up to the tunes, correct them first or set correct=True in check_phase_params()"
             )
         print("Match LHC optics")
-        for aa in self.arcs:
-            print(f"Match {aa.name.upper()}", end="")
-            aa.match(verbose=verbose)
-            print(" - done")
-        for ir in self.irs:
-            print(f"Match {ir.name.upper()}", end="")
-            ir.match(verbose=verbose)
-            print(" - done")
+        self.match_arcs(verbose=verbose)
+        self.match_irs(verbose=verbose)
 
         print("Match chroma")
         self.model.match_chroma(arcs="weak", verbose=verbose)
@@ -964,18 +958,40 @@ class LHCOptics:
         self.match_knobs(verbose=verbose)
         self.check()
 
-    def match_chroma(self, arcs="weak", verbose=False):
+    def match_arcs(self, verbose=False):
         """
-        match chroma and regenerate knobs
+        match the arcs and regenerate knobs
+        """
+        for arc in self.arcs:
+            tar0=arc.get_match()
+            print(f"Match {arc.name.upper()} {tar0:.3e}", end="")
+            arc.match(verbose=verbose)
+            tar1=arc.get_match()
+            print(f" -> {tar1:.3e} - done")
+
+    def match_irs(self, verbose=False):
+        """
+        match the IRs and regenerate knobs
+        """
+        for ir in self.irs:
+            tar0=ir.get_match()
+            print(f"Match {ir.name.upper()} {tar0:.3e}", end="")
+            ir.match(verbose=verbose)
+            tar1=ir.get_match()
+            print(f" -> {tar1:.3e} - done")
+
+    def match_chroma(self, arcs="weak", verbose=True):
+        """
+        match chroma, destroy all the knobs
 
         arcs: weak, strong, all
         """
         self.model.match_chroma(arcs=arcs, beam=1, verbose=verbose, solve=True)
         self.model.match_chroma(arcs=arcs, beam=2, verbose=verbose, solve=True)
-        for knob in self.find_knobs(f"dqp.*"):
-            self.model.update_knob(knob)
+        #for knob in self.find_knobs(f"dqp.*"):
+        #    self.model.create_knob(knob)
 
-    def match_knobs(self, verbose=True):
+    def match_knobs(self, verbose=False):
         result = {}
         for knob in self.find_knobs():
             if hasattr(knob, "match"):

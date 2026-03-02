@@ -195,7 +195,6 @@ class LHCXsuiteModel:
         self.env.b1.particle_ref.p0c = value
         self.env.b2.particle_ref.p0c = value
 
-
     def get_cmin(self, beam=None, pos="ip1"):
         """Compute the c-minus at a given position."""
         if beam is None:
@@ -203,7 +202,7 @@ class LHCXsuiteModel:
                 self.get_cmin(beam=1, pos=pos),
                 self.get_cmin(beam=2, pos=pos),
             ]
-        line = self.model.sequence[beam]
+        line = self.sequence[beam]
         if line.element_names[0] != pos:
             line.cycle(pos, inplace=True)
         tw = line.twiss(compute_chromatic_properties=False, strengths=True)
@@ -831,12 +830,18 @@ class LHCXsuiteModel:
         dwy5 = (wyip5r - wyip5l) / 2
         return dwx1, dwy1, dwx5, dwy5
 
-    def match_w(self, beam=1, target="triplet", k2max=0.42, verbose=False):
+    def match_w(self, beam=None, target="triplet", k2max=0.42, verbose=True):
         """
         Docstring for match_w
 
         K2max=1.280/0.017^2/23348.89927*2*600/550; !=0.4138703096
         """
+
+        if beam is None:
+            return [
+                self.match_w(beam=1, target=target, k2max=k2max, verbose=verbose),
+                self.match_w(beam=2, target=target, k2max=k2max, verbose=verbose),
+            ]
 
         line = getattr(self, f"b{beam}")
         if beam == 1:
@@ -900,7 +905,7 @@ class LHCXsuiteModel:
             targets=targets,
             strengths=False,
             compute_chromatic_properties=True,
-            verbose=verbose,
+            verbose=False,
         )
         if not verbose:
             mtc._err.show_call_counter = False
@@ -912,7 +917,9 @@ class LHCXsuiteModel:
             match_compare_log(mtc)
         return mtc
 
-    def match_chroma(self, beam=None, dqx=0, dqy=0, arcs="weak", solve=True, verbose=False):
+    def match_chroma(
+        self, beam=None, dqx=0, dqy=0, arcs="weak", solve=True, verbose=True
+    ):
         """
         Match the chromaticity of the optics.
 
@@ -920,7 +927,9 @@ class LHCXsuiteModel:
         """
         if beam is None:
             for beam in [1, 2]:
-                self.match_chroma(beam, dqx, dqy, arcs, solve=solve)
+                self.match_chroma(
+                    beam=beam, dqx=dqx, dqy=dqy, arcs=arcs, solve=solve, verbose=verbose
+                )
         else:
             model = self
             beam = f"b{beam}"
@@ -946,7 +955,7 @@ class LHCXsuiteModel:
                 strengths=False,
                 compute_chromatic_properties=True,
                 n_steps_max=50,
-                verbose=verbose,
+                verbose=False,
             )
             if not verbose:
                 mtc._err.show_call_counter = False

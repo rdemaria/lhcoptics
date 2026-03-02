@@ -1,6 +1,7 @@
 import json
 import re
 
+import numpy as np
 import matplotlib.pyplot as plt
 
 
@@ -158,11 +159,16 @@ class LHCSection:
             return self.parent.circuits
 
     def check_match(self, verbose=True):
-        opt = self.match(verbose=False)
-        opt._err(None, check_limits=False)
+        mtc = self.match(verbose=False)
+        mtc._err(None, check_limits=False)
         if verbose:
-            opt.target_status()
-        return opt._err.last_point_within_tol
+            mtc.vary_status()
+            mtc.target_status()
+        return mtc._err.last_point_within_tol
+
+    def get_match(self):
+        mtc = self.match(verbose=False)
+        return np.sqrt(mtc._err(None, check_limits=False,return_scalar=True))
 
     def get_param_mismatches(self, tol=1e-6, params=None):
         if params is None:

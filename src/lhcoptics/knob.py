@@ -630,7 +630,7 @@ class TuneKnob(Knob):
             variant=self.variant,
         )
 
-    def match(self, solve=True, verbose=True):
+    def match(self, solve=True, verbose=True, fail=True):
         model = self.parent.model
 
         if len(self.weights) == 0:
@@ -652,6 +652,9 @@ class TuneKnob(Knob):
         else:
             dq = {"x": 0, "y": self.match_value}
 
+        if verbose:
+            print(f"Updating model with knob {self.name!r} definition before matching")
+        model.create_knob(self, set_value=False, verbose=False)
         # find baseline
         model[self.name] = 0
         tw = line.twiss(strengths=False, compute_chromatic_properties=False)
@@ -671,12 +674,19 @@ class TuneKnob(Knob):
             targets=targets,
             strengths=False,
             compute_chromatic_properties=False,
-            verbose=verbose,
+            verbose=False,
         )
         if not verbose:
             mtc._err.show_call_counter = False
         if solve:
-            mtc.solve()
+            try:
+                mtc.solve()
+            except Exception as ex:
+                print(f"Failed to match {self.name}")
+                model[self.name] = knob_start
+                model.update_knob(self)
+                if fail:
+                    raise (ex)
             if verbose:
                 match_compare_log(mtc)
         model[self.name] = knob_start
@@ -793,12 +803,13 @@ class ChromaKnob(Knob):
                 variant=knob.variant,
             )
 
-    def match(self, verbose=True):
+    def match(self, verbose=True, fail=True, solve=True):
         if len(self.weights) == 0:
             if verbose:
                 print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
-            self.parent.model.create_knob(self)
+
+        self.parent.model.create_knob(self)
 
         model = self.parent.model
         xt = model._xt
@@ -818,6 +829,10 @@ class ChromaKnob(Knob):
             dq = {"x": self.match_value, "y": 0}
         else:
             dq = {"x": 0, "y": self.match_value}
+
+        if verbose:
+            print(f"Updating model with knob {self.name!r} definition before matching")
+        model.create_knob(self, set_value=False, verbose=False)
 
         # find baseline
         model[self.name] = 0
@@ -843,14 +858,23 @@ class ChromaKnob(Knob):
         )
         if not verbose:
             mtc._err.show_call_counter = False
-        mtc.step(20)
-        mtc.solve()
-        if verbose:
-            match_compare_log(mtc)
+        if solve:
+            try:
+                mtc.step(20)
+                mtc.solve()
+            except Exception as ex:
+                print(f"Failed to match {self.name}")
+                model[self.name] = knob_start
+                model.update_knob(self)
+                if fail:
+                    raise (ex)
+            if verbose:
+                match_compare_log(mtc)
         model[self.name] = knob_start
         # reset weights
         for wn in self.get_weight_knob_names():
             if self.weights[wn.split("_from_")[0]] != 0:
+                # print("resetting", model.ref[wn])
                 model.ref[wn] = model[wn]
         if verbose:
             model.get_knob(self).diff(self)
@@ -940,7 +964,7 @@ class CouplingKnob(Knob):
             variant=self.variant,
         )
 
-    def check(self, threshold=1e-3, test_value=0.0001, verbose=False):
+    def check(self, threshold=1e-3, test_value=0.0001, verbose=True):
         if verbose:
             print(f"Checking knob {self.name!r}")
         model = self.parent.model
@@ -954,22 +978,15 @@ class CouplingKnob(Knob):
             expected = (test_value, 0)
         else:
             expected = (0, test_value)
-        msg = []
-        if abs(delta[0] - expected[0]) > threshold:
-            msg.append(
-                f"Error: cmin_re = {new_cmin[0]:23.15g}, delta = {delta[0]:23.15g} != {expected[0]:23.15g}"
-            )
-        if abs(delta[1] - expected[1]) > threshold:
-            msg.append(
-                f"Error: cmin_im = {new_cmin[1]:23.15g}, delta = {delta[1]:23.15g} != {expected[1]:23.15g}"
-            )
-        model[self.name] = old_value
-        if len(msg) > 0:
-            if verbose:
-                print("\n".join(msg))
-            return False
-        else:
-            return True
+        if verbose:
+            print(f"        {'value':<23} {'expected':<23} {'delta':<23}")
+            print(f"cmin_re {new_cmin[0]:23.15g} {expected[0]:23.15g} {delta[0]:23.15g}")
+            print(f"cmin_im {new_cmin[1]:23.15g} {expected[1]:23.15g} {delta[1]:23.15g}")
+        res = (
+            (abs(delta[0] - expected[0]) < threshold)
+            and (abs(delta[1] - expected[1]) < threshold)
+        )
+        return bool(res)
 
     @classmethod
     def specialize(cls, knob):
