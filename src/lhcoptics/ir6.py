@@ -122,8 +122,8 @@ class LHCIR6(LHCIR):
             params[f"dmuxkickb1_tcdq{abc}"] = dmuxb1[i]
         params["dmuxkickb1"] = abs(dmuxb1 - 0.25).max()
 
-        params["dxq5l6b1"] = tw1["dx", "mqy.5l6.b1"]
-        params["dxq4r6b1"] = tw1["dx", "mqy.4r6.b1"]
+        params["dxq5l6b1"] = tw1["dx", "bpmya.5l6.b1"] # "mqy.5l6.b1"
+        params["dxq4r6b1"] = tw1["dx", "bpmya.4r6.b1"] # "mqy.4r6.b1"
         params["dxtcdqb1"] = tw1["dx", "tcdqa.a4r6.b1"]
         params["betxtcdqb1"] = tw1["betx", "tcdqa.a4r6.b1"]
         params["betytcdqb1"] = tw1["bety", "tcdqa.a4r6.b1"]
@@ -151,8 +151,8 @@ class LHCIR6(LHCIR):
             params[f"dmuxkickb2_tcdq{abc}"] = dmuxb2[i]
         params["dmuxkickb2"] = abs(dmuxb2 - 0.25).max()
 
-        params["dxq5r6b2"] = tw2["dx", "mqy.5r6.b2"]
-        params["dxq4l6b2"] = tw2["dx", "mqy.4l6.b2"]
+        params["dxq5r6b2"] = tw2["dx", "bpmya.5r6.b2"] # "mqy.5r6.b2"
+        params["dxq4l6b2"] = tw2["dx", "bpmya.4l6.b2"] # "mqy.4l6.b2"
         params["dxtcdqb2"] = tw2["dx", "tcdqa.a4l6.b2"]
         params["betxtcdqb2"] = tw2["betx", "tcdqa.a4l6.b2"]
         params["betytcdqb2"] = tw2["bety", "tcdqa.a4l6.b2"]
