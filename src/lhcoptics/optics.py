@@ -976,7 +976,7 @@ class LHCOptics:
         """
         match the IRs and regenerate knobs
         """
-        for ir in self.irs:
+        for ir in self.ir1, self.ir5, self.ir2, self.ir8, self.ir4, self.ir6, self.ir3, self.ir7:
             tar0=ir.get_match()
             print(f"Match {ir.name.upper()} {tar0:.3e}", end="")
             ir.match(verbose=verbose)
@@ -1008,6 +1008,10 @@ class LHCOptics:
                     print(f"Error matching knob {knob.name}: {e}")
                     result[knob.name] = e
         return result
+
+    def match_optics(self, verbose=False):
+        self.match_arcs(verbose=verbose)
+        self.match_irs(verbose=verbose)
 
     def match_phase_arcs(self, newphases):
         for arc in self.arcs:

@@ -15,7 +15,7 @@ class LHCIR4(LHCIR):
         for kk in "mux muy".split():
             vva = twa[kk, "ip5"] - twa[kk][0]
             vvb = twb[kk, "ip5"] - twb[kk][0]
-            print(f"{kk:5} at ip1: {vva:9.6f} {vvb:9.6f}")
+            print(f"{kk:5} at ip5: {vva:9.6f} {vvb:9.6f}")
 
     def get_mux_ats(self, beam):
         line = self.model.sequence[beam]
@@ -66,7 +66,7 @@ class LHCIR4(LHCIR):
         tw = line.twiss(
             init=self.init_left[beam],
             start=self.init_left[beam].element_name,
-            end="ip1",
+            end="ip5",
         )
         return tw
 
