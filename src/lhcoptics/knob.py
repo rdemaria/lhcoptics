@@ -989,6 +989,7 @@ class CouplingKnob(Knob):
         res = (abs(delta[0] - expected[0]) < threshold) and (
             abs(delta[1] - expected[1]) < threshold
         )
+        model[self.name] = old_value
         return bool(res)
 
     @classmethod
@@ -1018,13 +1019,14 @@ class CouplingKnob(Knob):
             if verbose:
                 print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
-            self.parent.model.create_knob(self)
+
 
         model = self.parent.model
         xt = model._xt
 
         line = getattr(model, self.beam)
         # line.cycle("ip7", inplace=True)
+        model.create_knob(self)
 
         kqsa = [
             f"{wm}_from_{self.name}"
