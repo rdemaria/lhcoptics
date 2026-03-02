@@ -818,11 +818,7 @@ class LHCIR(LHCSection):
                 kl = f"{k}_l"
                 kr = f"{k}_r"
                 if verbose:
-                    print(
-                        f"Set {kl} from {self.params[kl]} to {params[kl]}"
-                    )
-                    print(
-                        f"Set {kr} from {self.params[kr]} to {params[kr]}"
-                    )
+                    print(f"Set {kl} from {self.params[kl]} to {params[kl]}")
+                    print(f"Set {kr} from {self.params[kr]} to {params[kr]}")
                 self.params[kl] = params[kl]
                 self.params[kr] = params[kr]

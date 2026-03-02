@@ -168,7 +168,7 @@ class LHCSection:
 
     def get_match(self):
         mtc = self.match(verbose=False)
-        return np.sqrt(mtc._err(None, check_limits=False,return_scalar=True))
+        return np.sqrt(mtc._err(None, check_limits=False, return_scalar=True))
 
     def get_param_mismatches(self, tol=1e-6, params=None):
         if params is None:
@@ -263,7 +263,7 @@ class LHCSection:
         """
         Copy all parameters from get_params() to self.params
         """
-        src=self.get_params(mode=mode, verbose=verbose)
+        src = self.get_params(mode=mode, verbose=verbose)
         if verbose:
             print(f"Setting parameters from mode {mode} with full=True")
         self.params.update(src)

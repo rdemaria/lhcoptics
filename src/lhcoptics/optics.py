@@ -948,12 +948,15 @@ class LHCOptics:
         self.match_arcs(verbose=verbose)
         self.match_irs(verbose=verbose)
 
-        print("Match chroma")
-        self.model.match_chroma(arcs="weak", verbose=verbose)
-        print("Match w")
-        self.model.match_w(verbose=verbose)
-        print("Match chroma")
-        self.model.match_chroma(arcs="weak", verbose=verbose)
+        for beam in [1, 2]:
+            print(f"Match chroma weak Beam {beam}")
+            self.model.match_chroma(arcs="weak", verbose=verbose, beam=beam)
+        for beam in [1, 2]:
+            print(f"Match W Beam {beam}")
+            self.model.match_w(verbose=verbose, beam=beam)
+        for beam in [1, 2]:
+            print(f"Match chroma weak Beam {beam}")
+            self.model.match_chroma(arcs="weak", verbose=verbose, beam=beam)
         self.check_params(verbose=verbose)
         self.match_knobs(verbose=verbose)
         self.check()

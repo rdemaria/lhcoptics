@@ -15,9 +15,7 @@ def tcdq_mingap(bet, dx):
     dpoverp = 2e-4
     emitx = 2.5e-6 / (7000 / 0.9382720814)
     maxorbitdrift = 0.6e-3
-    return (
-        nsig * np.sqrt(emitx * bet) - 3e-4 - abs(dx * dpoverp) - maxorbitdrift
-    )
+    return nsig * np.sqrt(emitx * bet) - 3e-4 - abs(dx * dpoverp) - maxorbitdrift
 
 
 def tcdq_gap(bet):
@@ -28,18 +26,13 @@ def tcdq_gap(bet):
 
 def dmuxkickb1(tw1):
     muxmkdb1 = tw1["mux", "mkd.h5l6.b1"]
-    dmuxb1 = (
-        np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"])
-        - muxmkdb1
-    )
+    dmuxb1 = np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"]) - muxmkdb1
     return abs(dmuxb1 - 0.25).max()
 
 
 def dmuxkickb2(tw2):
     muxmkdb2 = tw2["mux", "mkd.h5r6.b2"]
-    dmuxb2 = muxmkdb2 - np.array(
-        [tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"]
-    )
+    dmuxb2 = muxmkdb2 - np.array([tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"])
     return abs(dmuxb2 - 0.25).max()
 
 
@@ -123,8 +116,7 @@ class LHCIR6(LHCIR):
         muxmkdb1 = tw1["mux", "mkd.h5l6.b1"]
         params["dmuxkickb1_tcsg"] = tw1["mux", "tcsp.a4r6.b1"] - muxmkdb1
         dmuxb1 = (
-            np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"])
-            - muxmkdb1
+            np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"]) - muxmkdb1
         )
         for i, abc in enumerate("abc"):
             params[f"dmuxkickb1_tcdq{abc}"] = dmuxb1[i]
@@ -141,21 +133,13 @@ class LHCIR6(LHCIR):
         params["betytcsgb1"] = tw1["bety", "tcsp.a4r6.b1"]
         params["betxmkdb1"] = tw1["betx", "mkd.h5l6.b1"]
         params["betymkdb1"] = tw1["bety", "mkd.h5l6.b1"]
-        params["bxdumpb1"] = beta_dump(
-            params["betxip6b1"], params["alfxip6b1"]
-        )
-        params["bydumpb1"] = beta_dump(
-            params["betyip6b1"], params["alfyip6b1"]
-        )
+        params["bxdumpb1"] = beta_dump(params["betxip6b1"], params["alfxip6b1"])
+        params["bydumpb1"] = beta_dump(params["betyip6b1"], params["alfyip6b1"])
 
         params["dmuxkickb1_bds"] = tw1["mux", "mkd.o5l6.b1"]
         params["dmuxkickb1_bdsa"] = tw1["mux", "mkd.a5l6.b1"]
-        params["dmuxkickb1_eds"] = (
-            tw1["mux", "e.ds.r6.b1"] - tw1["mux", "mkd.o5l6.b1"]
-        )
-        params["tcdqmingapb1"] = tcdq_mingap(
-            params["betxtcdqb1"], params["dxtcdqb1"]
-        )
+        params["dmuxkickb1_eds"] = tw1["mux", "e.ds.r6.b1"] - tw1["mux", "mkd.o5l6.b1"]
+        params["tcdqmingapb1"] = tcdq_mingap(params["betxtcdqb1"], params["dxtcdqb1"])
         params["tcdqgapb1"] = tcdq_gap(params["betxtcdqb1"])
 
         muxmkdb2 = tw2["mux", "mkd.h5r6.b2"]
@@ -178,21 +162,13 @@ class LHCIR6(LHCIR):
         params["betytcsgb2"] = tw2["bety", "tcsp.a4l6.b2"]
         params["betxmkdb2"] = tw2["betx", "mkd.h5r6.b2"]
         params["betymkdb2"] = tw2["bety", "mkd.h5r6.b2"]
-        params["bxdumpb2"] = beta_dump(
-            params["betxip6b2"], params["alfxip6b2"]
-        )
-        params["bydumpb2"] = beta_dump(
-            params["betyip6b2"], params["alfyip6b2"]
-        )
+        params["bxdumpb2"] = beta_dump(params["betxip6b2"], params["alfxip6b2"])
+        params["bydumpb2"] = beta_dump(params["betyip6b2"], params["alfyip6b2"])
 
         params["dmuxkickb2_bds"] = tw2["mux", "mkd.o5r6.b2"]
         params["dmuxkickb2_bdsa"] = tw2["mux", "mkd.a5r6.b2"]
-        params["dmuxkickb2_eds"] = (
-            tw2["mux", "e.ds.r6.b2"] - tw2["mux", "mkd.o5r6.b2"]
-        )
-        params["tcdqmingapb2"] = tcdq_mingap(
-            params["betxtcdqb2"], params["dxtcdqb2"]
-        )
+        params["dmuxkickb2_eds"] = tw2["mux", "e.ds.r6.b2"] - tw2["mux", "mkd.o5r6.b2"]
+        params["tcdqmingapb2"] = tcdq_mingap(params["betxtcdqb2"], params["dxtcdqb2"])
         params["tcdqgapb2"] = tcdq_gap(params["betxtcdqb2"])
         return params
 

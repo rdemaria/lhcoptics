@@ -200,13 +200,13 @@ class LHCIR7(LHCIR):
         if not verbose:
             opt._err.show_call_counter = False
         if solve:
-          try:
-            opt.solve()
-            self.update_params_lrphase(verbose=verbose)
-            if verbose:
-                match_compare_log(opt)
-          except Exception as e:
-              print(f"Matching failed for {self.name} with error: {e}")
-              if fail:
-                 raise ValueError(f"Matching failed for {self.name} with error: {e}")
+            try:
+                opt.solve()
+                self.update_params_lrphase(verbose=verbose)
+                if verbose:
+                    match_compare_log(opt)
+            except Exception as e:
+                print(f"Matching failed for {self.name} with error: {e}")
+                if fail:
+                    raise ValueError(f"Matching failed for {self.name} with error: {e}")
         return opt

@@ -935,7 +935,7 @@ class LHCXsuiteModel:
             beam = f"b{beam}"
             line = getattr(model, beam)
             for fd in "fd":
-                for ks in self.search(f"ks{fd}[12]\\.a..{beam}"):
+                for ks in self.search(f"ks{fd}[12]\\.a..{beam}$"):
                     model.ref[ks] = model[ks]  # reset otherwise error in knobs
                     if arcs == "weak":
                         if "a81" in ks or "a12" in ks or "a45" in ks or "a56" in ks:

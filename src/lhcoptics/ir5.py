@@ -17,8 +17,7 @@ class LHCIR5(LHCIR):
     ]
 
     def has_ats_phase(self):
-        return self.params['betxip5b1']<=2.5
-
+        return self.params["betxip5b1"] <= 2.5
 
     # def get_mux_left(self, beam):
     #     line = self.model.sequence[beam]
@@ -74,8 +73,3 @@ class LHCIR5(LHCIR):
     #     init.mux -= mux
     #     init.muy -= muy
     #     return init
-
-
-        
-
-

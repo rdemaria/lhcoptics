@@ -809,12 +809,13 @@ class ChromaKnob(Knob):
                 print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
 
-        self.parent.model.create_knob(self)
-
         model = self.parent.model
         xt = model._xt
+
         knob_start = model[self.name]
         line = getattr(model, self.beam)
+
+        model.create_knob(self, set_value=False, verbose=verbose)
         for wn in self.get_weight_knob_names():
             if self.weights[wn.split("_from_")[0]] != 0:
                 family = re.match(r"ks([fd]).*", wn).group(1)
@@ -832,7 +833,6 @@ class ChromaKnob(Knob):
 
         if verbose:
             print(f"Updating model with knob {self.name!r} definition before matching")
-        model.create_knob(self, set_value=False, verbose=False)
 
         # find baseline
         model[self.name] = 0
@@ -854,7 +854,7 @@ class ChromaKnob(Knob):
             strengths=False,
             compute_chromatic_properties=True,
             n_steps_max=50,
-            verbose=verbose,
+            verbose=False,
         )
         if not verbose:
             mtc._err.show_call_counter = False
@@ -870,14 +870,14 @@ class ChromaKnob(Knob):
                     raise (ex)
             if verbose:
                 match_compare_log(mtc)
-        model[self.name] = knob_start
-        # reset weights
-        for wn in self.get_weight_knob_names():
-            if self.weights[wn.split("_from_")[0]] != 0:
-                # print("resetting", model.ref[wn])
-                model.ref[wn] = model[wn]
-        if verbose:
-            model.get_knob(self).diff(self)
+            model[self.name] = knob_start
+            # reset weights
+            for wn in self.get_weight_knob_names():
+                if self.weights[wn.split("_from_")[0]] != 0:
+                    # print("resetting", model.ref[wn])
+                    model.ref[wn] = model[wn]
+            if verbose:
+                model.get_knob(self).diff(self)
         return mtc
 
     def preset_weights(self):
@@ -980,11 +980,14 @@ class CouplingKnob(Knob):
             expected = (0, test_value)
         if verbose:
             print(f"        {'value':<23} {'expected':<23} {'delta':<23}")
-            print(f"cmin_re {new_cmin[0]:23.15g} {expected[0]:23.15g} {delta[0]:23.15g}")
-            print(f"cmin_im {new_cmin[1]:23.15g} {expected[1]:23.15g} {delta[1]:23.15g}")
-        res = (
-            (abs(delta[0] - expected[0]) < threshold)
-            and (abs(delta[1] - expected[1]) < threshold)
+            print(
+                f"cmin_re {new_cmin[0]:23.15g} {expected[0]:23.15g} {delta[0]:23.15g}"
+            )
+            print(
+                f"cmin_im {new_cmin[1]:23.15g} {expected[1]:23.15g} {delta[1]:23.15g}"
+            )
+        res = (abs(delta[0] - expected[0]) < threshold) and (
+            abs(delta[1] - expected[1]) < threshold
         )
         return bool(res)
 
