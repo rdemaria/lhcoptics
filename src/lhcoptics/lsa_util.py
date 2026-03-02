@@ -1,5 +1,7 @@
 import re
 
+from .nxcals_util import get_spark
+
 _lsa = None
 
 
