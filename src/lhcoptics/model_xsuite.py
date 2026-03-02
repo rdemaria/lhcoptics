@@ -84,9 +84,6 @@ class LHCXsuiteModel:
         self.mgr = env._xdeps_manager
         self.madxfile = madxfile
         self.sequence = {1: env.b1, 2: env.b2}
-        for ss in self.sequence.values():
-            if ss.tracker is None:
-                ss.build_tracker()
         self._aperture = None
 
     @classmethod
@@ -683,7 +680,6 @@ class LHCXsuiteModel:
         if beam is None:
             return [self.get_survey_flat(beam=1), self.get_survey_flat(beam=2)]
         line = self.sequence[beam].copy()
-        line.build_tracker()
         for name, elem in line.element_dict.items():
             if name.startswith("mb."):
                 elem.h = 0

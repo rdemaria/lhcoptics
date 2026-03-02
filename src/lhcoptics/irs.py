@@ -476,10 +476,6 @@ class LHCIR(LHCSection):
         if len(self.params) == 0:
             self.set_params()
         lhc = self.parent.model.env
-        if lhc.b1.tracker is None:
-            lhc.b1.build_tracker()
-        if lhc.b2.tracker is None:
-            lhc.b2.build_tracker()
 
         if dkmin is None:
             dkmin = self.parent.params.get("match_dkmin", 0.01)

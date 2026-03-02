@@ -159,7 +159,7 @@ class LHCSection:
             return self.parent.circuits
 
     def check_match(self, verbose=True):
-        mtc = self.match(verbose=False)
+        mtc = self.match(verbose=False, solve=False)
         mtc._err(None, check_limits=False)
         if verbose:
             mtc.vary_status()
@@ -167,7 +167,7 @@ class LHCSection:
         return mtc._err.last_point_within_tol
 
     def get_match(self):
-        mtc = self.match(verbose=False)
+        mtc = self.match(verbose=False, solve=False)
         return np.sqrt(mtc._err(None, check_limits=False, return_scalar=True))
 
     def get_param_mismatches(self, tol=1e-6, params=None):
