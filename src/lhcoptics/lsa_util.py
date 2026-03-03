@@ -1,5 +1,7 @@
 import re
 
+from .nxcals_util import get_spark
+
 _lsa = None
 
 
@@ -12,7 +14,6 @@ def get_lsa():
     return _lsa
 
 
-
 class LHCRun:
     def __init__(self, year):
         self.year = year
@@ -21,7 +22,7 @@ class LHCRun:
         # self.set_fills()
 
     def set_fills(self):
-        lsa=get_lsa()
+        lsa = get_lsa()
         self.fills = {}
         fills = lsa.findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
         for filln, bp_list in fills.items():
@@ -53,6 +54,7 @@ class LHCRun:
     def __repr__(self):
         return f"LHCRun({self.year})"
 
+
 class LHCFill:
     def __init__(self, filln, beam_processes):
         self.filln = filln
@@ -82,12 +84,13 @@ class LHCFill:
     def __repr__(self):
         return f"LHCFill({self.filln})"
 
+
 class LHCBeamProcess:
     def __init__(self, name):
         self.name = name
 
     def get_optic_table(self):
-        lsa=get_lsa()
+        lsa = get_lsa()
         return lsa.getOpticTable(self.name)
 
     def save_models(self, knobs, model_path):
@@ -96,7 +99,7 @@ class LHCBeamProcess:
         modelseq.save_models(knobs, model_path)
 
     def get_modelseq(self, settings, presettings=None):
-        lsa=get_lsa()
+        lsa = get_lsa()
         optable = lsa.getOpticTable(self.name)
 
         models = []
@@ -104,7 +107,6 @@ class LHCBeamProcess:
         for op in optable:
             models.append(op.name)
             index.append(op.time)
-
 
         trims = {}
         for pp in settings:
@@ -116,14 +118,14 @@ class LHCBeamProcess:
 
         for pp, trim in trims.items():
             indexes, values = trim.data
-            #modelseq.apply_trim(pp, indexes, values)
+            # modelseq.apply_trim(pp, indexes, values)
 
-        #self.modelseq = modelseq
+        # self.modelseq = modelseq
 
-        #return modelseq
+        # return modelseq
 
     def get_trims(self, params, lhcrun=None):
-        lsa=get_lsa()
+        lsa = get_lsa()
         import jpype
 
         if lhcrun is None:
@@ -150,7 +152,7 @@ class LHCBeamProcess:
         return out
 
     def get_model_history(self, params, lhcrun, presettings):
-        lsa=get_lsa()
+        lsa = get_lsa()
         optable = lsa.getOpticTable(self.name)
 
         models = []

@@ -17,13 +17,13 @@ Fixes:
 - check web site generation
 
 Features:
+- Make sure to use model.create_knob (that deletes and recreate the knob) before matching in all knobs
 - replace LHC with LHCDev and update gitlab actions
 - introduce multi i/k power converter for triplets
 - match IR1/IR5 ats phase
 - used named particles in json for correct energy
 - implement measured transfer functions for HL-LHC triplets
 - implement fringe fields in the triplets for beta-beating
-- rename mux34b1 (hllhc) in muxa34b1 (2025) or muxcell78b2 (2025 and hl)
 - redefine the voltages of H crab beam2 in the sequence
 - add rotation crabbing plane
 - remove arc skew quads from irs
@@ -31,3 +31,4 @@ Features:
 - add verbose option in xdeps to silence matching
 - verify disp knobs closeness with coupling
 - improve max_chrom target in global_w chrom for flat optics
+- move kqs from ir strengths

@@ -1,5 +1,5 @@
 """
-From 
+From
 https://lhcmaskdoc.web.cern.ch/ipynbs/luminosity_formula/luminosity_formula/
 https://gitlab.cern.ch/sterbini/lhcmaskdoc/-/blob/master/docs/ipynbs/luminosity_formula/luminosity_formula.ipynb
 """
@@ -14,13 +14,15 @@ import scipy.optimize
 twopi = 2 * np.pi
 fourpi = 4 * np.pi
 
+
 class Particle:
     """
-        Particle class representing a particle with properties such as kind, mass, momentum, energy, gamma, betagamma, and beta.
-        
-        The class provides methods to calculate various particle properties based on the provided parameters. It also includes a dictionary of known particle masses.
-        Particle defined by kind, mass and momemtum
+    Particle class representing a particle with properties such as kind, mass, momentum, energy, gamma, betagamma, and beta.
+
+    The class provides methods to calculate various particle properties based on the provided parameters. It also includes a dictionary of known particle masses.
+    Particle defined by kind, mass and momemtum
     """
+
     _masses = {"proton": 938.27208816e6, "electron": 510998.95}
     clight = clight
 
@@ -217,8 +219,8 @@ def luminosity(
     c = clight
 
     if verbose:
-        print(f"B1 momentum:{particle_1.momentum/1e9}")
-        print(f"B2 momentum:{particle_2.momentum/1e9}")
+        print(f"B1 momentum:{particle_1.momentum / 1e9}")
+        print(f"B2 momentum:{particle_2.momentum / 1e9}")
         print(f"B1 betagamma:{betagamma_1}")
         print(f"B2 betagamma:{betagamma_2}")
         print(f"B1 beta:{br_1}")
@@ -241,8 +243,8 @@ def luminosity(
     v_2 = np.array([vx_2, vy_2, vz_2])
 
     if verbose:
-        print(f"B1 velocity vector [c]:{v_1/c}")
-        print(f"B2 velocity vector [c]:{v_2/c}")
+        print(f"B1 velocity vector [c]:{v_1 / c}")
+        print(f"B2 velocity vector [c]:{v_2 / c}")
 
     diff_v = v_1 - v_2
     cross_v = np.cross(v_1, v_2)
@@ -285,10 +287,10 @@ def luminosity(
     sigma_z = np.max([sigma_z1, sigma_z2])
 
     if verbose:
-        print(f"Sigma_x1 [um]: {sx1(0)*1e6}")
-        print(f"Sigma_x2 [um]: {sx2(0)*1e6}")
-        print(f"Sigma_y1 [um]: {sy1(0)*1e6}")
-        print(f"Sigma_y2 [um]: {sy2(0)*1e6}")
+        print(f"Sigma_x1 [um]: {sx1(0) * 1e6}")
+        print(f"Sigma_x2 [um]: {sx2(0) * 1e6}")
+        print(f"Sigma_y1 [um]: {sy1(0) * 1e6}")
+        print(f"Sigma_y2 [um]: {sy2(0) * 1e6}")
 
     if not [CC_V_x_1, CC_V_y_1, CC_V_x_2, CC_V_y_2] == [0, 0, 0, 0]:
         # delta_z is longitudinal coordinate of the particle
@@ -362,15 +364,23 @@ def luminosity(
 
         if verbose:
             eps = 1e-12
-            print(f"Hor. crabbing angle B1 [murad] {(mx1(0,eps)-mx1(0,0))/eps/c}")
-            print(f"Hor. crabbing angle B2 [murad] {(mx2(0,eps)-mx2(0,0))/eps/c}")
-            print(f"Ver. crabbing angle B1 [murad] {(my1(0,eps)-my1(0,0))/eps/c}")
-            print(f"Ver. crabbing angle B2 [murad] {(my2(0,eps)-my2(0,0))/eps/c}")
+            print(
+                f"Hor. crabbing angle B1 [murad] {(mx1(0, eps) - mx1(0, 0)) / eps / c}"
+            )
+            print(
+                f"Hor. crabbing angle B2 [murad] {(mx2(0, eps) - mx2(0, 0)) / eps / c}"
+            )
+            print(
+                f"Ver. crabbing angle B1 [murad] {(my1(0, eps) - my1(0, 0)) / eps / c}"
+            )
+            print(
+                f"Ver. crabbing angle B2 [murad] {(my2(0, eps) - my2(0, 0)) / eps / c}"
+            )
             eps = 1e-6
-            print(f"Hor. net cros angle B1 [murad] {(mx1(eps,0)-mx1(0,0))/eps}")
-            print(f"Hor. net cros angle B2 [murad] {(mx2(eps,0)-mx2(0,0))/eps}")
-            print(f"Ver. cros angle B1 [murad] {(my1(eps,0)-my1(0,0))/eps}")
-            print(f"Ver. cros angle B2 [murad] {(my2(eps,0)-my2(0,0))/eps}")
+            print(f"Hor. net cros angle B1 [murad] {(mx1(eps, 0) - mx1(0, 0)) / eps}")
+            print(f"Hor. net cros angle B2 [murad] {(mx2(eps, 0) - mx2(0, 0)) / eps}")
+            print(f"Ver. cros angle B1 [murad] {(my1(eps, 0) - my1(0, 0)) / eps}")
+            print(f"Ver. cros angle B2 [murad] {(my2(eps, 0) - my2(0, 0)) / eps}")
 
         def kernel_double_integral(t, z):
             return (
@@ -436,11 +446,9 @@ def luminosity(
     result = L0 * Moeller_efficiency
     if verbose:
         print(f"Moeller efficiency: {Moeller_efficiency}")
-        print(f"Integral Relative Error: {integral[1]/integral[0]}")
+        print(f"Integral Relative Error: {integral[1] / integral[0]}")
         print(f"==> Luminosity [Hz/cm^2]: {result}")
     return result
-
-
 
 
 def crossing_spec(x1=0, x2=0, y1=0, y2=0, px1=0, px2=0, py1=0, py2=0, degree=False):
@@ -623,7 +631,6 @@ class IP:
     def sigy(self):
         return np.sqrt(self.bety * self.emity + self.dy**2)
 
-
     def clone(self, **kwargs):
         ip = IP(
             name=self.name,
@@ -679,8 +686,8 @@ class IP:
         """Separation factor"""
         sigx = np.sqrt(self.betx * bunch.emitx)
         sigy = np.sqrt(self.bety * bunch.emity)
-        fx = np.exp(-self.sepx**2 / sigx**2)
-        fy = np.exp(-self.sepy**2 / sigy**2)
+        fx = np.exp(-(self.sepx**2) / sigx**2)
+        fy = np.exp(-(self.sepy**2) / sigy**2)
         return fx, fy
 
     def lumi_headon(self, bunch):
@@ -958,13 +965,13 @@ class BetaStarLeveling:
                     nc[ip] += bb.nb
         return nc
 
-        #ips = (ip1, ip2, ip5, ip8)
-        #if verbose:
+        # ips = (ip1, ip2, ip5, ip8)
+        # if verbose:
         #    print(f"{ip1.name:6} beta {ip1.betx:5.2f},{ip1.bety:5.2f} m")
         #    print(f"{ip5.name:6} beta {ip5.betx:5.2f},{ip5.bety:5.2f} m")
         #    print(f"{ip2.name:6} sep  {ip2.sepx*1e3:5.2f} mm")
         #    print(f"{ip8.name:6} sep  {ip2.sepy*1e3:5.2f} mm")
-        #return ips
+        # return ips
 
     def level_betasep(self, ips, lumis, bunch, verbose=True):
         ip1, ip5, ip2, ip8 = ips
@@ -1089,39 +1096,17 @@ class StableBeam:
         self.ip8 = ip8
 
 
-
 class LHCLuminosity:
     def __init__(self, ips=None, bunches=None, parameters=None):
         if ips is None:
-            ips=[
-            IP("atlass",
-               betx=0.15,
-               bety=0.15,
-               px=250e-6,
-               ccx=190e-6),
-            IP("cms",
-               betx=0.15,
-               bety=0.15,
-               px=250e-6,
-               ccx=190e-6),
-            IP("lhcb",
-               betx=0.15,
-               bety=1.5,
-               px=250e-6,
-               ccx=190e-6),
-            IP("alice",
-               betx=0.15,
-               bety=1.5,
-               px=250e-6,
-               ccx=190e-6)]
-        self.ips=ips
+            ips = [
+                IP("atlass", betx=0.15, bety=0.15, px=250e-6, ccx=190e-6),
+                IP("cms", betx=0.15, bety=0.15, px=250e-6, ccx=190e-6),
+                IP("lhcb", betx=0.15, bety=1.5, px=250e-6, ccx=190e-6),
+                IP("alice", betx=0.15, bety=1.5, px=250e-6, ccx=190e-6),
+            ]
+        self.ips = ips
         if bunches is None:
-            bunches=[
-            Bunch(nb=2340,
-                  ppb=2.2e11,
-                  emitnx=2.5e-6,
-                  emitny=2.5e-6)
-        ]
-        self.bunches=bunches
-        self.parameters={
-        }
+            bunches = [Bunch(nb=2340, ppb=2.2e11, emitnx=2.5e-6, emitny=2.5e-6)]
+        self.bunches = bunches
+        self.parameters = {}

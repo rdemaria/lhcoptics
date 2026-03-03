@@ -27,20 +27,20 @@ def format_xticks_as_datetime():
     plt.tight_layout()
 
 
-kqx_limits = { #LHC 2025 with polarity inversions
+kqx_limits = {  # LHC 2025 with polarity inversions
     "kqx.l1": [0, 205.0],
     "kqx.r1": [-205.0, 0],
     "kqx.l2": [0, 205.0],
     "kqx.r2": [-205.0, 0],
     "kqx.l5": [-205.0, 0],
     "kqx.r5": [0, 205.0],
-    "kqx.l8": [0,205.0],
+    "kqx.l8": [0, 205.0],
     "kqx.r8": [-205.0, 0],
-} 
+}
 for irn in "15":
-    for q in ["1","2a","2b","3"]:
-      kqx_limits[f"kqx{q}.l{irn}"] = [-132.6,0]
-      kqx_limits[f"kqx{q}.r{irn}"] = [0,132.6]
+    for q in ["1", "2a", "2b", "3"]:
+        kqx_limits[f"kqx{q}.l{irn}"] = [-132.6, 0]
+        kqx_limits[f"kqx{q}.r{irn}"] = [0, 132.6]
 
 
 def madname_from_pcname(pc):

@@ -8,7 +8,6 @@ from .utils import print_diff_dict_float
 
 
 class RMatrix:
-
     def __init__(self, matrix):
         self.matrix = matrix
 
@@ -165,9 +164,7 @@ class MADSequence:
         tw = self.madx.twiss(betx=1, bety=1, rmatrix=True)
         return RMatrix(tw.getmat("re", -1, 6, 6))
 
-    def twiss_line_back(
-        self, start, end, betx=1, bety=1, alfx=0, alfy=0, dx=0, dpx=0
-    ):
+    def twiss_line_back(self, start, end, betx=1, bety=1, alfx=0, alfy=0, dx=0, dpx=0):
         self.madx.use(sequence=self.sequence, range=f"{start}/{end}")
         tw = self.madx.twiss(betx=1, bety=1, rmatrix=True)
         rmat = tw.getmat("re", -1, 6, 6)
@@ -195,9 +192,7 @@ class MADSequence:
         ay1 = r44 * r43 * by2 + (r33 * r44 + r34 * r43) * ay2 + r34 * r33 * gy2
         dx1 = r22 * (dx2 - r16) - r12 * (dpx2 - r26)
         dpx1 = -r21 * (dx2 - r16) + r11 * (dpx2 - r26)
-        tw = self.madx.twiss(
-            betx=bx1, bety=by1, alfx=ax1, alfy=ay1, dx=dx1, dpx=dpx1
-        )
+        tw = self.madx.twiss(betx=bx1, bety=by1, alfx=ax1, alfy=ay1, dx=dx1, dpx=dpx1)
         return tw
 
 
@@ -258,7 +253,7 @@ ablw.r8       := -0.000180681598453109894*on_lhcb   ;
 abxws.r8      := +0.000045681598453109894*on_lhcb   ;
     """
 
-    extra_defs_hllhc="""
+    extra_defs_hllhc = """
 kd1.l1             := ad1.l1/l.mbxf      ;
 kd1.r1             := ad1.r1/l.mbxf      ;
 kd2.l1             := ad2.l1/l.mbrd      ;
@@ -389,17 +384,15 @@ use, sequence=lhcb2;
     def update_knobs(self, knobs, verbose=False, knobs_off=False, knobs_check=False):
         for k, knob in knobs.items():
             if not knobs_off:
-              if verbose:
-                  print(f"{k:20} {self[k]:15.6g} -> {knob.value:15.6g}")
-              self[k] = knob.value
+                if verbose:
+                    print(f"{k:20} {self[k]:15.6g} -> {knob.value:15.6g}")
+                self[k] = knob.value
             for wn, value in knob.weights.items():
                 name = f"{wn}_from_{k}"
                 self[name] = value
                 if expr := self.madx.globals.cmdpar[wn].expr:
                     if expr is not None and k in expr and name not in expr:
-                        raise ValueError(
-                            f"{wn} depends on {k} but not on {name}"
-                        )
+                        raise ValueError(f"{wn} depends on {k} but not on {name}")
                 if expr is None:
                     wnvalue = self[wn]
                     self.madx.input(f"{wn} := {wnvalue} + ({name} * {k});")
@@ -425,7 +418,7 @@ use, sequence=lhcb2;
             if dvalue != 0:
                 weights[s] = dvalue
         madx.globals[name] = value
-        return Knob(name, value, weights,variant=variant).specialize()
+        return Knob(name, value, weights, variant=variant).specialize()
 
     def mad_find_and_set0_knobs(madx, strengths, variant=None):
         """
@@ -481,12 +474,8 @@ use, sequence=lhcb2;
         return knobs
 
     def diff(self, other):
-        selfvar = {
-            k: v for k, v in self.madx.globals.items() if isinstance(v,float)
-        }
-        othervar = {
-            k: v for k, v in other.madx.globals.items() if isinstance(v,float)
-        }
+        selfvar = {k: v for k, v in self.madx.globals.items() if isinstance(v, float)}
+        othervar = {k: v for k, v in other.madx.globals.items() if isinstance(v, float)}
         print_diff_dict_float(selfvar, othervar)
 
     def __getitem__(self, key):

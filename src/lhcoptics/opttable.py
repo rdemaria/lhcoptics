@@ -159,9 +159,7 @@ class LHCSectionTable:
             self.rows[k] = row
             if hasattr(self, "irs") and hasattr(row, "irs"):
                 print(k, row)
-                for ss, ss_row in zip(
-                    self.irs + self.arcs, row.irs + row.arcs
-                ):
+                for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
                     ss.rows[k] = ss_row
         else:
             raise ValueError(f"Cannot set item {k}")
@@ -204,17 +202,12 @@ class LHCSectionTable:
 
 
 class LHCIRTable(LHCSectionTable):
-
     def interp(self, n, order=1, xaxis="id"):
         ir0 = self.rows[0]
-        strengths = {
-            k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths
-        }
+        strengths = {k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths}
         params = {k: self.interp_val(n, k, order, xaxis) for k in ir0.params}
         ##TODO add knobs
-        return ir0.__class__(
-            strengths=strengths, params=params, parent=self.parent
-        )
+        return ir0.__class__(strengths=strengths, params=params, parent=self.parent)
 
     def get_quads(self, n=None):
         if n is None:
@@ -224,9 +217,7 @@ class LHCIRTable(LHCSectionTable):
         else:
             ir = self.rows[0]
             if n > 3:
-                quad_names = [
-                    k for k in ir.quads if re.match(f"kt?q[xtl]*{n}\\.", k)
-                ]
+                quad_names = [k for k in ir.quads if re.match(f"kt?q[xtl]*{n}\\.", k)]
             elif n == 1:
                 quad_names = [k for k in ir.quads if re.match("kt?qx", k)]
             else:
@@ -290,9 +281,7 @@ class LHCIRTable(LHCSectionTable):
         plt.suptitle(figname)
         # plt.tight_layout()
 
-    def plot_quad(
-        self, n, xaxis="id", ax=None, title=None, figname=None, p0c=None
-    ):
+    def plot_quad(self, n, xaxis="id", ax=None, title=None, figname=None, p0c=None):
         if p0c is None:
             p0c = self.get_p0c()
         if title is None:
@@ -349,14 +338,10 @@ class LHCIRTable(LHCSectionTable):
         for nkk, kname in enumerate(self.get_quads(n)):
             yy = self[kname]
             xx_fit = np.linspace(xx[0], xx[-1], 1001)
-            yy_fit = self.interp_val(
-                xx_fit, kname, order=order, xname=xaxis, soft=soft
-            )
+            yy_fit = self.interp_val(xx_fit, kname, order=order, xname=xaxis, soft=soft)
             ax.plot(xx, yy * brho, "o", label=f"{kname}", color=f"C{nkk}")
             ax.plot(xx_fit, yy_fit * brho, label=f"fit {kname}", color="k")
-            yy_res = self.interp_val(
-                xx, kname, order=order, xname=xaxis, soft=soft
-            )
+            yy_res = self.interp_val(xx, kname, order=order, xname=xaxis, soft=soft)
             print("residuals", kname, np.abs(yy - yy_res).max())
         ax.set_title(title)
         ax.set_xlabel(xaxis)
@@ -373,9 +358,7 @@ class LHCIRTable(LHCSectionTable):
         xx = self[xaxis]
         yy = self[attr]
         xx_fit = np.linspace(xx[0], xx[-1], 1001)
-        yy_fit = self.interp_val(
-            xx_fit, attr, order=order, xname=xaxis, soft=soft
-        )
+        yy_fit = self.interp_val(xx_fit, attr, order=order, xname=xaxis, soft=soft)
         ax.plot(xx, yy, "o", label=attr)
         ax.plot(xx_fit, yy_fit, label=f"fit {attr}")
         ax.set_title(title)
@@ -428,12 +411,10 @@ class LHCIRTable(LHCSectionTable):
 
 
 class LHCArcTable(LHCSectionTable):
-
     def interp(self, n, order=1, xaxis="id", soft=True):
         arc0 = self.rows[0]
         strengths = {
-            k: self.interp_val(n, k, order, xaxis, soft=soft)
-            for k in arc0.strengths
+            k: self.interp_val(n, k, order, xaxis, soft=soft) for k in arc0.strengths
         }
         params = {
             k: self.interp_val(
@@ -468,13 +449,12 @@ class LHCOpticsTable(LHCSectionTable):
             out[pp] = np.interp(out["time"], ptime, pval)
         return xd.Table(out)
 
-    def __init__(self, rows, time=None ,beamprocess=None):
+    def __init__(self, rows, time=None, beamprocess=None):
         self.rows = rows
         self.params = Col("params", rows)
         self.knobs = Col("knobs", rows)
         self.irs = [
-            LHCIRTable(irlst, self)
-            for irlst in zip(*[row.irs for row in self.rows])
+            LHCIRTable(irlst, self) for irlst in zip(*[row.irs for row in self.rows])
         ]
         self.arcs = [
             LHCArcTable(arclst, self)
@@ -493,9 +473,7 @@ class LHCOpticsTable(LHCSectionTable):
         params = {k: self.interp_val(n, k, order, xaxis) for k in opt0.params}
         irs = [ir.interp(n, order, xaxis) for ir in self.irs]
         arcs = [arc.interp(n, order, xaxis) for arc in self.arcs]
-        return opt0.__class__(
-            name=f"{xaxis}={n}", params=params, irs=irs, arcs=arcs
-        )
+        return opt0.__class__(name=f"{xaxis}={n}", params=params, irs=irs, arcs=arcs)
 
     def clear(self):
         self.rows.clear()
@@ -511,9 +489,7 @@ class LHCOpticsTable(LHCSectionTable):
 
     def extend(self, rows):
         self.rows.extend(rows)
-        for ss, ss_rows in zip(
-            self.irs + self.arcs, zip(*[row.irs for row in rows])
-        ):
+        for ss, ss_rows in zip(self.irs + self.arcs, zip(*[row.irs for row in rows])):
             ss.extend(ss_rows)
         return self
 
@@ -535,7 +511,6 @@ class LHCOpticsTable(LHCSectionTable):
 
 
 class BeamProcess:
-
     def __init__(self, name, opticstable, parameters=None):
         self.name = name
         self.opticstable = opticstable

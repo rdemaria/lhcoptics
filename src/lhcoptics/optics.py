@@ -330,6 +330,46 @@ class LHCOptics:
             variant=variant,
         )
 
+    @classmethod
+    def regenerate(
+        cls,
+        madxfile,
+        jsonfile="acc-models-lhc/xsuite/lhc.json",
+        p0c=6800e9,
+        outfile=None,
+    ):
+        import xtrack as xt
+
+        lhc = xt.load(jsonfile)
+        madxfile = Path(madxfile)
+        outdir = Path("regenerate")
+        outdir.mkdir(exist_ok=True)
+        if outfile is None:
+            outfile = outdir / madxfile.name
+        else:
+            outfile = outdir / Path(outfile)
+        if outfile.exists():
+            raise ValueError(
+                f"File {outfile} already exists, refusing to overwrite. Please remove it first if you want to regenerate the MADX file."
+            )
+        lhc.vars.load(madxfile)
+        lhc.set_particle_ref(p0c=p0c)
+        lhc.b1.twiss().cols["betx bety"].rows["ip.*"]
+        lhc.b2.twiss().cols["betx bety"].rows["ip.*"]
+
+        opt = LHCOptics.from_xsuite(
+            lhc,
+            knob_structure="acc-models-lhc/xsuite/knobs.yaml",
+            variant="hl",
+            circuits="lhccircuits.json",
+            params_mode="from_variables",
+        )
+        opt.check()
+        opt.check_phase_params(correct=True)
+        opt.match()
+        opt.check()
+        opt.to_madx(outfile)
+
     def __init__(
         self,
         name,
@@ -715,7 +755,7 @@ class LHCOptics:
             out[ss.name] = list(ss.knobs.keys())
         return out
 
-    def get_mkdtct(self, tw1=None, tw2=None):
+    def get_phase_constraints(self, tw1=None, tw2=None):
         """
         Compute the TCT and MKD phase advances at IP1, IP5 and IP8
 
@@ -728,25 +768,36 @@ class LHCOptics:
             tw2 = self.twiss(2, strengths=False)
         mux_tcphb1 = tw1["mux", "tcp.b6l7.b1"]
         muy_tcpvb1 = tw1["muy", "tcp.d6l7.b1"]
-        mux_tct5b1 = tw1["mux", "tctph.4l5.b1"]
-        muy_tct5b1 = tw1["muy", "tctpv.4l5.b1"]
-        mux_tct1b1 = tw1["mux", "tctph.4l1.b1"]
-        muy_tct1b1 = tw1["muy", "tctpv.4l1.b1"]
+        mux_tct5b1 = tw1["mux", "tctpxh.4l5.b1"]
+        muy_tct5b1 = tw1["muy", "tctpxv.4l5.b1"]
+        mux_tct1b1 = tw1["mux", "tctpxh.4l1.b1"]
+        muy_tct1b1 = tw1["muy", "tctpxv.4l1.b1"]
         mux_tct8b1 = tw1["mux", "tctph.4l8.b1"]
         muy_tct8b1 = tw1["muy", "tctpv.4l8.b1"]
         mux_mkdob1 = tw1["mux", "mkd.o5l6.b1"]
         mux_mkdab1 = tw1["mux", "mkd.a5l6.b1"]
+        mux_cchl1b1 = tw1["mux", "acfcah.a4l1.b1"]
+        mux_cchr1b1 = tw1["mux", "acfcah.a4r1.b1"]
+        muy_ccvl5b1 = tw1["muy", "acfcav.a4l5.b1"]
+        muy_ccvr5b1 = tw1["muy", "acfcav.a4r5.b1"]
+
 
         mux_tcphb2 = tw2["mux", "tcp.b6r7.b2"]
         muy_tcpvb2 = tw2["muy", "tcp.d6r7.b2"]
-        mux_tct5b2 = tw2["mux", "tctph.4r5.b2"]
-        muy_tct5b2 = tw2["muy", "tctpv.4r5.b2"]
-        mux_tct1b2 = tw2["mux", "tctph.4r1.b2"]
-        muy_tct1b2 = tw2["muy", "tctpv.4r1.b2"]
+        mux_tct5b2 = tw2["mux", "tctpxh.4r5.b2"]
+        muy_tct5b2 = tw2["muy", "tctpxv.4r5.b2"]
+        mux_tct1b2 = tw2["mux", "tctpxh.4r1.b2"]
+        muy_tct1b2 = tw2["muy", "tctpxv.4r1.b2"]
         mux_tct8b2 = tw2["mux", "tctph.4r8.b2"]
         muy_tct8b2 = tw2["muy", "tctpv.4r8.b2"]
         mux_mkdob2 = tw2["mux", "mkd.o5r6.b2"]
         mux_mkdab2 = tw2["mux", "mkd.a5r6.b2"]
+        mux_cchl1b2 = tw2["mux", "acfcah.a4l1.b2"]
+        mux_cchr1b2 = tw2["mux", "acfcah.a4r1.b2"]
+        muy_ccvl5b2 = tw2["muy", "acfcav.a4l5.b2"]
+        muy_ccvr5b2 = tw2["muy", "acfcav.a4r5.b2"]
+        
+        print(mux_tcphb2, mux_cchl1b2, mux_cchr1b2)
 
         qx = 61.31
         qy = 60.32
@@ -776,6 +827,14 @@ class LHCOptics:
             "tcpv_tct5_b2": -muy_tct5b2 + muy_tcpvb2,
             "tcph_tct8_b2": -mux_tct8b2 + mux_tcphb2 + qx,
             "tcpv_tct8_b2": -muy_tct8b2 + muy_tcpvb2 + qy,
+            "cchl1_tcph_b1": mux_tcphb1 + qx - mux_cchl1b1,
+            "cchr1_tcph_b1": mux_tcphb1 - mux_cchr1b1,
+            "cchl1_tcph_b2": -mux_tcphb2 + mux_cchl1b2,
+            "cchr1_tcph_b2": -mux_tcphb2 + mux_cchr1b2+qx,
+            "ccvl5_tcpv_b1": muy_tcpvb1 - muy_ccvl5b1,
+            "ccvr5_tcpv_b1": muy_tcpvb1 - muy_ccvr5b1,
+            "ccvl5_tcpv_b2": -muy_tcpvb2 + muy_ccvl5b2+qy,
+            "ccvr5_tcpv_b2": -muy_tcpvb2 + muy_ccvr5b2+qy,
         }
         return out
 
@@ -945,35 +1004,63 @@ class LHCOptics:
                 "Phase parameters do not sum up to the tunes, correct them first or set correct=True in check_phase_params()"
             )
         print("Match LHC optics")
-        for aa in self.arcs:
-            print(f"Match {aa.name.upper()}", end="")
-            aa.match(verbose=verbose)
-            print(" - done")
-        for ir in self.irs:
-            print(f"Match {ir.name.upper()}", end="")
-            ir.match(verbose=verbose)
-            print(" - done")
+        self.match_arcs(verbose=verbose)
+        self.match_irs(verbose=verbose)
 
-        print("Match chroma")
-        self.model.match_chroma(arcs="weak", verbose=verbose)
-        print("Match w")
-        self.model.match_w(verbose=verbose)
-        print("Match chroma")
-        self.model.match_chroma(arcs="weak", verbose=verbose)
+        for beam in [1, 2]:
+            print(f"Match chroma weak Beam {beam}")
+            self.model.match_chroma(arcs="weak", verbose=verbose, beam=beam)
+        for beam in [1, 2]:
+            print(f"Match W Beam {beam}")
+            self.model.match_w(verbose=verbose, beam=beam)
+        for beam in [1, 2]:
+            print(f"Match chroma weak Beam {beam}")
+            self.model.match_chroma(arcs="weak", verbose=verbose, beam=beam)
         self.check_params(verbose=verbose)
         self.match_knobs(verbose=verbose, fail=True)
         self.check()
 
-    def match_chroma(self, arcs="weak", verbose=False):
+    def match_arcs(self, verbose=False):
         """
-        match chroma and regenerate knobs
+        match the arcs and regenerate knobs
+        """
+        for arc in self.arcs:
+            tar0 = arc.get_match()
+            print(f"Match {arc.name.upper()} {tar0:.3e}", end="")
+            arc.match(verbose=verbose)
+            tar1 = arc.get_match()
+            print(f" -> {tar1:.3e} - done")
+
+    def match_irs(self, verbose=False):
+        """
+        match the IRs and regenerate knobs
+        """
+        for ir in (
+            self.ir1,
+            self.ir5,
+            self.ir2,
+            self.ir8,
+            self.ir4,
+            self.ir6,
+            self.ir3,
+            self.ir7,
+        ):
+            tar0 = ir.get_match()
+            print(f"Match {ir.name.upper()} {tar0:.3e}", end="")
+            ir.match(verbose=verbose)
+            tar1 = ir.get_match()
+            print(f" -> {tar1:.3e} - done")
+
+    def match_chroma(self, arcs="weak", verbose=True):
+        """
+        match chroma, destroy all the knobs
 
         arcs: weak, strong, all
         """
         self.model.match_chroma(arcs=arcs, beam=1, verbose=verbose, solve=True)
         self.model.match_chroma(arcs=arcs, beam=2, verbose=verbose, solve=True)
-        for knob in self.find_knobs(f"dqp.*"):
-            self.model.update_knob(knob)
+        # for knob in self.find_knobs(f"dqp.*"):
+        #    self.model.create_knob(knob)
 
     def match_knobs(self, verbose=True, fail=False):
         result = {}
@@ -983,7 +1070,7 @@ class LHCOptics:
                     print(f"Match knob {knob.name}", end="")
                     knob.match(verbose=verbose)
                     if not verbose:
-                         print(" - done")
+                        print(" - done")
                     result[knob.name] = "matched"
                 except Exception as e:
                     print(f"Error matching knob {knob.name}: {e}")
@@ -991,6 +1078,10 @@ class LHCOptics:
                     if fail:
                         raise e
         return result
+
+    def match_optics(self, verbose=False):
+        self.match_arcs(verbose=verbose)
+        self.match_irs(verbose=verbose)
 
     def match_phase_arcs(self, newphases):
         for arc in self.arcs:
@@ -1118,6 +1209,71 @@ class LHCOptics:
             tw.plot("wx_chrom wy_chrom", ax=ax)
             set_ip_labels(ax, tw)
 
+    def print_phase_constraints(self):
+        """
+
+        Crabcavities (CC) to tertiary collimators (TCP) phase advance
+        should be smaller than 30∘ mod 180∘.
+        Dilution kickers
+        (MKD) to TCT phase advance should be smaller than 30∘mod 180∘.
+
+        The primary collimators (TCP) to TCT should
+        be either below 30∘ or in between 70 − 110∘ mod 180∘.
+
+
+        https://jacow.org/hb2023/papers/thbp21.pdf
+        """
+        phases = self.get_phase_constraints()
+        cc_tcp = [
+            ["CC-TCP", "B1 Left", "B1 Right", "B2 Left", "B2 Right"],
+            [
+                "CC1 H",
+                "cchl1_tcph_b1",
+                "cchr1_tcph_b1",
+                "cchl1_tcph_b2",
+                "cchr1_tcph_b2",
+            ],
+            [
+                "CC1 V",
+                "ccvl5_tcpv_b1",
+                "ccvr5_tcpv_b1",
+                "ccvl5_tcpv_b2",
+                "ccvr5_tcpv_b2",
+            ],
+        ]
+        mkd_tct = [
+            ["MKD-TCT", "B1 MKD.A", "B1 MKD.0", "B2 MKD.A", "B2 MKD.0"],
+            ["TCTH1", "mkda_tct1_b1", "mkdo_tct1_b1", "mkda_tct1_b2", "mkdo_tct1_b2"],
+            ["TCTH5", "mkda_tct5_b1", "mkdo_tct5_b1", "mkda_tct5_b2", "mkdo_tct5_b2"],
+            ["TCTH8", "mkda_tct8_b1", "mkdo_tct8_b1", "mkda_tct8_b2", "mkdo_tct8_b2"],
+        ]
+        tcp_tct = [
+            ["TCP-TCT", "B1 H", "B1 V", "B2 H", "B2 V"],
+            ["TCPH1", "tcph_tct1_b1", "tcpv_tct1_b1", "tcph_tct1_b2", "tcpv_tct1_b2"],
+            ["TCPH5", "tcph_tct5_b1", "tcpv_tct5_b1", "tcph_tct5_b2", "tcpv_tct5_b2"],
+            ["TCPH8", "tcph_tct8_b1", "tcpv_tct8_b1", "tcph_tct8_b2", "tcpv_tct8_b2"],
+        ]
+
+        for tab in cc_tcp, mkd_tct, tcp_tct:
+            for row in tab:
+                for col in row:
+                    if "_" not in col:
+                        print(f"{col:10} ", end="")
+                    else:
+                        val = phases[col]
+                        cc = (val * 2 - round(val * 2)) / 2
+                        cc *= 360
+                        if abs(cc) < 30 or (
+                            col.startswith("tcp") and 70 < abs(cc) < 110
+                        ):
+                            color = "\033[32m"  # green
+                        elif abs(cc) < 40:
+                            color = "\033[33m"  # yellow
+                        else:
+                            color = "\033[31m"  # red
+                        print(f"{color}{cc:10.2f}\033[0m ", end="")
+                print()
+
     def round_params(
         self, full=True, verbose=True, dryrun=False, qx=62.31, qy=60.32, qp=0.0
     ):
@@ -1140,10 +1296,10 @@ class LHCOptics:
                 if not dryrun:
                     self.params[f"q{xy}b{beam}"] = qx if xy == "x" else qy
                     self.params[f"qp{xy}b{beam}"] = qp
-        ## round ATS factors is not straightforward because they are computed from the 
-        ## ratio of the beta functions at the IPs, so we need to compute them from the 
+        ## round ATS factors is not straightforward because they are computed from the
+        ## ratio of the beta functions at the IPs, so we need to compute them from the
         ## twiss and check that the values from beam 1 and beam 2 are consistent
-        ## also the value cannot be rounded as 1/3 is common 
+        ## also the value cannot be rounded as 1/3 is common
         # for xy in "xy":
         #     for irn in [1, 5]:
         #         rname = f"r{xy}_ip{irn}"
@@ -1170,29 +1326,26 @@ class LHCOptics:
         """
         if bet_sep is None:
             bet_sep = bet_cross
-        if flat[0]=="h":
-            self.params["rx_ip1"] = self.ir1.params['betxip1b1'] / bet_cross
-            self.params["ry_ip1"] = self.ir1.params['betxip1b1'] / bet_sep
-        elif flat[0]=="v":
-            self.params["rx_ip1"] = self.ir1.params['betxip1b1'] / bet_sep
-            self.params["ry_ip1"] = self.ir1.params['betxip1b1'] / bet_cross
+        if flat[0] == "h":
+            self.params["rx_ip1"] = self.ir1.params["betxip1b1"] / bet_cross
+            self.params["ry_ip1"] = self.ir1.params["betxip1b1"] / bet_sep
+        elif flat[0] == "v":
+            self.params["rx_ip1"] = self.ir1.params["betxip1b1"] / bet_sep
+            self.params["ry_ip1"] = self.ir1.params["betxip1b1"] / bet_cross
         else:
             raise ValueError("Flat an only be 'h' or 'v'")
-        if flat[1]=="v":
-            self.params["rx_ip5"] = self.ir5.params['betxip5b1'] / bet_sep
-            self.params["ry_ip5"] = self.ir5.params['betxip5b1'] / bet_cross
-        elif flat[1]=="h":
-            self.params["rx_ip5"] = self.ir5.params['betxip5b1'] / bet_cross
-            self.params["ry_ip5"] = self.ir5.params['betxip5b1'] / bet_sep
+        if flat[1] == "v":
+            self.params["rx_ip5"] = self.ir5.params["betxip5b1"] / bet_sep
+            self.params["ry_ip5"] = self.ir5.params["betxip5b1"] / bet_cross
+        elif flat[1] == "h":
+            self.params["rx_ip5"] = self.ir5.params["betxip5b1"] / bet_cross
+            self.params["ry_ip5"] = self.ir5.params["betxip5b1"] / bet_sep
         else:
             raise ValueError("Flat an only be 'h' or 'v'")
         if verbose:
             print(
                 f"Set rx_ip1={self.params['rx_ip1']}, ry_ip1={self.params['ry_ip1']}, rx_ip5={self.params['rx_ip5']}, ry_ip5={self.params['ry_ip5']}"
             )
-
-
-
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""

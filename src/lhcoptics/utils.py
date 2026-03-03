@@ -11,11 +11,13 @@ import numpy as np
 
 import ruamel.yaml
 
-yaml=ruamel.yaml.YAML()
+yaml = ruamel.yaml.YAML()
 yaml.indent(mapping=4, sequence=2, offset=2)
+
 
 def get_yaml():
     return yaml
+
 
 def string_to_unixtime(timestr: str, utc: bool = False) -> int:
     """
@@ -29,6 +31,7 @@ def string_to_unixtime(timestr: str, utc: bool = False) -> int:
         dt = dt.astimezone()
     return int(dt.timestamp())
 
+
 def unixtime_to_string(unixtime: int, utc: bool = False) -> str:
     """
     Convert Unix time to a time string "%Y-%m-%d %H:%M:%S".
@@ -39,6 +42,7 @@ def unixtime_to_string(unixtime: int, utc: bool = False) -> str:
     else:
         dt = datetime.fromtimestamp(unixtime)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
+
 
 def deliver_list_str(out, output=None):
     if output is str:
@@ -91,38 +95,36 @@ def iter_rows(table):
         yield Row(*[table._data[cn][i] for cn in table._col_names])
 
 
-def print_diff_dict_float(dct1, dct2, keys='union'):
-    if keys == 'union':
+def print_diff_dict_float(dct1, dct2, keys="union"):
+    if keys == "union":
         allk = set(dct1.keys()) | set(dct2.keys())
-    elif keys == 'intersection':
+    elif keys == "intersection":
         allk = set(dct1.keys()) & set(dct2.keys())
     else:
         allk = set(keys)
-    diffes=[]
+    diffes = []
     for k in sorted(allk):
         if k not in dct1:
             print(f"{k:20} {dct2[k]:15.6g} only in other")
         elif k not in dct2:
             print(f"{k:20} {dct1[k]:15.6g} only in self")
         elif dct1[k] != dct2[k]:
-            v1=dct1[k]
-            v2=dct2[k]
-            diffes.append( (abs(v1-v2),k,v1,v2) )
-            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1-v2:15.6g}")
+            v1 = dct1[k]
+            v2 = dct2[k]
+            diffes.append((abs(v1 - v2), k, v1, v2))
+            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1 - v2:15.6g}")
 
-    if len(diffes)>0:
+    if len(diffes) > 0:
         diffes.sort(reverse=True)
         print("\nLargest differences:")
-        for diff,k,v1,v2 in diffes[:1]:
-            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1-v2:15.6g}")
+        for diff, k, v1, v2 in diffes[:1]:
+            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1 - v2:15.6g}")
 
 
-
-
-def print_diff_dict_objs(dct1, dct2, keys='union'):
-    if keys == 'union':
+def print_diff_dict_objs(dct1, dct2, keys="union"):
+    if keys == "union":
         allk = set(dct1.keys()) | set(dct2.keys())
-    elif keys == 'intersection':
+    elif keys == "intersection":
         allk = set(dct1.keys()) & set(dct2.keys())
     else:
         allk = set(keys)
@@ -162,16 +164,12 @@ def gitlab_get_branches_and_tags(
     headers = {}
     if private_token:
         headers = {"PRIVATE-TOKEN": private_token}
-    branches_url = (
-        f"{gitlab_url}/api/v4/projects/{project_id}/repository/branches"
-    )
+    branches_url = f"{gitlab_url}/api/v4/projects/{project_id}/repository/branches"
     tags_url = f"{gitlab_url}/api/v4/projects/{project_id}/repository/tags"
 
     try:
         # Get branches
-        branches_response = requests.get(
-            branches_url, headers=headers, timeout=timeout
-        )
+        branches_response = requests.get(branches_url, headers=headers, timeout=timeout)
         branches_response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         branches_data = branches_response.json()
         branches = dict(
@@ -179,23 +177,17 @@ def gitlab_get_branches_and_tags(
         )
 
         # Get tags
-        tags_response = requests.get(
-            tags_url, headers=headers, timeout=timeout
-        )
+        tags_response = requests.get(tags_url, headers=headers, timeout=timeout)
         tags_response.raise_for_status()  # Raise HTTPError for bad responses
         tags_data = tags_response.json()
-        tags = dict(
-            [(tag["name"], tag["commit"]["id"]) for tag in tags_data]
-        )
+        tags = dict([(tag["name"], tag["commit"]["id"]) for tag in tags_data])
 
         return {"branches": branches, "tags": tags}
 
     except json.JSONDecodeError:
         print("Error: Failed to decode JSON response from GitLab.")
     except KeyError as e:
-        print(
-            f"Error: Unexpected data structure from GitLab API.  Missing key: {e}"
-        )
+        print(f"Error: Unexpected data structure from GitLab API.  Missing key: {e}")
     except requests.exceptions.RequestException as e:
         print(f"Error: {e}")
 
@@ -208,6 +200,7 @@ def file_one_day_old(path):
     """
     return path.stat().st_mtime > time.time() - 24 * 3600
 
+
 def file_expired(path, max_age):
     """
     Check if a file is older than max_age seconds.
@@ -218,6 +211,7 @@ def file_expired(path, max_age):
 def read_yaml(filename):
     return yaml.load(open(filename, "r"))
 
+
 def write_yaml(data, filename):
     yaml.dump(data, open(filename, "w"))
 
@@ -226,9 +220,11 @@ def read_json(filename):
     with open(filename, "r") as fid:
         return json.load(fid)
 
+
 def write_json(data, filename):
     with open(filename, "w") as fid:
         json.dump(data, fid, indent=4)
+
 
 def git_get_current_commit(directory):
     result = subprocess.run(
@@ -238,10 +234,9 @@ def git_get_current_commit(directory):
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to get current commit: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to get current commit: {result.stderr.strip()}")
     return result.stdout.strip()
+
 
 def git_pull(directory):
     result = subprocess.run(
@@ -251,10 +246,9 @@ def git_pull(directory):
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to pull branch: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to pull branch: {result.stderr.strip()}")
     return result.stdout.strip()
+
 
 def git_get_branch_name(directory):
     result = subprocess.run(
@@ -264,16 +258,15 @@ def git_get_branch_name(directory):
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to get branch name: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to get branch name: {result.stderr.strip()}")
     return result.stdout.strip()
+
 
 def git_clone_repo(repo_url, target_directory, branch=None):
     """
     Clone a Git repository.
     """
-    cmds=[ "git", "clone", repo_url, target_directory]
+    cmds = ["git", "clone", repo_url, target_directory]
     if branch:
         cmds.extend(["--branch", branch])
     result = subprocess.run(
@@ -282,68 +275,61 @@ def git_clone_repo(repo_url, target_directory, branch=None):
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to clone repository: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to clone repository: {result.stderr.strip()}")
     return result.stdout.strip()
 
 
-def git_status(directory,*args):
+def git_status(directory, *args):
     result = subprocess.run(
-        ["git", "status"]+list(args),
+        ["git", "status"] + list(args),
         cwd=directory,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to get git status: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to get git status: {result.stderr.strip()}")
     return result.stdout.strip()
 
-def git_commit(directory, message,*args):
+
+def git_commit(directory, message, *args):
     result = subprocess.run(
-        ["git", "commit", "-m", message]+list(args),
+        ["git", "commit", "-m", message] + list(args),
         cwd=directory,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to commit changes: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to commit changes: {result.stderr.strip()}")
     return result.stdout.strip()
 
-def git_push(directory,*args):
+
+def git_push(directory, *args):
     """
     Push changes to the remote repository.
     """
     result = subprocess.run(
-        ["git", "push"]+list(args),
+        ["git", "push"] + list(args),
         cwd=directory,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to push changes: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to push changes: {result.stderr.strip()}")
     return result.stdout.strip()
+
 
 def git_add(directory, *args):
     """
     Add files to the staging area.
     """
     result = subprocess.run(
-        ["git", "add"]+list(args),
+        ["git", "add"] + list(args),
         cwd=directory,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Failed to add files: {result.stderr.strip()}"
-        )
+        raise RuntimeError(f"Failed to add files: {result.stderr.strip()}")
     return result.stdout.strip()
 
 
@@ -363,9 +349,9 @@ def xmltodict(filename):
     root = ET.parse(filename).getroot()
     return etree_to_dict(root)
 
+
 def etree_to_dict(elem):
-    """Turn an ElementTree into a dict.
-    """
+    """Turn an ElementTree into a dict."""
     # convert an Element and its children into a dict
     d = {elem.tag: {} if elem.attrib else None}
     children = list(elem)
@@ -382,11 +368,11 @@ def etree_to_dict(elem):
                     dd[k] = v
         d = {elem.tag: dd}
     if elem.attrib:
-        d[elem.tag].update(('@' + k, v) for k, v in elem.attrib.items())
+        d[elem.tag].update(("@" + k, v) for k, v in elem.attrib.items())
     if elem.text and elem.text.strip():
         text = elem.text.strip()
         if children or elem.attrib:
-            d[elem.tag]['#text'] = text
+            d[elem.tag]["#text"] = text
         else:
             d[elem.tag] = text
     return d
@@ -415,14 +401,14 @@ def find_comparable_values(a, b, tol=1e-6):
     Returns:
         list of int: Indices of comparable values.
     """
-    a=sorted(a)
-    b=sorted(b)
-    ia=0
-    ib=0
-    indices_a=[]
-    indices_b=[]
+    a = sorted(a)
+    b = sorted(b)
+    ia = 0
+    ib = 0
+    indices_a = []
+    indices_b = []
     while ia < len(a) and ib < len(b):
-        if abs(a[ia]-b[ib]) < tol:
+        if abs(a[ia] - b[ib]) < tol:
             indices_a.append(ia)
             indices_b.append(ib)
             ia += 1
@@ -434,23 +420,20 @@ def find_comparable_values(a, b, tol=1e-6):
     return np.array(indices_a), np.array(indices_b)
 
 
-def match_compare_log(mtc,entry1=0,entry2=-1):
-    log=mtc.log()
-    print(f"{'Parameter':<35} {'Value['+str(entry1)+']':>18} {'Value['+str(entry2)+']':>18} {'Diff':>18}")
-    for iv,vary in enumerate(mtc.vary):
-        value1=log.vary[entry1,iv]
-        value2=log.vary[entry2,iv]
-        diff=value1-value2
+def match_compare_log(mtc, entry1=0, entry2=-1):
+    log = mtc.log()
+    print(
+        f"{'Parameter':<35} {'Value[' + str(entry1) + ']':>18} {'Value[' + str(entry2) + ']':>18} {'Diff':>18}"
+    )
+    for iv, vary in enumerate(mtc.vary):
+        value1 = log.vary[entry1, iv]
+        value2 = log.vary[entry2, iv]
+        diff = value1 - value2
         print(f"{vary.name:<35} {value1:18.9g} {value2:18.9g} {diff:18.9g}")
-    print(f"{'-'*35} {'-'*18} {'-'*18} {'-'*18}")
-    for it,target in enumerate(mtc.targets):
-        value1=log.targets[entry1,it]
-        value2=log.targets[entry2,it]
-        diff=value1-value2
-        name=f"{target.tag} {target.tar}"
+    print(f"{'-' * 35} {'-' * 18} {'-' * 18} {'-' * 18}")
+    for it, target in enumerate(mtc.targets):
+        value1 = log.targets[entry1, it]
+        value2 = log.targets[entry2, it]
+        diff = value1 - value2
+        name = f"{target.tag} {target.tar}"
         print(f"{name:<35} {value1:18.9g} {value2:18.9g} {diff:18.9g}")
-
-
-
-
-

@@ -17,7 +17,6 @@ class LHCIR1(LHCIR):
         "on_ov1",
     ]
 
-
     @property
     def quads(self):
         if self.variant == "2025":
@@ -30,6 +29,4 @@ class LHCIR1(LHCIR):
             return LHCIR.quads.__get__(self)
 
     def has_ats_phase(self):
-        return self.params['betxip1b1']<=2.5
-
-
+        return self.params["betxip1b1"] <= 2.5

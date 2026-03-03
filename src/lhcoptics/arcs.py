@@ -187,7 +187,7 @@ class LHCArc(LHCSection):
     def get_params(self, mode="from_twiss", verbose=False):
         """Get params from model"""
         if verbose:
-            print(f"Getting parameters for Arc {self.name} using mode '{mode}'")    
+            print(f"Getting parameters for Arc {self.name} using mode '{mode}'")
         if mode.startswith("from_twiss"):
             tw1, tw2 = self.twiss(strengths=False)
             return self.get_params_from_twiss(tw1, tw2)
@@ -299,18 +299,21 @@ class LHCArc(LHCSection):
                 cc = f"cell{self.name[1:]}"
                 for beam in [1, 2]:
                     for xy in "xy":
-                        nn=f"mu{xy}{cc}b{beam}"
+                        nn = f"mu{xy}{cc}b{beam}"
                         if verbose:
                             print(
-                                f"Update {nn}: from {self.params[nn]:.6f} to {params[nn]:.6f} diff {params[nn] - self.params[nn]:.2f}")
+                                f"Update {nn}: from {self.params[nn]:.6f} to {params[nn]:.6f} diff {params[nn] - self.params[nn]:.2f}"
+                            )
                         self.params[nn] = params[nn]
                 if verbose:
-                   match_compare_log(mtc)
+                    match_compare_log(mtc)
             except Exception as e:
                 if verbose:
                     print(f"Matching failed for Arc {self.name} with error: {e}")
                 if fail:
-                    raise ValueError(f"Matching failed for Arc {self.name} with error: {e}")
+                    raise ValueError(
+                        f"Matching failed for Arc {self.name} with error: {e}"
+                    )
         return mtc
 
     def get_close_irs(self):
