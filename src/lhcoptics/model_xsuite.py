@@ -203,7 +203,7 @@ class LHCXsuiteModel:
                 self.get_cmin(beam=1, pos=pos),
                 self.get_cmin(beam=2, pos=pos),
             ]
-        line = self.model.sequence[beam]
+        line = self.sequence[beam]
         if line.element_names[0] != pos:
             line.cycle(pos, inplace=True)
         tw = line.twiss(compute_chromatic_properties=False, strengths=True)

@@ -1,6 +1,7 @@
 import json
 import re
 
+import numpy as np
 import matplotlib.pyplot as plt
 
 
@@ -208,6 +209,13 @@ class LHCSection:
         self.model.create_knobs(self.knobs, verbose=verbose)
         return self
 
+    def get_match(self):
+        mtc = self.match(verbose=False, solve=False)
+        err = mtc._err
+        err.show_call_counter = False
+        err.return_scalar = True
+        return np.sqrt(err())
+
     def diff(self, other):
         self.diff_strengths(other)
         self.diff_knobs(other)
@@ -257,7 +265,7 @@ class LHCSection:
         """
         Copy all parameters from get_params() to self.params
         """
-        src=self.get_params(mode=mode, verbose=verbose)
+        src = self.get_params(mode=mode, verbose=verbose)
         if verbose:
             print(f"Setting parameters from mode {mode} with full=True")
         self.params.update(src)
