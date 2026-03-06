@@ -214,6 +214,13 @@ class LHCSection:
         self.model.create_knobs(self.knobs, verbose=verbose)
         return self
 
+    def get_match(self):
+        mtc = self.match(verbose=False, solve=False)
+        err = mtc._err
+        err.show_call_counter = False
+        err.return_scalar = True
+        return np.sqrt(err())
+
     def diff(self, other):
         self.diff_strengths(other)
         self.diff_knobs(other)

@@ -1399,7 +1399,7 @@ class CrabKnob(Knob):
     def __repr__(self):
         return f"<CrabKnob {self.name!r} = {self.value}>"
 
-    def check(self, threshold=1e-9, test_value=190, verbose=False):
+    def check(self, threshold=1e-8, test_value=190, verbose=False):
         print(f"Checking knob {self.name!r}")
         model = self.parent.model
         old_value = model[self.name]

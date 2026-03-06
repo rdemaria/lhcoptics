@@ -1010,7 +1010,7 @@ class LHCOptics:
             print(f"Match chroma weak Beam {beam}")
             self.model.match_chroma(arcs="weak", verbose=verbose, beam=beam)
         self.check_params(verbose=verbose)
-        self.match_knobs(verbose=verbose)
+        self.match_knobs(verbose=verbose, fail=True)
         self.check()
 
     def match_arcs(self, verbose=False):
@@ -1055,7 +1055,7 @@ class LHCOptics:
         # for knob in self.find_knobs(f"dqp.*"):
         #    self.model.create_knob(knob)
 
-    def match_knobs(self, verbose=False):
+    def match_knobs(self, verbose=True, fail=False):
         result = {}
         for knob in self.find_knobs():
             if hasattr(knob, "match"):
@@ -1068,6 +1068,8 @@ class LHCOptics:
                 except Exception as e:
                     print(f"Error matching knob {knob.name}: {e}")
                     result[knob.name] = e
+                    if fail:
+                        raise e
         return result
 
     def match_optics(self, verbose=False):
