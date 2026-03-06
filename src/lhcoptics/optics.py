@@ -781,7 +781,6 @@ class LHCOptics:
         muy_ccvl5b1 = tw1["muy", "acfcav.a4l5.b1"]
         muy_ccvr5b1 = tw1["muy", "acfcav.a4r5.b1"]
 
-
         mux_tcphb2 = tw2["mux", "tcp.b6r7.b2"]
         muy_tcpvb2 = tw2["muy", "tcp.d6r7.b2"]
         mux_tct5b2 = tw2["mux", "tctpxh.4r5.b2"]
@@ -796,8 +795,6 @@ class LHCOptics:
         mux_cchr1b2 = tw2["mux", "acfcah.a4r1.b2"]
         muy_ccvl5b2 = tw2["muy", "acfcav.a4l5.b2"]
         muy_ccvr5b2 = tw2["muy", "acfcav.a4r5.b2"]
-        
-        print(mux_tcphb2, mux_cchl1b2, mux_cchr1b2)
 
         qx = 61.31
         qy = 60.32
@@ -830,11 +827,11 @@ class LHCOptics:
             "cchl1_tcph_b1": mux_tcphb1 + qx - mux_cchl1b1,
             "cchr1_tcph_b1": mux_tcphb1 - mux_cchr1b1,
             "cchl1_tcph_b2": -mux_tcphb2 + mux_cchl1b2,
-            "cchr1_tcph_b2": -mux_tcphb2 + mux_cchr1b2+qx,
+            "cchr1_tcph_b2": -mux_tcphb2 + mux_cchr1b2 + qx,
             "ccvl5_tcpv_b1": muy_tcpvb1 - muy_ccvl5b1,
             "ccvr5_tcpv_b1": muy_tcpvb1 - muy_ccvr5b1,
-            "ccvl5_tcpv_b2": -muy_tcpvb2 + muy_ccvl5b2+qy,
-            "ccvr5_tcpv_b2": -muy_tcpvb2 + muy_ccvr5b2+qy,
+            "ccvl5_tcpv_b2": -muy_tcpvb2 + muy_ccvl5b2 + qy,
+            "ccvr5_tcpv_b2": -muy_tcpvb2 + muy_ccvr5b2 + qy,
         }
         return out
 
@@ -964,24 +961,20 @@ class LHCOptics:
         )
         return ratios.max()
 
-    def get_quad_margin(self, name, verbose=False, p0c=None, absvalue=False):
+    def get_quad_margin(self, name, verbose=True, p0c=None):
         """
         Get the margin of the quadrupole strengths in the IRs.
         """
         if p0c is None:
             p0c = self.params["p0c"]
         v = self.model[name]
-        p0c = self.params["p0c"]
-        limits = self.circuits.get_klimits(name, p0c)
-        if absvalue:
-            kmin = min(abs(limits[0]), abs(limits[1]))
-            kmax = max(abs(limits[0]), abs(limits[1]))
-            margin0 = abs(abs(v) - kmin) / kmax
-            margin1 = abs(kmax - abs(v)) / kmax
-        else:
-            maxv = max(abs(limits[0]), abs(limits[1]))
-            margin0 = (v - limits[0]) / maxv
-            margin1 = (limits[1] - v) / maxv
+        limits = self.circuits.get_klimits(name, pc=p0c)
+        kmax=max(abs(limits[0]), abs(limits[1]))
+        margin0 = (v - limits[0]) / kmax
+        margin1 = (limits[1] - v) / kmax
+        if verbose and (margin0 < 0 or margin1 < 0):
+            print(
+                f"{name}:  {limits[0]:.3e}<{v:.3e}<{limits[1]:.3e}")
         return (margin0, margin1)
 
     def is_ats(self):
@@ -1265,7 +1258,9 @@ class LHCOptics:
                             col.startswith("tcp") and 70 < abs(cc) < 110
                         ):
                             color = "\033[32m"  # green
-                        elif abs(cc) < 40:
+                        elif abs(cc) < 40 or (
+                            col.startswith("tcp") and 60 < abs(cc) < 120
+                        ):
                             color = "\033[33m"  # yellow
                         else:
                             color = "\033[31m"  # red

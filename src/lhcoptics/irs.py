@@ -186,7 +186,7 @@ class LHCIR(LHCSection):
 
     def check_quad_strengths(
         self,
-        verbose=False,
+        verbose=True,
         p0c=None,
         ratio=1.5,
         margin=0.1,
@@ -195,12 +195,12 @@ class LHCIR(LHCSection):
             p0c = self.parent.params["p0c"]
         out = {}
         if ratio is not None:
-            self.get_quad_max_ratio(verbose=verbose, ratio=ratio)
+            self.get_quad_max_ratio(verbose=False, ratio=ratio)
         if margin is not None:
             # if verbose:
             #    print(f"Name                  Strength      Low    High")
             for k, v in self.quads.items():
-                kmin, kmax = self.parent.get_quad_margin(k)
+                kmin, kmax = self.parent.get_quad_margin(k,verbose=False, p0c=p0c)
                 if kmin < margin or kmax < margin:
                     out[k] = (v, kmin, kmax)
                     if verbose:

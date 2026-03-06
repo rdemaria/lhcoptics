@@ -250,19 +250,19 @@ class LHCArc(LHCSection):
                 )
         return targets
 
-    def get_match_kq_vary(self, fd, beam="", kmax_marg=0.0):
+    def get_match_kq_vary(self, fd, beam="", dkmax=0.0):
         """Get match vary for the arc"""
         if beam:
             kname = f"kqt{fd}.{self.name}{beam}"
         else:
             kname = f"kq{fd}.{self.name}"
         limits = self.parent.circuits.get_klimits(kname, self.parent.params["p0c"])
-        limits[0] *= 1 + kmax_marg
-        limits[1] *= 1 - kmax_marg
+        limits[0] *= 1 + dkmax
+        limits[1] *= 1 - dkmax
         tag = beam if beam else "common"
         return xt.Vary(name=kname, limits=limits, step=1e-10, tag=tag)
 
-    def match(self, b1=True, b2=True, verbose=False, solve=True, tol=1e-11, fail=True):
+    def match(self, b1=True, b2=True, verbose=False, solve=True, tol=5e-10 , fail=True):
         lhc = self.parent.model.env
         """Match the arc"""
         targets = self.get_match_targets(b1=b1, b2=b2)

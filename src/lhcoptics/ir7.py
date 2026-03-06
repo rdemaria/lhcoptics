@@ -100,8 +100,8 @@ class LHCIR7(LHCIR):
 
     def match(
         self,
-        kmin_marg=0.0,
-        kmax_marg=0.0,
+        dkmin=0.0,
+        dkmax=0.0,
         collimation=False,
         b1=True,
         b2=True,
@@ -120,6 +120,7 @@ class LHCIR7(LHCIR):
         if len(self.params) == 0:
             self.set_params()
         lhc = self.parent.model.env
+        lhc.b2.build_tracker()
 
         if collimation:
             self.action_sp1 = SinglePassDispersion(
@@ -173,8 +174,8 @@ class LHCIR7(LHCIR):
             b1=b1,
             b2=b2,
             common=common,
-            dkmin=kmin_marg,
-            dkmax=kmax_marg,
+            dkmin=dkmin,
+            dkmax=dkmax,
         )
 
         opt = lhc.match(
