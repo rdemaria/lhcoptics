@@ -120,7 +120,6 @@ class LHCIR7(LHCIR):
         if len(self.params) == 0:
             self.set_params()
         lhc = self.parent.model.env
-        lhc.b2.build_tracker()
 
         if collimation:
             self.action_sp1 = SinglePassDispersion(

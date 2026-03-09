@@ -961,13 +961,16 @@ class LHCOptics:
         )
         return ratios.max()
 
-    def get_quad_margin(self, name, verbose=True, p0c=None):
+    def get_quad_margin(self, name, verbose=True, p0c=None, model=True):
         """
         Get the margin of the quadrupole strengths in the IRs.
         """
         if p0c is None:
             p0c = self.params["p0c"]
-        v = self.model[name]
+        if model:
+            v = self.model[name]
+        else:
+            v = self.get(name)
         limits = self.circuits.get_klimits(name, pc=p0c)
         kmax=max(abs(limits[0]), abs(limits[1]))
         margin0 = (v - limits[0]) / kmax
@@ -1215,6 +1218,7 @@ class LHCOptics:
 
 
         https://jacow.org/hb2023/papers/thbp21.pdf
+        https://indico.cern.ch/event/1320306/contributions/5556313/attachments/2709133/4704016/20230906_ir7Optics.pdf
         """
         phases = self.get_phase_constraints()
         cc_tcp = [
@@ -1268,6 +1272,19 @@ class LHCOptics:
                             color = "\033[31m"  # red
                         print(f"{color}{cc:10.2f}\033[0m ", end="")
                 print()
+
+    def print_disp_knob_orbit(self):
+        for kk in self.knobs:
+            if kk.startswith("on_dx"):
+                self.model[kk]=250
+                tw1,tw2=self.twiss()
+                self.model[kk]=0
+                x1max=abs(tw1.x).max()
+                x2max=abs(tw2.x).max()
+                y1max=abs(tw1.y).max()
+                y2max=abs(tw2.y).max()
+                print(f"{kk:10} -> max orbit: {x1max*1e3:6.2f} mm, {y1max*1e3:6.2f} mm, {x2max*1e3:6.2f} mm, {y2max*1e3:6.2f} mm for 250 urad")
+
 
     def round_params(
         self, full=True, verbose=True, dryrun=False, qx=62.31, qy=60.32, qp=0.0
