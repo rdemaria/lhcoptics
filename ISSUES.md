@@ -16,6 +16,7 @@ Fixes:
 - add per-arc dispersion knobs
 - check web site generation
 - symplify opt creation from simple madx files (e.g.no knob structure)
+- check on_disp, w_correction bumps yannis optics
 
 Features:
 - Make sure to use model.create_knob (that deletes and recreate the knob) before matching in all knobs

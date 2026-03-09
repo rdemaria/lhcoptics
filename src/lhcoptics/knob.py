@@ -1155,6 +1155,8 @@ class DispKnob(Knob):
         self.ipknobname = f"on_{self.kind[1:]}{self.ip}{self.hv}{self.sl or ''}"
         self.ipl = f"ip{(self.ip - 2) % 8 + 1}"
         self.ipr = f"ip{(self.ip) % 8 + 1}"
+        self.irr = f"ir{self.ip}"
+        self.rdispname = f"d{self.xy}{self.ipr}b"
 
     @classmethod
     def specialize(cls, knob):
@@ -1257,12 +1259,13 @@ class DispKnob(Knob):
         bumps = self.parent.get_bumps()
         self.parent.set_bumps_off()
 
-        model[self.ipknobname] = self.match_value
-        model[self.name] = self.match_value
-
         model.update_knob(self)
         for beam in [1, 2]:
-            initl, initr = self.get_inits(beam=beam)
+            model[self.ipknobname] = 0
+            model[self.name] = 0
+            initl, initr = self.get_inits(beam=beam) #inits needs to be clean
+            model[self.ipknobname] = self.match_value
+            model[self.name] = self.match_value
 
             targets = [
                 xt.Target(
@@ -1329,11 +1332,12 @@ class DispKnob(Knob):
                 print(f"Failed to match {self.name}")
                 model.update_knob(self)
                 raise (ex)
-            if verbose:
-                print("restoring bumps")
-            self.parent.set_bumps(bumps, verbose=verbose)
 
-            return mtc
+        if verbose:
+            print("restoring bumps")
+        self.parent.set_bumps(bumps, verbose=verbose)
+
+        return self
 
     def plot(self, value=None):
         model = self.parent.model
@@ -1347,7 +1351,7 @@ class DispKnob(Knob):
         init2, _ = self.get_inits(beam=2)
         model[self.name] = value
         model[self.ipknobname] = value
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), num=self.name)
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), num=self.name, clear=True)
         model.b1.twiss(start=self.ipl, init=init1, end=self.ipr).plot(
             yl=self.xy, yr="d" + self.xy, ax=ax1
         )

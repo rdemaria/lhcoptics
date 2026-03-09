@@ -980,6 +980,16 @@ class LHCOptics:
                 f"{name}:  {limits[0]:.3e}<{v:.3e}<{limits[1]:.3e}")
         return (margin0, margin1)
 
+    def get_strong_sextupoles(self):
+        out={}
+        for fd in "fd":
+          for arc in self.a81,self.a12,self.a45,self.a56:
+              for beam in '12':
+                ii='1' if fd=='f' and beam =='1' or fd=='d' and beam =='2' else '2'
+                kk=f"ks{fd}{ii}.{arc.name}b{beam}"
+                out[kk]=arc.strengths[kk]
+        return out
+
     def is_ats(self):
         """
         Check if the optics has ATS factors different from 1.
@@ -1205,6 +1215,29 @@ class LHCOptics:
             tw.plot("wx_chrom wy_chrom", ax=ax)
             set_ip_labels(ax, tw)
 
+    def print_disp_knob_orbit(self):
+         for hv in "hv":
+          for ir in "15":
+           for sl in 'sl':
+                kk=f"on_dx{ir}{hv}{sl}"
+                self.model[kk]=250
+                tw1,tw2=self.twiss()
+                self.model[kk]=0
+                x1max=abs(tw1.x).max()
+                x2max=abs(tw2.x).max()
+                y1max=abs(tw1.y).max()
+                y2max=abs(tw2.y).max()
+                print(f"{kk:10} -> max orbit: {x1max*1e3:6.2f} mm, {x2max*1e3:6.2f} mm, {y1max*1e3:6.2f} mm, {y2max*1e3:6.2f} mm for 250 urad")
+
+    def print_strong_sextupoles(self):
+        for fd in "fd":
+          for arc in self.a81,self.a12,self.a45,self.a56:
+              for beam in '12':
+                ii='1' if fd=='f' and beam =='1' or fd=='d' and beam =='2' else '2'
+                kk=f"ks{fd}{ii}.{arc.name}b{beam}"
+                if kk.startswith("ks") and abs(arc.strengths[kk]) > 0.1:
+                    print(f"{kk:10} -> {arc.strengths[kk]:16.3e} m^-3")
+
     def print_phase_constraints(self):
         """
 
@@ -1272,18 +1305,6 @@ class LHCOptics:
                             color = "\033[31m"  # red
                         print(f"{color}{cc:10.2f}\033[0m ", end="")
                 print()
-
-    def print_disp_knob_orbit(self):
-        for kk in self.knobs:
-            if kk.startswith("on_dx"):
-                self.model[kk]=250
-                tw1,tw2=self.twiss()
-                self.model[kk]=0
-                x1max=abs(tw1.x).max()
-                x2max=abs(tw2.x).max()
-                y1max=abs(tw1.y).max()
-                y2max=abs(tw2.y).max()
-                print(f"{kk:10} -> max orbit: {x1max*1e3:6.2f} mm, {y1max*1e3:6.2f} mm, {x2max*1e3:6.2f} mm, {y2max*1e3:6.2f} mm for 250 urad")
 
 
     def round_params(
