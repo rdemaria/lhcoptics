@@ -1001,6 +1001,60 @@ class LHCOptics:
             or self.params.get("ry_ip5", 1) != 1
         )
 
+    def make_madx_model(self, sequence="acc-models-lhc/lhc.seq", aperture=True):
+        """
+        Create a MAD-X model from the optics.
+        """
+        madx=Madx()
+        madx.options(echo=False, warn=False, info=False)
+        if aperture:
+            madx.call("acc-models-lhc/aperture/const_for_aperture.madx")
+        madx.call(sequence)
+        ss=self.to_madx(output=str)
+        madx.call("acc-models-lhc/toolkit/macro.madx")
+        madx.input(ss)
+        nrj=self.params['p0c']/1e9
+        madx.exec(f"mk_beam({nrj})")
+        madx.exec("check_ip(b1)")
+        madx.exec("check_ip(b2)")
+        if aperture:
+            madx.input("""
+            call,   file="acc-models-lhc/aperture/aperture.b1.madx";
+            call,   file="acc-models-lhc/aperture/aperture.b2.madx";
+            call,   file="acc-models-lhc/aperture/aper_tol.b1.madx";
+            call,   file="acc-models-lhc/aperture/aper_tol.b2.madx";
+            call,file="acc-models-lhc/aperture/exp_pipe_model_after_LS3.madx";
+            call,file="acc-models-lhc/aperture/exp_pipe_install_after_LS3.madx";
+            """)
+            madx.input("""
+                   seqedit,sequence=lhcb1;flatten;cycle,start=e.ds.r3.b1;endedit;
+                   seqedit,sequence=lhcb2;flatten;cycle,start=e.ds.r3.b2;endedit;
+                   """)
+            madx.call("acc-models-lhc/aperture/aperture_upgrade_IT.madx")
+            madx.call("acc-models-lhc/aperture/aperture_upgrade_MS.madx")
+            if nrj <500:
+                madx.input("""
+                on_sep1:= 2;on_x1hs:=295;on_sol_atlas:=0;on_crab1:=0;
+                on_sep5:= 2;on_x5hs:=295;on_sol_cms  :=0;on_crab5:=0;
+                on_sep2:= 3.5;on_x2:= 170;on_a2=-40;on_alice:=7000/nrj;on_sol_alice:=0;
+                on_sep8:=-3.5;on_x8:=-170;on_a8=-40;on_lhcb :=7000/nrj;
+                on_disp=0;
+
+                no_bs_tol=0;
+
+                emittance_norm=2.5e-6;
+                apbbeat=1.1;
+                halor=6.001; halox=6; haloy=6;
+                DParcx=0.10; DParcy=0.10;
+                COmax=0.002; dPmax=0.0002; VMAXI=30; SPECIF=7;
+                FULL=1;
+
+                """)
+            else:
+                raise NotImplementedError("Aperture settings for p0c > 500 GeV not implemented yet")
+        model=LHCMadxModel(madx)
+        return model
+
     def match(self, verbose=False):
         """
         Rematch the entire optics

@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 import xdeps as xd
 
@@ -308,6 +309,21 @@ abxws.l8           := -0.000045681598453109894*on_lhcb ;
 abxwh.l8           := +0.000180681598453109894*on_lhcb ;
 ablw.r8            := -0.000180681598453109894*on_lhcb ;
 abxws.r8           := +0.000045681598453109894*on_lhcb ;
+
+kqx.l1             := kqx2a.l1           ;
+ktqx1.l1           := kqx1.l1-kqx2a.l1   ;
+ktqx3.l1           := kqx3.l1-kqx2a.l1   ;
+kqx.r1             := kqx2a.r1           ;
+ktqx1.r1           := kqx1.r1-kqx2a.r1   ;
+ktqx3.r1           := kqx3.r1-kqx2a.r1   ;
+
+kqx.l5             := kqx2a.l5           ;
+ktqx1.l5           := kqx1.l5-kqx2a.l5   ;
+ktqx3.l5           := kqx3.l5-kqx2a.l5   ;
+kqx.r5             := kqx2a.r5           ;
+ktqx1.r5           := kqx1.r5-kqx2a.r5   ;
+ktqx3.r5           := kqx3.r5-kqx2a.r5   ;
+
 """
 
     extra_madx = (
@@ -487,6 +503,31 @@ use, sequence=lhcb2;
     def __contains__(self, key):
         return key in self.madx.globals
 
-    def aperture(self, irn, beam):
+    def get_ap_ir(self, irn, beam):
+        Path("temp").mkdir(exist_ok=True)
         self.madx.exec(f"mk_apir({irn},b{beam})")
-        return xd.Table(self.madx.table.aperture)
+        tab=xd.Table(self.madx.table.aperture)
+        tab._data.update(self.madx.table.aperture.summary)
+        return tab
+
+    def get_ap_arc(self, arc, beam):
+        Path("temp").mkdir(exist_ok=True)
+        self.madx.exec(f"mk_aparc({arc},b{beam})")
+        tab=xd.Table(self.madx.table.aperture)
+        tab._data.update(self.madx.table.aperture.summary)
+        return tab
+
+    def get_ap_irs(self, verbose=True):
+        out={}
+        for ir in range(1, 9):
+          for beam in [1, 2]:
+            tab=self.get_ap_ir(ir, beam)
+            out[f"ir{ir}b{beam}"]=tab
+
+        if verbose:
+            for kk, tab in out.items():
+                nn=tab.at_element
+                print(f"{kk.upper()} for {nn:>20} {tab.n1min:9.3f} sigma")
+        return out
+
+
