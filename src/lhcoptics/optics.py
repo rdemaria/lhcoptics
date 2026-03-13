@@ -850,12 +850,17 @@ class LHCOptics:
             )
             return self.get_params_from_twiss(tw1, tw2, full=full)
         elif mode == "from_twiss_init":
-            tw1 = self.ir1.twiss_from_params(1)
-            tw2 = self.ir1.twiss_from_params(2)
+            tw1 = tw1 = self.model.b1.twiss(
+                compute_chromatic_properties=True, strengths=False
+            )
+            tw2 = self.model.b2.twiss(
+                compute_chromatic_properties=True, strengths=False
+            )
             ret = self.get_params_from_twiss(tw1, tw2, full=False)
             for ss in self.irs + self.arcs:
                 retss = ss.get_params(mode="from_twiss_init")
-                ret = ret and retss
+                ret.update(retss)
+            return ret
         elif mode == "from_variables":
             return self.get_params_from_variables(full=full)
         else:
@@ -865,8 +870,9 @@ class LHCOptics:
         """
         Get the parameters from the twiss object.
         """
+        p0c=tw1.particle_on_co.p0c[0]
         params = {
-            "p0c": tw1.p0c,
+            "p0c": p0c,
             "qxb1": tw1.qx,
             "qyb1": tw1.qy,
             "qxb2": tw2.qx,
