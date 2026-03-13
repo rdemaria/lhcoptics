@@ -1,13 +1,15 @@
 # Issues
 
 Fixes:
+- do injection optics: aperture, phases, review MD optics
+- aperture for collision, add phase dep logic in limit
+- replace optics in v0 and v3 for MAD-X compatibility
 - make thin optics
 - check cycle_v2 optics
 - make transition examples
 - check 50cm strengths margins
 - add dp_trim knobs
 - change rx_ip definition to have round numbers
-- check apertures at injection
 - match injection transition
 - remove twiss defaults, enforce correct options
 - add detuning knobs
@@ -16,7 +18,6 @@ Fixes:
 - add per-arc dispersion knobs
 - check web site generation
 - symplify opt creation from simple madx files (e.g.no knob structure)
-- check on_disp, w_correction bumps yannis optics
 
 Features:
 - Make sure to use model.create_knob (that deletes and recreate the knob) before matching in all knobs

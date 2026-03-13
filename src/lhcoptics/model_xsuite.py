@@ -956,7 +956,7 @@ class LHCXsuiteModel:
             if not verbose:
                 mtc._err.show_call_counter = False
             if solve:
-                mtc.solve()
+                mtc.solve(broyden=True)
             if verbose:
                 match_compare_log(mtc)
             return mtc

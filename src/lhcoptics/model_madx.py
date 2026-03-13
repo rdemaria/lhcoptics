@@ -1,12 +1,42 @@
 import re
 from pathlib import Path
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 import xdeps as xd
 
 
 from .knob import Knob
 from .utils import print_diff_dict_float
 
+def get_ap_limit(section, ap, verbose=True):
+    energy=ap.energy
+    if energy < 500e9:
+        limit=12.6
+    else:
+        limit=14.6
+    n1=ap.n1.copy()
+    n1[ap.name=='tcdqm.b4l6.b1:1']*=1.2
+    n1[ap.name=='tcdqm.a4l6.b1:1']*=1.2
+    n1[ap.name=='tcdqm.a4r6.b1:1']*=1.2
+    n1[ap.name=='tcdqm.b4r6.b1:1']*=1.2
+    n1[ap.name=='tcdqm.b4l6.b2:1']*=1.1
+    n1[ap.name=='tcdqm.a4l6.b2:1']*=1.1
+    n1[ap.name=='tcdqm.a4r6.b2:1']*=1.1
+    n1[ap.name=='tcdqm.b4r6.b2:1']*=1.1
+    minap=np.argmin(n1)
+    n1min=n1[minap]
+    smin=ap.s[minap]
+    namemin=ap.name[minap]
+    name2min=namemin.lower()[:-2]
+    if verbose:
+        reset="\033[0m"
+        if n1min<limit:
+            color="\033[91m" #red
+        else:
+            color="\033[92m" #green
+        print(f"{section}: limit {name2min:20} {color}{n1min:9.3f}{reset} σ at s={smin:.1f} m")
 
 class RMatrix:
     def __init__(self, matrix):
@@ -503,31 +533,113 @@ use, sequence=lhcb2;
     def __contains__(self, key):
         return key in self.madx.globals
 
-    def get_ap_ir(self, irn, beam):
+    def get_ap_ir(self, irn, beam,verbose=True):
         Path("temp").mkdir(exist_ok=True)
         self.madx.exec(f"mk_apir({irn},b{beam})")
-        tab=xd.Table(self.madx.table.aperture)
+        tab = xd.Table(self.madx.table.aperture)
         tab._data.update(self.madx.table.aperture.summary)
+        if verbose:
+            get_ap_limit(f"IR{irn} B{beam}", tab, verbose=True)
         return tab
 
     def get_ap_arc(self, arc, beam):
         Path("temp").mkdir(exist_ok=True)
         self.madx.exec(f"mk_aparc({arc},b{beam})")
-        tab=xd.Table(self.madx.table.aperture)
+        tab = xd.Table(self.madx.table.aperture)
         tab._data.update(self.madx.table.aperture.summary)
         return tab
 
     def get_ap_irs(self, verbose=True):
-        out={}
+        out = {}
         for ir in range(1, 9):
-          for beam in [1, 2]:
-            tab=self.get_ap_ir(ir, beam)
-            out[f"ir{ir}b{beam}"]=tab
+            for beam in [1, 2]:
+                tab = self.get_ap_ir(ir, beam)
+                out[f"ir{ir}b{beam}"] = tab
 
         if verbose:
             for kk, tab in out.items():
-                nn=tab.at_element
-                print(f"{kk.upper()} for {nn:>20} {tab.n1min:9.3f} sigma")
+                get_ap_limit(kk, tab, verbose=verbose)
         return out
 
+    def print_ip(self):
+        tw1,tw2=self.twiss()
+        print(f"{'':7}", end="")
+        for ir in [1,2,5,8]:
+             print(f"    IR{ir}B1     IR{ir}B2", end="")
+        print()
+        for cc, scale in zip('betx bety x y px py'.split(),[1,1,1e3,1e3,1e6,1e6]):
+            print(f"{cc:7}", end="")
+            for ir in [1,2,5,8]:
+                ipn=f"ip{ir}:1"
+                print (f"{tw1[cc,ipn]*scale:9.3f} {tw2[cc,ipn]*scale:9.3f}", end="")
+            print()
 
+    def plot(self, beam=None, left="betx bety", right="dx"):
+        ylabels = {
+            "betx": r"$\beta$ [m]",
+            "bety": r"$\beta$ [m]",
+            "mux": r"$\mu$ [2π]",
+            "muy": r"$\mu$ [2π]",
+            "x": r"$x$ [m]",
+            "y": r"$y$ [m]",
+            "dx": r"$D$ [m]",
+            "dy": r"$D$ [m]",
+        }
+        if beam is None:
+            self.plot(beam=1, left=left, right=right)
+            self.plot(beam=2, left=left, right=right)
+        else:
+            tw = self.twiss(sequence=beam)
+            fig, ax = plt.subplots(num=f"MAD lhcb{beam}", clear=True)
+            lines = []
+            for col in left.split():
+                (ln,) = ax.plot(tw.s, getattr(tw, col), label=col)
+                lines.append(ln)
+                ax.set_ylabel(ylabels.get(col, col))
+            ax2 = ax.twinx()
+            for col in right.split():
+                (ln,) = ax2.plot(
+                    tw.s, getattr(tw, col), label=col, color=f"C{len(lines)}"
+                )
+                lines.append(ln)
+                ax2.set_ylabel(ylabels.get(col, col))
+            ax.legend(handles=lines)
+            ax.set_xlabel("s [m]")
+            ax.set_title(f"MAD LHC Optics - Beam {beam}")
+
+    def plot_ap_ir(self, irn, beam):
+        apb = self.get_ap_ir(irn, beam)
+        fig, ax = plt.subplots(num=f"MAD IR{irn} B{beam} aperture", clear=True)
+        n1=apb.n1
+        n1[(n1>30)|(n1==0)]=30
+        ax.plot(apb.s, n1, 'b', label="n1")
+        ax.set_xlabel("s [m]")
+        ax.set_ylabel("$n_1$ [σ]")
+        ax.legend()
+        idx=np.argmin(apb.n1)
+        ax.axvline(apb.s[idx], color='k', ls='--')
+
+    def plot_ap_orbit(self, irn):
+        apb1=self.get_ap_ir(irn, 1)
+        apb2=self.get_ap_ir(irn, 2)
+        fig, ax = plt.subplots(2, 1, num=f"MAD IR{irn} orbit", clear=True)
+        ax[0].plot(apb1.s, apb1.x, 'b', label="x B1")
+        ax[0].plot(apb2.s, apb2.x, 'r',label="x B2")
+        ax[0].set_xlabel("s [m]")
+        ax[0].set_ylabel("x [m]")
+        ax[0].legend()
+        idx=np.argmin(apb1.n1)
+        ax[0].axvline(apb1.s[idx], color='k', ls='--')
+        ax[1].plot(apb1.s, apb1.y, 'b', label="y B1")
+        ax[1].plot(apb2.s, apb2.y, 'r', label="y B2")
+        ax[1].set_xlabel("s [m]")
+        ax[1].set_ylabel("y [m]")
+        ax[1].legend()
+        idx=np.argmin(apb2.n1)
+        ax[1].axvline(apb2.s[idx], color='k', ls='--')
+
+    def plot_beta(self):
+        self.plot(left="betx bety", right="dx")
+
+    def plot_orbit(self):
+        self.plot(left="x y", right="dx dy")

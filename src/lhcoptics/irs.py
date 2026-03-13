@@ -637,6 +637,12 @@ class LHCIR(LHCSection):
                 knob.match(**kwargs)
         return self
 
+    def match_orbit(self, verbose=False, **kwargs):
+        for knobname, knob in self.knobs.items():
+            if re.match(r"on_[xsao]", knobname):
+                knob.match(verbose=verbose, **kwargs)
+        return self
+
     def plot(
         self,
         beam=None,

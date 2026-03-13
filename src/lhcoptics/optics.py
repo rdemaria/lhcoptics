@@ -972,22 +972,25 @@ class LHCOptics:
         else:
             v = self.get(name)
         limits = self.circuits.get_klimits(name, pc=p0c)
-        kmax=max(abs(limits[0]), abs(limits[1]))
+        kmax = max(abs(limits[0]), abs(limits[1]))
         margin0 = (v - limits[0]) / kmax
         margin1 = (limits[1] - v) / kmax
         if verbose and (margin0 < 0 or margin1 < 0):
-            print(
-                f"{name}:  {limits[0]:.3e}<{v:.3e}<{limits[1]:.3e}")
+            print(f"{name}:  {limits[0]:.3e}<{v:.3e}<{limits[1]:.3e}")
         return (margin0, margin1)
 
     def get_strong_sextupoles(self):
-        out={}
+        out = {}
         for fd in "fd":
-          for arc in self.a81,self.a12,self.a45,self.a56:
-              for beam in '12':
-                ii='1' if fd=='f' and beam =='1' or fd=='d' and beam =='2' else '2'
-                kk=f"ks{fd}{ii}.{arc.name}b{beam}"
-                out[kk]=arc.strengths[kk]
+            for arc in self.a81, self.a12, self.a45, self.a56:
+                for beam in "12":
+                    ii = (
+                        "1"
+                        if fd == "f" and beam == "1" or fd == "d" and beam == "2"
+                        else "2"
+                    )
+                    kk = f"ks{fd}{ii}.{arc.name}b{beam}"
+                    out[kk] = arc.strengths[kk]
         return out
 
     def is_ats(self):
@@ -1005,15 +1008,15 @@ class LHCOptics:
         """
         Create a MAD-X model from the optics.
         """
-        madx=Madx()
+        madx = Madx()
         madx.options(echo=False, warn=False, info=False)
         if aperture:
             madx.call("acc-models-lhc/aperture/const_for_aperture.madx")
         madx.call(sequence)
-        ss=self.to_madx(output=str)
+        ss = self.to_madx(output=str)
         madx.call("acc-models-lhc/toolkit/macro.madx")
         madx.input(ss)
-        nrj=self.params['p0c']/1e9
+        nrj = self.params["p0c"] / 1e9
         madx.exec(f"mk_beam({nrj})")
         madx.exec("check_ip(b1)")
         madx.exec("check_ip(b2)")
@@ -1032,12 +1035,12 @@ class LHCOptics:
                    """)
             madx.call("acc-models-lhc/aperture/aperture_upgrade_IT.madx")
             madx.call("acc-models-lhc/aperture/aperture_upgrade_MS.madx")
-            if nrj <500:
+            if nrj < 500:
                 madx.input("""
-                on_sep1:= 2;on_x1hs:=295;on_sol_atlas:=0;on_crab1:=0;
-                on_sep5:= 2;on_x5hs:=295;on_sol_cms  :=0;on_crab5:=0;
-                on_sep2:= 3.5;on_x2:= 170;on_a2=-40;on_alice:=7000/nrj;on_sol_alice:=0;
-                on_sep8:=-3.5;on_x8:=-170;on_a8=-40;on_lhcb :=7000/nrj;
+                on_sepv1:= 2;on_x1hs:=295;on_sol_atlas:=0;on_crab1:=0;
+                on_sep5h:= 2;on_x5vs:=295;on_sol_cms  :=0;on_crab5:=0;
+                on_sep2h:=-3.5;on_x2v:= 170;on_a2h=40;on_alice:=7000/nrj;on_sol_alice:=0;
+                on_sep8v:=-3.5;on_x8h:=-170;on_a8v=-40;on_lhcb :=7000/nrj;
                 on_disp=0;
 
                 no_bs_tol=0;
@@ -1051,8 +1054,12 @@ class LHCOptics:
 
                 """)
             else:
-                raise NotImplementedError("Aperture settings for p0c > 500 GeV not implemented yet")
-        model=LHCMadxModel(madx)
+                raise NotImplementedError(
+                    "Aperture settings for p0c > 500 GeV not implemented yet"
+                )
+        madx.exec("check_ip(b1)")
+        madx.exec("check_ip(b2)")
+        model = LHCMadxModel(madx)
         return model
 
     def match(self, verbose=False):
@@ -1142,6 +1149,15 @@ class LHCOptics:
     def match_optics(self, verbose=False):
         self.match_arcs(verbose=verbose)
         self.match_irs(verbose=verbose)
+
+    def match_orbit(self, verbose=False):
+        for ir in self.irs:
+            print(f"Match orbit knobs in {ir.name.upper()}", end="")
+            for knob in ir.knobs.values():
+                if re.match(r"on_(sep|x|o|a)", knob.name):
+                    print(f"Match knob {knob.name}", end="")
+                    knob.match(verbose=verbose)
+                    print(" - done")
 
     def match_phase_arcs(self, newphases):
         for arc in self.arcs:
@@ -1270,27 +1286,33 @@ class LHCOptics:
             set_ip_labels(ax, tw)
 
     def print_disp_knob_orbit(self):
-         for hv in "hv":
-          for ir in "15":
-           for sl in 'sl':
-                kk=f"on_dx{ir}{hv}{sl}"
-                self.model[kk]=250
-                tw1,tw2=self.twiss()
-                self.model[kk]=0
-                x1max=abs(tw1.x).max()
-                x2max=abs(tw2.x).max()
-                y1max=abs(tw1.y).max()
-                y2max=abs(tw2.y).max()
-                print(f"{kk:10} -> max orbit: {x1max*1e3:6.2f} mm, {x2max*1e3:6.2f} mm, {y1max*1e3:6.2f} mm, {y2max*1e3:6.2f} mm for 250 urad")
+        for hv in "hv":
+            for ir in "15":
+                for sl in "sl":
+                    kk = f"on_dx{ir}{hv}{sl}"
+                    self.model[kk] = 250
+                    tw1, tw2 = self.twiss()
+                    self.model[kk] = 0
+                    x1max = abs(tw1.x).max()
+                    x2max = abs(tw2.x).max()
+                    y1max = abs(tw1.y).max()
+                    y2max = abs(tw2.y).max()
+                    print(
+                        f"{kk:10} -> max orbit: {x1max * 1e3:6.2f} mm, {x2max * 1e3:6.2f} mm, {y1max * 1e3:6.2f} mm, {y2max * 1e3:6.2f} mm for 250 urad"
+                    )
 
     def print_strong_sextupoles(self):
         for fd in "fd":
-          for arc in self.a81,self.a12,self.a45,self.a56:
-              for beam in '12':
-                ii='1' if fd=='f' and beam =='1' or fd=='d' and beam =='2' else '2'
-                kk=f"ks{fd}{ii}.{arc.name}b{beam}"
-                if kk.startswith("ks") and abs(arc.strengths[kk]) > 0.1:
-                    print(f"{kk:10} -> {arc.strengths[kk]:16.3e} m^-3")
+            for arc in self.a81, self.a12, self.a45, self.a56:
+                for beam in "12":
+                    ii = (
+                        "1"
+                        if fd == "f" and beam == "1" or fd == "d" and beam == "2"
+                        else "2"
+                    )
+                    kk = f"ks{fd}{ii}.{arc.name}b{beam}"
+                    if kk.startswith("ks") and abs(arc.strengths[kk]) > 0.1:
+                        print(f"{kk:10} -> {arc.strengths[kk]:16.3e} m^-3")
 
     def print_phase_constraints(self):
         """
@@ -1359,7 +1381,6 @@ class LHCOptics:
                             color = "\033[31m"  # red
                         print(f"{color}{cc:10.2f}\033[0m ", end="")
                 print()
-
 
     def round_params(
         self, full=True, verbose=True, dryrun=False, qx=62.31, qy=60.32, qp=0.0
