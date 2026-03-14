@@ -58,6 +58,22 @@ class LHCOptics:
     knob_names += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
     knob_names += ["dqxdjy.b1", "dqxdjy.b1"]
 
+    _global_param_names = [
+        "p0c",
+        "qxb1",
+        "qyb1",
+        "qxb2",
+        "qyb2",
+        "qpxb1",
+        "qpyb1",
+        "qpxb2",
+        "qpyb2",
+        "rx_ip1",
+        "ry_ip1",
+        "rx_ip5",
+        "ry_ip5",
+    ]
+
     @classmethod
     def get_default_knob_names(cls):
         out = cls.knob_names[:]
@@ -755,86 +771,6 @@ class LHCOptics:
             out[ss.name] = list(ss.knobs.keys())
         return out
 
-    def get_phase_constraints(self, tw1=None, tw2=None):
-        """
-        Compute the TCT and MKD phase advances at IP1, IP5 and IP8
-
-        B1: IP1 TCT IP5       MKD IP6      TCP IP7        TCT IP1
-        B2: IP1     IP5 TCT       IP6 MKD      IP7 TCP        IP1 TCT
-        """
-        if tw1 is None:
-            tw1 = self.twiss(1, strengths=False)
-        if tw2 is None:
-            tw2 = self.twiss(2, strengths=False)
-        mux_tcphb1 = tw1["mux", "tcp.b6l7.b1"]
-        muy_tcpvb1 = tw1["muy", "tcp.d6l7.b1"]
-        mux_tct5b1 = tw1["mux", "tctpxh.4l5.b1"]
-        muy_tct5b1 = tw1["muy", "tctpxv.4l5.b1"]
-        mux_tct1b1 = tw1["mux", "tctpxh.4l1.b1"]
-        muy_tct1b1 = tw1["muy", "tctpxv.4l1.b1"]
-        mux_tct8b1 = tw1["mux", "tctph.4l8.b1"]
-        muy_tct8b1 = tw1["muy", "tctpv.4l8.b1"]
-        mux_mkdob1 = tw1["mux", "mkd.o5l6.b1"]
-        mux_mkdab1 = tw1["mux", "mkd.a5l6.b1"]
-        mux_cchl1b1 = tw1["mux", "acfcah.a4l1.b1"]
-        mux_cchr1b1 = tw1["mux", "acfcah.a4r1.b1"]
-        muy_ccvl5b1 = tw1["muy", "acfcav.a4l5.b1"]
-        muy_ccvr5b1 = tw1["muy", "acfcav.a4r5.b1"]
-
-        mux_tcphb2 = tw2["mux", "tcp.b6r7.b2"]
-        muy_tcpvb2 = tw2["muy", "tcp.d6r7.b2"]
-        mux_tct5b2 = tw2["mux", "tctpxh.4r5.b2"]
-        muy_tct5b2 = tw2["muy", "tctpxv.4r5.b2"]
-        mux_tct1b2 = tw2["mux", "tctpxh.4r1.b2"]
-        muy_tct1b2 = tw2["muy", "tctpxv.4r1.b2"]
-        mux_tct8b2 = tw2["mux", "tctph.4r8.b2"]
-        muy_tct8b2 = tw2["muy", "tctpv.4r8.b2"]
-        mux_mkdob2 = tw2["mux", "mkd.o5r6.b2"]
-        mux_mkdab2 = tw2["mux", "mkd.a5r6.b2"]
-        mux_cchl1b2 = tw2["mux", "acfcah.a4l1.b2"]
-        mux_cchr1b2 = tw2["mux", "acfcah.a4r1.b2"]
-        muy_ccvl5b2 = tw2["muy", "acfcav.a4l5.b2"]
-        muy_ccvr5b2 = tw2["muy", "acfcav.a4r5.b2"]
-
-        qx = 61.31
-        qy = 60.32
-
-        out = {
-            "mkda_tct1_b1": mux_tct1b1 - mux_mkdab1,
-            "mkdo_tct1_b1": mux_tct1b1 - mux_mkdob1,
-            "mkda_tct5_b1": mux_tct5b1 - mux_mkdab1 + qx,
-            "mkdo_tct5_b1": mux_tct5b1 - mux_mkdob1 + qx,
-            "mkda_tct8_b1": mux_tct8b1 - mux_mkdab1,
-            "mkdo_tct8_b1": mux_tct8b1 - mux_mkdob1,
-            "mkda_tct1_b2": -mux_tct1b2 + mux_mkdab2,
-            "mkdo_tct1_b2": -mux_tct1b2 + mux_mkdob2,
-            "mkda_tct5_b2": -mux_tct5b2 + mux_mkdab2,
-            "mkdo_tct5_b2": -mux_tct5b2 + mux_mkdob2,
-            "mkda_tct8_b2": -mux_tct8b2 + mux_mkdab2 + qx,
-            "mkdo_tct8_b2": -mux_tct8b2 + mux_mkdob2 + qx,
-            "tcph_tct1_b1": mux_tct1b1 - mux_tcphb1,
-            "tcpv_tct1_b1": muy_tct1b1 - muy_tcpvb1,
-            "tcph_tct5_b1": mux_tct5b1 - mux_tcphb1 + qx,
-            "tcpv_tct5_b1": muy_tct5b1 - muy_tcpvb1 + qy,
-            "tcph_tct8_b1": mux_tct8b1 - mux_tcphb1,
-            "tcpv_tct8_b1": muy_tct8b1 - muy_tcpvb1,
-            "tcph_tct1_b2": -mux_tct1b2 + mux_tcphb2,
-            "tcpv_tct1_b2": -muy_tct1b2 + muy_tcpvb2,
-            "tcph_tct5_b2": -mux_tct5b2 + mux_tcphb2,
-            "tcpv_tct5_b2": -muy_tct5b2 + muy_tcpvb2,
-            "tcph_tct8_b2": -mux_tct8b2 + mux_tcphb2 + qx,
-            "tcpv_tct8_b2": -muy_tct8b2 + muy_tcpvb2 + qy,
-            "cchl1_tcph_b1": mux_tcphb1 + qx - mux_cchl1b1,
-            "cchr1_tcph_b1": mux_tcphb1 - mux_cchr1b1,
-            "cchl1_tcph_b2": -mux_tcphb2 + mux_cchl1b2,
-            "cchr1_tcph_b2": -mux_tcphb2 + mux_cchr1b2 + qx,
-            "ccvl5_tcpv_b1": muy_tcpvb1 - muy_ccvl5b1,
-            "ccvr5_tcpv_b1": muy_tcpvb1 - muy_ccvr5b1,
-            "ccvl5_tcpv_b2": -muy_tcpvb2 + muy_ccvl5b2 + qy,
-            "ccvr5_tcpv_b2": -muy_tcpvb2 + muy_ccvr5b2 + qy,
-        }
-        return out
-
     def get_params(self, mode="from_twiss", full=False, verbose=False):
         """
         Get the parameters from the optics and its sections.
@@ -948,6 +884,87 @@ class LHCOptics:
         for arc in self.arcs:
             phases.update(arc.get_phase())
         return phases
+
+    def get_phase_constraints(self, tw1=None, tw2=None):
+        """
+        Compute the TCT and MKD phase advances at IP1, IP5 and IP8
+
+        B1: IP1 TCT IP5       MKD IP6      TCP IP7        TCT IP1
+        B2: IP1     IP5 TCT       IP6 MKD      IP7 TCP        IP1 TCT
+        """
+        if tw1 is None:
+            tw1 = self.twiss(1, strengths=False)
+        if tw2 is None:
+            tw2 = self.twiss(2, strengths=False)
+        mux_tcphb1 = tw1["mux", "tcp.b6l7.b1"]
+        muy_tcpvb1 = tw1["muy", "tcp.d6l7.b1"]
+        mux_tct5b1 = tw1["mux", "tctpxh.4l5.b1"]
+        muy_tct5b1 = tw1["muy", "tctpxv.4l5.b1"]
+        mux_tct1b1 = tw1["mux", "tctpxh.4l1.b1"]
+        muy_tct1b1 = tw1["muy", "tctpxv.4l1.b1"]
+        mux_tct8b1 = tw1["mux", "tctph.4l8.b1"]
+        muy_tct8b1 = tw1["muy", "tctpv.4l8.b1"]
+        mux_mkdob1 = tw1["mux", "mkd.o5l6.b1"]
+        mux_mkdab1 = tw1["mux", "mkd.a5l6.b1"]
+        mux_cchl1b1 = tw1["mux", "acfcah.a4l1.b1"]
+        mux_cchr1b1 = tw1["mux", "acfcah.a4r1.b1"]
+        muy_ccvl5b1 = tw1["muy", "acfcav.a4l5.b1"]
+        muy_ccvr5b1 = tw1["muy", "acfcav.a4r5.b1"]
+
+        mux_tcphb2 = tw2["mux", "tcp.b6r7.b2"]
+        muy_tcpvb2 = tw2["muy", "tcp.d6r7.b2"]
+        mux_tct5b2 = tw2["mux", "tctpxh.4r5.b2"]
+        muy_tct5b2 = tw2["muy", "tctpxv.4r5.b2"]
+        mux_tct1b2 = tw2["mux", "tctpxh.4r1.b2"]
+        muy_tct1b2 = tw2["muy", "tctpxv.4r1.b2"]
+        mux_tct8b2 = tw2["mux", "tctph.4r8.b2"]
+        muy_tct8b2 = tw2["muy", "tctpv.4r8.b2"]
+        mux_mkdob2 = tw2["mux", "mkd.o5r6.b2"]
+        mux_mkdab2 = tw2["mux", "mkd.a5r6.b2"]
+        mux_cchl1b2 = tw2["mux", "acfcah.a4l1.b2"]
+        mux_cchr1b2 = tw2["mux", "acfcah.a4r1.b2"]
+        muy_ccvl5b2 = tw2["muy", "acfcav.a4l5.b2"]
+        muy_ccvr5b2 = tw2["muy", "acfcav.a4r5.b2"]
+
+        qx = 61.31
+        qy = 60.32
+
+        out = {
+            "mkda_tct1_b1": mux_tct1b1 - mux_mkdab1,
+            "mkdo_tct1_b1": mux_tct1b1 - mux_mkdob1,
+            "mkda_tct5_b1": mux_tct5b1 - mux_mkdab1 + qx,
+            "mkdo_tct5_b1": mux_tct5b1 - mux_mkdob1 + qx,
+            "mkda_tct8_b1": mux_tct8b1 - mux_mkdab1,
+            "mkdo_tct8_b1": mux_tct8b1 - mux_mkdob1,
+            "mkda_tct1_b2": -mux_tct1b2 + mux_mkdab2,
+            "mkdo_tct1_b2": -mux_tct1b2 + mux_mkdob2,
+            "mkda_tct5_b2": -mux_tct5b2 + mux_mkdab2,
+            "mkdo_tct5_b2": -mux_tct5b2 + mux_mkdob2,
+            "mkda_tct8_b2": -mux_tct8b2 + mux_mkdab2 + qx,
+            "mkdo_tct8_b2": -mux_tct8b2 + mux_mkdob2 + qx,
+            "tcph_tct1_b1": mux_tct1b1 - mux_tcphb1,
+            "tcpv_tct1_b1": muy_tct1b1 - muy_tcpvb1,
+            "tcph_tct5_b1": mux_tct5b1 - mux_tcphb1 + qx,
+            "tcpv_tct5_b1": muy_tct5b1 - muy_tcpvb1 + qy,
+            "tcph_tct8_b1": mux_tct8b1 - mux_tcphb1,
+            "tcpv_tct8_b1": muy_tct8b1 - muy_tcpvb1,
+            "tcph_tct1_b2": -mux_tct1b2 + mux_tcphb2,
+            "tcpv_tct1_b2": -muy_tct1b2 + muy_tcpvb2,
+            "tcph_tct5_b2": -mux_tct5b2 + mux_tcphb2,
+            "tcpv_tct5_b2": -muy_tct5b2 + muy_tcpvb2,
+            "tcph_tct8_b2": -mux_tct8b2 + mux_tcphb2 + qx,
+            "tcpv_tct8_b2": -muy_tct8b2 + muy_tcpvb2 + qy,
+            "cchl1_tcph_b1": mux_tcphb1 + qx - mux_cchl1b1,
+            "cchr1_tcph_b1": mux_tcphb1 - mux_cchr1b1,
+            "cchl1_tcph_b2": -mux_tcphb2 + mux_cchl1b2,
+            "cchr1_tcph_b2": -mux_tcphb2 + mux_cchr1b2 + qx,
+            "ccvl5_tcpv_b1": muy_tcpvb1 - muy_ccvl5b1,
+            "ccvr5_tcpv_b1": muy_tcpvb1 - muy_ccvr5b1,
+            "ccvl5_tcpv_b2": -muy_tcpvb2 + muy_ccvl5b2 + qy,
+            "ccvr5_tcpv_b2": -muy_tcpvb2 + muy_ccvr5b2 + qy,
+        }
+        return out
+
 
     def get_phase_irs(self):
         """
@@ -1513,7 +1530,13 @@ class LHCOptics:
         """
         if verbose:
             print(f"Setting parameters from mode {mode} with full={full}")
-        self.params.update(self.get_params(mode=mode, verbose=verbose))
+        params = self.get_params(mode=mode, verbose=verbose)
+        for k in self._global_param_names:
+            if k in params:
+                v = params[k]
+                if verbose and self.params.get(k, v) != v:
+                    print(f"Set parameter {k} from {self.params.get(k, v)} to {v}")
+                self.params[k] = v
         if full:
             for ss in self.irs + self.arcs:
                 ss.set_params(mode=mode, verbose=verbose)
