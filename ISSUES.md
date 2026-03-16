@@ -1,6 +1,9 @@
 # Issues
 
 Fixes:
+- investigate strange bug, when loading two injection optic is different from the second one
+- investigate strange bug, dqx.b12 knobs are matched but
+  needs update_model to have a proper model for beam2
 - do injection optics: aperture, phases, review MD optics
 - aperture for collision, add phase dep logic in limit
 - replace optics in v0 and v3 for MAD-X compatibility
@@ -34,4 +37,6 @@ Features:
 - add verbose option in xdeps to silence matching
 - verify disp knobs closeness with coupling
 - improve max_chrom target in global_w chrom for flat optics
+- test matching chrom and w at the same time
 - move kqs from ir strengths
+- add energy dependent knobs (e.g. i_mo)

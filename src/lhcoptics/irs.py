@@ -200,7 +200,7 @@ class LHCIR(LHCSection):
             # if verbose:
             #    print(f"Name                  Strength      Low    High")
             for k, v in self.quads.items():
-                kmin, kmax = self.parent.get_quad_margin(k,verbose=False, p0c=p0c)
+                kmin, kmax = self.parent.get_quad_margin(k, verbose=False, p0c=p0c)
                 if kmin < margin or kmax < margin:
                     out[k] = (v, kmin, kmax)
                     if verbose:
@@ -493,14 +493,19 @@ class LHCIR(LHCSection):
         )
         if extra_targets is not None:
             for name, attr in extra_targets.items():
-                if name.endswith("b1"):
-                    line = "b1"
-                    value = self.twiss(beam=1)[attr, name]
-                elif name.endswith("b2"):
-                    line = "b2"
-                    value = self.twiss(beam=2)[attr, name]
+                if type(attr) is str:
+                    attrlist = [attr]
                 else:
-                    raise ValueError(f"Unknown beam for {name}")
+                    attrlist = attr
+                for attr in attrlist:
+                    if name.endswith("b1"):
+                        line = "b1"
+                        value = self.twiss(beam=1)[attr, name]
+                    elif name.endswith("b2"):
+                        line = "b2"
+                        value = self.twiss(beam=2)[attr, name]
+                    else:
+                        raise ValueError(f"Unknown beam for {name}")
 
                 targets.append(
                     xt.Target(

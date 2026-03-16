@@ -692,6 +692,7 @@ class LHCOptics:
             self.diff_params(other)
             if full:
                 for ss, so in zip(self.irs + self.arcs, other.irs + other.arcs):
+                    print(f"Comparing section {ss.name}")
                     ss.diff_strengths(so)
                     ss.diff_knobs(so)
                     ss.diff_params(so)

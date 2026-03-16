@@ -299,12 +299,6 @@ class LHCXsuiteModel:
                     print(f"Update {wname} from {self[wname]:15.6g} to {value:15.6g}")
                 self[wname] = value
 
-    def get_knob(self, knob):
-        value = self._var_values[knob.name]
-        weights = {}
-        for wname in knob.weights:
-            weights[wname] = self._var_values[f"{wname}_from_{knob.name}"]
-        return Knob(knob.name, value, weights, variant=knob.variant).specialize()
 
     def show_knob(self, knobname):
         print(f"Knob: {knobname} = {self[knobname]:15.6g}")
@@ -314,6 +308,13 @@ class LHCXsuiteModel:
             wname = f"{deps._key}_from_{knobname}"
             if wname in self:
                 print(f"    Weight {wname} = {self[wname]:15.6g}")
+
+    def get_knob(self, knob):
+        value = self._var_values[knob.name]
+        weights = {}
+        for wname in knob.weights:
+            weights[wname] = self._var_values[f"{wname}_from_{knob.name}"]
+        return Knob(knob.name, value, weights, variant=knob.variant).specialize()
 
     def get_knob_by_weight_names(self, name, variant=None, verbose=False):
         if verbose:
@@ -547,6 +548,46 @@ class LHCXsuiteModel:
 
     def get(self, key, default=None):
         return self._var_values.get(key, default)
+
+    def get_mo_rdt(self,qx=62.270, qy=60.295, i_mo=40):
+        lhc=self.env
+        print("Setting detuning knobs for dqx and dqy")
+        lhc["dqx.b1"]=(qx-62.31)
+        lhc["dqy.b1"]=(qy-60.32)
+        lhc["dqx.b2"]=(qx-62.31)
+        lhc["dqy.b2"]=(qy-60.32)
+        tw1, tw2 = lhc.b1.twiss(method="4d"), lhc.b2.twiss(method="4d",reverse=False)
+        print(f"Tunes {tw1.qx:.6f} {tw1.qy:.6f} {tw2.qx:.6f} {tw2.qy:.6f}")
+        # Octupolar RDT
+        print("Setting MO knobs for i_mo and on_mo")
+        motf=lhc['kmax_mo']/lhc['imax_mo']/lhc.b1.particle_ref.rigidity0[0]
+        lhc['i_mo.b1']=0;lhc['on_mo.b1']=0
+        for ko in lhc.vars.get_table().rows['ko[fd].a..b1'].name:
+            lhc[ko]=f"i_mo.b1*{motf} - 6*on_mo.b1"
+        lhc.vars['i_mo.b2']=0;lhc.vars['on_mo.b2']=0
+        for ko in lhc.vars.get_table().rows['ko[fd].a..b2'].name:
+            lhc[ko]=f"i_mo.b2*{motf} - 6*on_mo.b2"
+        lhc['i_mo.b1']=i_mo
+        lhc['i_mo.b2']=i_mo
+        rdts=["f4000", "f0004", "f2002"]
+        stt1=lhc.b1.get_table(attr=True)
+        stt2=lhc.b2.get_table(attr=True)
+        rdt1 = xt.rdt_first_order_perturbation(
+        rdt=rdts, twiss=tw1, strengths=stt1
+        )
+        rdt2 = xt.rdt_first_order_perturbation(
+        rdt=rdts, twiss=tw2, strengths=stt2
+        )
+        for rr in rdts:
+            avg1=np.mean(np.abs(rdt1[rr]))/1e4
+            avg2=np.mean(np.abs(rdt2[rr]))/1e4
+            print(f"{rr:10}/1e4 {avg1:15.6g} {avg2:15.6g}")
+        print("Setting MO to 0")
+        for ko in lhc.vars.get_table().rows['ko[fd].a..b[12]'].name:
+            lhc[ko]=0
+        lhc["dqx.b1"]=0; lhc["dqy.b1"]=0; lhc["dqx.b2"]=0; lhc["dqy.b2"]=0
+        return rdt1, rdt2
+
 
     def get_p0c(self):
         return self.env.b1.particle_ref.p0c[0]
