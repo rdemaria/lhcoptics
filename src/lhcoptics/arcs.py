@@ -262,9 +262,9 @@ class LHCArc(LHCSection):
         tag = beam if beam else "common"
         return xt.Vary(name=kname, limits=limits, step=1e-10, tag=tag)
 
-    def match(self, b1=True, b2=True, verbose=False, solve=True, tol=5e-10 , fail=True):
-        lhc = self.parent.model.env
+    def match(self, b1=True, b2=True, verbose=False, solve=True, tol=5e-10, fail=True):
         """Match the arc"""
+        lhc = self.parent.model.env
         targets = self.get_match_targets(b1=b1, b2=b2)
         varylst = []
         for fd in ["f", "d"]:
@@ -330,11 +330,11 @@ class LHCArc(LHCSection):
         self.match_phase(rematch_irs=rematch_irs)
 
     def match_phase(self, rematch_irs=True):
-        print(f"Match {self}")
+        print(f"Match {self.name.upper()}")
         self.match().solve()
         if rematch_irs:
             ira, irb = self.get_close_irs()
-            print(f"Match {ira}")
+            print(f"Match {ira.name.upper()}")
             ira.match().solve()
             print(f"Match {irb}")
             irb.match().solve()

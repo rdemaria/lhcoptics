@@ -807,7 +807,7 @@ class LHCOptics:
         """
         Get the parameters from the twiss object.
         """
-        p0c=tw1.particle_on_co.p0c[0]
+        p0c = tw1.particle_on_co.p0c[0]
         params = {
             "p0c": p0c,
             "qxb1": tw1.qx,
@@ -965,7 +965,6 @@ class LHCOptics:
             "ccvr5_tcpv_b2": -muy_tcpvb2 + muy_ccvr5b2 + qy,
         }
         return out
-
 
     def get_phase_irs(self):
         """
@@ -1325,6 +1324,20 @@ class LHCOptics:
                         f"{kk:10} -> max orbit: {x1max * 1e3:6.2f} mm, {x2max * 1e3:6.2f} mm, {y1max * 1e3:6.2f} mm, {y2max * 1e3:6.2f} mm for 250 urad"
                     )
 
+    def print_kqt(self,model=False):
+        brho= self.params["p0c"] / 0.299792458e9
+        print(f"{'Arc':3}{'F B1':>10}{'F B2':>10}{'D B1':>10}{'D B2':>10}")
+        for arc in self.arcs:
+            print(f"{arc.name.upper()}",end="")
+            for fd in "fd":
+                for beam in "12":
+                    if model:
+                        vv = self.model[f"kqt{fd}.{arc.name}b{beam}"]*brho
+                    else:
+                        vv = arc.strengths[f"kqt{fd}.{arc.name}b{beam}"]*brho
+                    print(f"{vv:10.3f}", end="")
+            print()
+
     def print_strong_sextupoles(self):
         for fd in "fd":
             for arc in self.a81, self.a12, self.a45, self.a56:
@@ -1379,9 +1392,9 @@ class LHCOptics:
         ]
         tcp_tct = [
             ["TCP-TCT", "B1 H", "B1 V", "B2 H", "B2 V"],
-            ["TCPH1", "tcph_tct1_b1", "tcpv_tct1_b1", "tcph_tct1_b2", "tcpv_tct1_b2"],
-            ["TCPH5", "tcph_tct5_b1", "tcpv_tct5_b1", "tcph_tct5_b2", "tcpv_tct5_b2"],
-            ["TCPH8", "tcph_tct8_b1", "tcpv_tct8_b1", "tcph_tct8_b2", "tcpv_tct8_b2"],
+            ["TCT1", "tcph_tct1_b1", "tcpv_tct1_b1", "tcph_tct1_b2", "tcpv_tct1_b2"],
+            ["TCT5", "tcph_tct5_b1", "tcpv_tct5_b1", "tcph_tct5_b2", "tcpv_tct5_b2"],
+            ["TCT8", "tcph_tct8_b1", "tcpv_tct8_b1", "tcph_tct8_b2", "tcpv_tct8_b2"],
         ]
 
         for tab in cc_tcp, mkd_tct, tcp_tct:
@@ -1405,6 +1418,26 @@ class LHCOptics:
                             color = "\033[31m"  # red
                         print(f"{color}{cc:10.2f}\033[0m ", end="")
                 print()
+
+    def rephase_a2334_diff(self, dmux=0.0, dmuy=0.0):
+        """
+        This procedure rebalances the MQT strengths in the arcs a23 and a34 in case there is a large difference between Beam 1 and Beam 2 in a single arc.
+        """
+        self.a23.shift_phase(dmux, dmuy, -dmux, -dmuy,rematch_irs=False)
+        self.a34.shift_phase(-dmux, -dmuy, dmux, dmuy,rematch_irs=False)
+        for ir in self.ir2,self.ir3,self.ir4:
+            print("Match IR", ir.name.upper())
+            ir.match(verbose=False)
+
+    def rephase_a782334(self, dmuxb1=0.0, dmuyb1=0.0, dmuxb2=0.0, dmuyb2=0.0):
+        """
+        This procedure shift the phase of IP1 relative to IP7"""
+        self.a78.shift_phase(dmuxb1, dmuyb1, dmuxb2, dmuyb2,rematch_irs=False)
+        self.a23.shift_phase(-dmuxb1/2, -dmuyb1/2, dmuxb2/2, dmuyb2/2,rematch_irs=False)
+        self.a34.shift_phase(-dmuxb1/2, -dmuyb1/2, dmuxb2/2, dmuyb2/2,rematch_irs=False)
+        for ir in self.ir7,self.ir8,self.ir2,self.ir3,self.ir4:
+            print("Match IR", ir.name.upper())
+            ir.match(verbose=False)
 
     def round_params(
         self, full=True, verbose=True, dryrun=False, qx=62.31, qy=60.32, qp=0.0

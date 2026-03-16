@@ -1,7 +1,9 @@
 # Issues
 
 Fixes:
-- investigate strange bug, when loading two injection optic is different from the second one
+- lhc.vars.load() does not create the knob structure with name expected by opt.update()
+  a workaround is needed. LHCOptics.from_xsuite does the correct thing, but it is not atomic
+  very dangerous...
 - investigate strange bug, dqx.b12 knobs are matched but
   needs update_model to have a proper model for beam2
 - do injection optics: aperture, phases, review MD optics
