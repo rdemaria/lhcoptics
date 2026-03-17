@@ -225,8 +225,8 @@ class LHCOptics:
         name=None,
         circuits=None,
         knob_structure=None,
-        variant="2025",
-        params_mode="from_twiss_init",
+        variant=None,
+        params_mode="from_variables",
         verbose=False,
     ):
         """
@@ -256,6 +256,13 @@ class LHCOptics:
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
         elif hasattr(xsuite_model, "to_json"):
             xsuite_model = LHCXsuiteModel(xsuite_model)
+
+        if variant is None:
+            if "mqxfa.b1r1/b1" in xsuite_model.b1.element_names:
+                variant = "hl"
+            else:
+                variant = "2025"
+
         if knob_structure is None:
             knob_structure = read_knob_structure(
                 xsuite_model.env.metadata["knob_structure"]
@@ -1324,17 +1331,17 @@ class LHCOptics:
                         f"{kk:10} -> max orbit: {x1max * 1e3:6.2f} mm, {x2max * 1e3:6.2f} mm, {y1max * 1e3:6.2f} mm, {y2max * 1e3:6.2f} mm for 250 urad"
                     )
 
-    def print_kqt(self,model=False):
-        brho= self.params["p0c"] / 0.299792458e9
+    def print_kqt(self, model=False):
+        brho = self.params["p0c"] / 0.299792458e9
         print(f"{'Arc':3}{'F B1':>10}{'F B2':>10}{'D B1':>10}{'D B2':>10}")
         for arc in self.arcs:
-            print(f"{arc.name.upper()}",end="")
+            print(f"{arc.name.upper()}", end="")
             for fd in "fd":
                 for beam in "12":
                     if model:
-                        vv = self.model[f"kqt{fd}.{arc.name}b{beam}"]*brho
+                        vv = self.model[f"kqt{fd}.{arc.name}b{beam}"] * brho
                     else:
-                        vv = arc.strengths[f"kqt{fd}.{arc.name}b{beam}"]*brho
+                        vv = arc.strengths[f"kqt{fd}.{arc.name}b{beam}"] * brho
                     print(f"{vv:10.3f}", end="")
             print()
 
@@ -1423,19 +1430,23 @@ class LHCOptics:
         """
         This procedure rebalances the MQT strengths in the arcs a23 and a34 in case there is a large difference between Beam 1 and Beam 2 in a single arc.
         """
-        self.a23.shift_phase(dmux, dmuy, -dmux, -dmuy,rematch_irs=False)
-        self.a34.shift_phase(-dmux, -dmuy, dmux, dmuy,rematch_irs=False)
-        for ir in self.ir2,self.ir3,self.ir4:
+        self.a23.shift_phase(dmux, dmuy, -dmux, -dmuy, rematch_irs=False)
+        self.a34.shift_phase(-dmux, -dmuy, dmux, dmuy, rematch_irs=False)
+        for ir in self.ir2, self.ir3, self.ir4:
             print("Match IR", ir.name.upper())
             ir.match(verbose=False)
 
     def rephase_a782334(self, dmuxb1=0.0, dmuyb1=0.0, dmuxb2=0.0, dmuyb2=0.0):
         """
         This procedure shift the phase of IP1 relative to IP7"""
-        self.a78.shift_phase(dmuxb1, dmuyb1, dmuxb2, dmuyb2,rematch_irs=False)
-        self.a23.shift_phase(-dmuxb1/2, -dmuyb1/2, dmuxb2/2, dmuyb2/2,rematch_irs=False)
-        self.a34.shift_phase(-dmuxb1/2, -dmuyb1/2, dmuxb2/2, dmuyb2/2,rematch_irs=False)
-        for ir in self.ir7,self.ir8,self.ir2,self.ir3,self.ir4:
+        self.a78.shift_phase(dmuxb1, dmuyb1, dmuxb2, dmuyb2, rematch_irs=False)
+        self.a23.shift_phase(
+            -dmuxb1 / 2, -dmuyb1 / 2, dmuxb2 / 2, dmuyb2 / 2, rematch_irs=False
+        )
+        self.a34.shift_phase(
+            -dmuxb1 / 2, -dmuyb1 / 2, dmuxb2 / 2, dmuyb2 / 2, rematch_irs=False
+        )
+        for ir in self.ir7, self.ir8, self.ir2, self.ir3, self.ir4:
             print("Match IR", ir.name.upper())
             ir.match(verbose=False)
 
