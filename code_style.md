@@ -1,7 +1,7 @@
 The packages are organized as following:
+(by alphabetic sorting I mean the sequence  _A-Za-z0-9)
 
-- by alphabetic sorting I mean the sequence  _A-Za-z0-9
-
+- docstring
 - imports
   - standard library sorted alphabetically
   - installed packages sorted alphabetically
