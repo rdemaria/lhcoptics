@@ -1128,6 +1128,26 @@ class LHCOptics:
             tar1 = arc.get_match()
             print(f" -> {tar1:.3e} - done")
 
+    def match_chroma_knobs(self, verbose=False):
+        """
+        match the chroma knobs
+        """
+        for knob in self.find_knobs(f"dqp.*"):
+            print(f"Match chroma knob {knob.name}", end="")
+            knob.match(verbose=verbose)
+            print(" - done")
+
+    def match_chroma(self, arcs="weak", verbose=True):
+        """
+        match chroma, destroy all the knobs
+
+        arcs: weak, strong, all
+        """
+        self.model.match_chroma(arcs=arcs, beam=1, verbose=verbose, solve=True)
+        self.model.match_chroma(arcs=arcs, beam=2, verbose=verbose, solve=True)
+        # for knob in self.find_knobs(f"dqp.*"):
+        #    self.model.create_knob(knob)
+
     def match_irs(self, verbose=False):
         """
         match the IRs and regenerate knobs
@@ -1147,17 +1167,6 @@ class LHCOptics:
             ir.match(verbose=verbose)
             tar1 = ir.get_match()
             print(f" -> {tar1:.3e} - done")
-
-    def match_chroma(self, arcs="weak", verbose=True):
-        """
-        match chroma, destroy all the knobs
-
-        arcs: weak, strong, all
-        """
-        self.model.match_chroma(arcs=arcs, beam=1, verbose=verbose, solve=True)
-        self.model.match_chroma(arcs=arcs, beam=2, verbose=verbose, solve=True)
-        # for knob in self.find_knobs(f"dqp.*"):
-        #    self.model.create_knob(knob)
 
     def match_knobs(self, verbose=True, fail=False):
         result = {}
@@ -1334,7 +1343,16 @@ class LHCOptics:
     def print_kqt(self, model=False):
         brho = self.params["p0c"] / 0.299792458e9
         print(f"{'Arc':3}{'F B1':>10}{'F B2':>10}{'D B1':>10}{'D B2':>10}")
-        for arc in self.arcs:
+        for arc in (
+            self.a81,
+            self.a12,
+            self.a45,
+            self.a56,
+            self.a23,
+            self.a34,
+            self.a67,
+            self.a78,
+        ):
             print(f"{arc.name.upper()}", end="")
             for fd in "fd":
                 for beam in "12":

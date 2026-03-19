@@ -532,3 +532,22 @@ class BeamProcess:
             pval = trim.data[1]
             out[pp] = np.interp(out["time"], ptime, pval)
         return xd.Table(out)
+
+
+class PolyProcess:
+    def __init__(self, name, xa, xb, targets=None, parameters=None):
+        self.name = name
+        self.xa = xa
+        self.xb = xb
+        if targets is None:
+            targets = []
+        if parameters is None:
+            parameters = []
+        assert len(targets) == len(parameters)
+        self.targets = targets
+        self.parameters = parameters
+
+    def apply(self, x):
+        for target, (parameter_name, poly) in zip(self.targets, self.parameters):
+            value = poly_val(poly, x)
+            target[parameter_name] = value

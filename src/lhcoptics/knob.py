@@ -1238,7 +1238,7 @@ class DispKnob(Knob):
         initl, initr = [tw.get_twiss_init(ii) for ii in (self.ipl, self.ipr)]
         return initl, initr
 
-    def match(self, verbose=True):
+    def match(self, verbose=True,steps=100):
         """
         In general the problem is to find
 
@@ -1325,12 +1325,15 @@ class DispKnob(Knob):
                 mtc._err.show_call_counter = False
 
             try:
-                mtc.solve()
+                mtc.solve(n_steps=steps)
                 if verbose:
                     match_compare_log(mtc)
             except Exception as ex:
                 print(f"Failed to match {self.name}")
                 model.update_knob(self)
+                if verbose:
+                   print("restoring bumps")
+                self.parent.set_bumps(bumps, verbose=verbose)
                 raise (ex)
 
         if verbose:
