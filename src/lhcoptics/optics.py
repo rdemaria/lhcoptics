@@ -1215,7 +1215,7 @@ class LHCOptics:
         dmuyb2 = qy - tw2.qy
         if arcs == "all":
             arcs = self.arcs
-        elif arcs == "noats":
+        elif arcs == "noats" or arcs == "weak":
             arcs = [self.a23, self.a34, self.a67, self.a78]
         print(f"Apply dmu: {dmuxb1:.3f} {dmuyb1:.3f} {dmuxb2:.3f} {dmuyb2:.3f}")
         narcs = len(arcs)
@@ -1513,6 +1513,13 @@ class LHCOptics:
         #             print(f"Round {rname} from {self.params[rname]} to {rr_ipb1}")
         #         if not dryrun:
         #             self.params[rname] = rr_ipb1
+
+    def set_ats_phase(self):
+        """
+        Set the ATS phase advances from the model.
+        """
+        for arc in self.a81, self.a12, self.a45, self.a56:
+            arc.set_ats_phase()
 
     def set_ats_params(self, bet_cross, bet_sep=None, flat="hv", verbose=True):
         """

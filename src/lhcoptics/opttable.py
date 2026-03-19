@@ -80,6 +80,11 @@ class LHCSectionTable:
         self.rows.append(row)
         return self
 
+    def append_from_madxfile(self, filename):
+        row=self.rows[0]
+        row.from_madxfile(filename,variant=row.variant)
+        self.rows.append(row)
+
     def extend(self, rows):
         self.rows.extend(rows)
         return self

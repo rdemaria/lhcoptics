@@ -353,6 +353,16 @@ class LHCArc(LHCSection):
             if not dryrun:
                 self.params[k] = new_value
 
+    def set_ats_phase(self):
+        self.strengths[f"kqf.{self.name}"] = 0.0087032988458
+        self.strengths[f"kqd.{self.name}"] = -0.0087047551604
+        for beam in [1, 2]:
+            for fd in "fd":
+                kname = f"kqt{fd}.{self.name}b{beam}"
+                self.strengths[kname] = 0
+        self.update_model()
+        self.set_params()
+
     def to_table(self, *rows):
         from .opttable import LHCArcTable
 

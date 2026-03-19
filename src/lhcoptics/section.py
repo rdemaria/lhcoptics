@@ -207,6 +207,7 @@ class LHCSection:
             knobs={k: knob.copy() for k, knob in self.knobs.items()},
             parent=self.parent,
             filename=self.filename,
+            variant=self.variant,
         )
 
     def create_knobs(self, verbose=False):

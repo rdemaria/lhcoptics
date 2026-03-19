@@ -208,15 +208,26 @@ class LHCIR(LHCSection):
         return out
 
     def get_kqx(self, n, lr):
-        side = lr + f"{self.irn}"
-        kq = self.strengths[f"kqx.{side}"]
-        if n == 3:
+        if self.variant.startswith("hl") and self.irn in [1, 5]:
+            if n == 1:
+                kq = self.strengths[f"kqx1.{lr}{self.irn}"]
+            elif n == 2:
+                kq = self.strengths[f"kqx2a.{lr}{self.irn}"]
+            elif n == 3:
+                kq = self.strengths[f"kqx3.{lr}{self.irn}"]
+            else:
+                raise ValueError(f"Invalid n={n} for kqx{n}.{lr}{self.irn}")
             return kq
-        elif n == 1 or n == 2:
-            ktq = self.strengths[f"ktqx{n}.{side}"]
-            return kq + ktq
         else:
-            raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
+            side = lr + f"{self.irn}"
+            kq = self.strengths[f"kqx.{side}"]
+            if n == 3:
+                return kq
+            elif n == 1 or n == 2:
+                ktq = self.strengths[f"ktqx{n}.{side}"]
+                return kq + ktq
+            else:
+                raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
 
     def get_params_from_twiss(self, tw1, tw2):
         ipname = self.ipname
