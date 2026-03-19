@@ -92,10 +92,12 @@ class LHCOptics:
         verbose=False,
         name=None,
     ):
+        variant = data.get("variant", "2025")
         irs = [
-            globals()[f"LHCIR{n + 1}"].from_dict(d) for n, d in enumerate(data["irs"])
+            globals()[f"LHCIR{n + 1}"].from_dict(d, variant=variant)
+            for n, d in enumerate(data["irs"])
         ]
-        arcs = [LHCArc.from_dict(d) for d in data["arcs"]]
+        arcs = [LHCArc.from_dict(d, variant=variant) for d in data["arcs"]]
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
         out = cls(
@@ -105,7 +107,7 @@ class LHCOptics:
             params=data["params"],
             knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
             model=xsuite_model,
-            variant=data.get("variant", "2025"),
+            variant=variant,
         )
         if xsuite_model is not None:
             out.update_model(verbose=verbose)
@@ -194,7 +196,12 @@ class LHCOptics:
             for ir in cls._irs
         ]
         arcs = [
-            LHCArc.from_model(madmodel, arc, knob_names=knob_structure.get(arc))
+            LHCArc.from_model(
+                madmodel,
+                arc,
+                knob_names=knob_structure.get(arc),
+                variant=variant,
+            )
             for arc in cls._arcs
         ]
         for k, knob in knobs.items():
@@ -663,6 +670,7 @@ class LHCOptics:
             arcs=[arc.copy() for arc in self.arcs],
             circuits=self.circuits,
             model=self.model,
+            variant=self.variant,
         )
         return other
 

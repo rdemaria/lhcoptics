@@ -1,9 +1,11 @@
-from .irs import LHCIR
 import re
+
+from .irs import LHCIR
 
 
 class LHCIR1(LHCIR):
-    name = "ir1"
+    """IR1-specific optics model."""
+
     knob_names = [
         "on_x1_h",
         "on_sep1_h",
@@ -16,6 +18,7 @@ class LHCIR1(LHCIR):
         "on_yip1b1",
         "on_ov1",
     ]
+    name = "ir1"
 
     @property
     def quads(self):

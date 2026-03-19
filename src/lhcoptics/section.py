@@ -80,7 +80,7 @@ class LHCSection:
     """
 
     @classmethod
-    def from_dict(cls, data, filename=None):
+    def from_dict(cls, data, filename=None, variant=None):
         return cls(
             name=data["name"],
             start=data["start"],
@@ -89,18 +89,19 @@ class LHCSection:
             params=data["params"],
             knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
             filename=filename,
+            variant=data.get("variant", variant if variant is not None else "2025"),
         )
 
     @classmethod
-    def from_json(cls, filename):
+    def from_json(cls, filename, variant=None):
         with open(filename) as f:
             data = json.load(f)
-            return cls.from_dict(data, filename=filename)
+            return cls.from_dict(data, filename=filename, variant=variant)
 
     @classmethod
-    def from_madxfile(cls, filename):
+    def from_madxfile(cls, filename, name=None, variant="2025"):
         model = LHCMadxModel.from_madxfile(filename)
-        return cls.from_madx(model.madx, filename=filename, variant="2025")
+        return cls.from_madx(model.madx, name=name, variant=variant)
 
     def __init__(
         self,
@@ -296,6 +297,7 @@ class LHCSection:
             "strengths": self.strengths,
             "params": self.params,
             "knobs": {n: k.to_dict() for n, k in self.knobs.items()},
+            "variant": self.variant,
         }
 
     def to_json(self, filename):
@@ -352,8 +354,12 @@ class LHCSection:
         return self
 
     def update_from_madxfile(self, filename):
-        self.__class__.from_madxfile(filename)
-        self.update(self.__class__.from_madxfile(filename))
+        src = self.__class__.from_madxfile(
+            filename,
+            name=self.name,
+            variant=self.variant,
+        )
+        self.update(src)
 
     def update_knobs(self, src=None, verbose=False):
         """

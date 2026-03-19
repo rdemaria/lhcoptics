@@ -81,9 +81,14 @@ class LHCSectionTable:
         return self
 
     def append_from_madxfile(self, filename):
-        row=self.rows[0]
-        row.from_madxfile(filename,variant=row.variant)
+        row0 = self.rows[0]
+        row = row0.__class__.from_madxfile(
+            filename,
+            name=row0.name,
+            variant=row0.variant,
+        )
         self.rows.append(row)
+        return self
 
     def extend(self, rows):
         self.rows.extend(rows)
@@ -212,7 +217,12 @@ class LHCIRTable(LHCSectionTable):
         strengths = {k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths}
         params = {k: self.interp_val(n, k, order, xaxis) for k in ir0.params}
         ##TODO add knobs
-        return ir0.__class__(strengths=strengths, params=params, parent=self.parent)
+        return ir0.__class__(
+            strengths=strengths,
+            params=params,
+            parent=self.parent,
+            variant=ir0.variant,
+        )
 
     def get_quads(self, n=None):
         if n is None:
@@ -297,18 +307,13 @@ class LHCIRTable(LHCSectionTable):
             fig, ax = plt.subplots(num=figname)
         xx = self[xaxis]
         if n == 1:
-            kqx1l = self.get_gradient(f"kqx1.l{self.rows[0].irn}", p0c=p0c)
-            kqx1r = self.get_gradient(f"kqx1.r{self.rows[0].irn}", p0c=p0c)
-            kqx2l = self.get_gradient(f"kqx2.l{self.rows[1].irn}", p0c=p0c)
-            kqx2r = self.get_gradient(f"kqx2.r{self.rows[1].irn}", p0c=p0c)
-            kqx3l = self.get_gradient(f"kqx3.l{self.rows[0].irn}", p0c=p0c)
-            kqx3r = self.get_gradient(f"kqx3.r{self.rows[0].irn}", p0c=p0c)
-            ax.plot(xx, abs(kqx1l), label=f"kqx1.l{self.rows[0].irn}")
-            ax.plot(xx, abs(kqx1r), label=f"kqx1.r{self.rows[0].irn}")
-            ax.plot(xx, abs(kqx2l), label=f"kqx2.l{self.rows[1].irn}")
-            ax.plot(xx, abs(kqx2r), label=f"kqx2.r{self.rows[1].irn}")
-            ax.plot(xx, abs(kqx3l), label=f"kqx3.l{self.rows[0].irn}")
-            ax.plot(xx, abs(kqx3r), label=f"kqx3.r{self.rows[0].irn}")
+            irn=self.rows[0].irn
+            for nn in [1,2,3]:
+                for lr in "lr":
+                    kname = f"kqx{nn}.{lr}{irn}"
+                    grad = self.get_gradient(kname, p0c=p0c)
+                    ax.plot(xx, np.abs(grad), label=f"|{kname}|")
+
         else:
             for q in self.get_quads(n):
                 grad = self.get_gradient(q, p0c=p0c)
@@ -433,7 +438,11 @@ class LHCArcTable(LHCSectionTable):
         }
         ##TODO add knobs
         return arc0.__class__(
-            arc0.name, strengths=strengths, params=params, parent=self.parent
+            arc0.name,
+            strengths=strengths,
+            params=params,
+            parent=self.parent,
+            variant=arc0.variant,
         )
 
 
@@ -478,7 +487,13 @@ class LHCOpticsTable(LHCSectionTable):
         params = {k: self.interp_val(n, k, order, xaxis) for k in opt0.params}
         irs = [ir.interp(n, order, xaxis) for ir in self.irs]
         arcs = [arc.interp(n, order, xaxis) for arc in self.arcs]
-        return opt0.__class__(name=f"{xaxis}={n}", params=params, irs=irs, arcs=arcs)
+        return opt0.__class__(
+            name=f"{xaxis}={n}",
+            params=params,
+            irs=irs,
+            arcs=arcs,
+            variant=opt0.variant,
+        )
 
     def clear(self):
         self.rows.clear()

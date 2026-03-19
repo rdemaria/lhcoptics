@@ -47,7 +47,7 @@ class LHCArc(LHCSection):
             knobs = {}
         params = {}
         strengths = {st: model[st] for st in strength_names}
-        return cls(name, strengths, params, knobs)
+        return cls(name, strengths, params, knobs, variant=variant)
 
     def __init__(
         self,
