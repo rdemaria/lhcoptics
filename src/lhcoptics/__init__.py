@@ -5,7 +5,7 @@ LHCIR(s) -> Contains strengths, constraints, knobs
 LHCArc -> Contains strengths, constraints, knobs
 """
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 from .arcs import LHCArc
 from .circuits import LHCCircuits, LHCCalibration, LHCCircuit, LHCCircuit2in1
 from .lsa_util import get_lsa
