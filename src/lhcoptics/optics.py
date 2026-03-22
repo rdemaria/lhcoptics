@@ -265,7 +265,7 @@ class LHCOptics:
             xsuite_model = LHCXsuiteModel(xsuite_model)
 
         if variant is None:
-            if "mqxfa.b1r1/b1" in xsuite_model.b1.element_names:
+            if "mqxfa.b1r1/b1" in xsuite_model.env.element_dict:
                 variant = "hl"
             else:
                 variant = "2025"
