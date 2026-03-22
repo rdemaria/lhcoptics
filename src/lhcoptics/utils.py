@@ -209,14 +209,19 @@ def file_expired(path, max_age):
 
 
 def read_yaml(filename):
-    return yaml.load(open(filename, "r"))
+    if filename.startswith("http://") or filename.startswith("https://"):
+        return yaml.load(read_url(filename))
+    with open(filename, "r") as fid:
+        return yaml.load(fid)
 
 
 def write_yaml(data, filename):
-    yaml.dump(data, open(filename, "w"))
-
+    with open(filename, "w") as fid:
+        yaml.dump(data, fid)
 
 def read_json(filename):
+    if filename.startswith("http://") or filename.startswith("https://"):
+        return json.loads(read_url(filename))
     with open(filename, "r") as fid:
         return json.load(fid)
 

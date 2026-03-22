@@ -1,4 +1,3 @@
-import json
 import re
 import time
 from datetime import datetime
@@ -9,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .lsa_util import get_lsa
+from .utils import read_json
 # from .nxcals_util import get_nxcals
 
 
@@ -387,9 +387,7 @@ class LHCCircuits:
 
     @classmethod
     def from_json(cls, filename):
-        with open(filename) as f:
-            data = json.load(f)
-            return cls.from_dict(data)
+        return cls.from_dict(read_json(filename))
 
     def add_calibration(self, name, field, current, fieldtype):
         calibration = LHCCalibration(name, current, field, fieldtype)
