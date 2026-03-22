@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lhcoptics"
-version = "0.0.3"
+dynamic = ["version"]
 description = "Library to build LHC Optics"
 authors = [{ name = "Riccardo De Maria", email = "riccardodemaria@gmail.com" }]
 license = { text = "MIT" }
@@ -19,6 +19,15 @@ dependencies = [
     "scipy",
     "pandas",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "lhcoptics.__version__"}
 
 [tool.black]
 line-length = 79
