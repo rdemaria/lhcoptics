@@ -3,6 +3,7 @@ from pprint import pp
 import re
 from pathlib import Path
 import gzip
+from turtle import clear
 
 import numpy as np
 
@@ -1319,6 +1320,58 @@ class LHCOptics:
                     f"IP{ip} B{beam} Cxy= {out[f'ip{beam}_H_{ip}']:9.3f}, {out[f'ip{beam}_V_{ip}']:9.3f} urad"
                 )
         return ax
+
+    def plot_mo_rdt(
+        self, beam=None, linestyle="-", ax=None, ylim=(0, 12), label="LHC", figname=None
+    ):
+        if beam is None:
+            if ax is None:
+                ax = [None, None]
+            ax1 = self.plot_mo_rdt(
+                beam=1,
+                linestyle=linestyle,
+                ax=ax[0],
+                ylim=ylim,
+                label=label,
+                figname=figname,
+            )
+            ax2 = self.plot_mo_rdt(
+                beam=2,
+                linestyle=linestyle,
+                ax=ax[1],
+                ylim=ylim,
+                label=label,
+                figname=figname,
+            )
+            return ax1, ax2
+        else:
+            if ax is None:
+                fig, ax = plt.subplots(
+                    figsize=(3, 3),
+                    num=f"LHCOptics {self.name} MO RDT B{beam}",
+                    clear=clear,
+                )
+            else:
+                fig = ax.figure
+            tw, rdt = self.model.get_mo_rdt(beam=beam, verbose=False)
+            for rdt_name in ["f4000", "f0004", "f2002"]:
+                ax.plot(
+                    tw.s,
+                    np.abs(rdt[rdt_name]) / 1e4,
+                    label=rdt_name,
+                    linestyle=linestyle,
+                )
+            ax.legend()
+            ax.set_ylabel("$10^4 |f_{ijkl}|$")
+            ax.set_ylim(*ylim)
+            set_ip_labels(ax, tw)
+            ax.set_title(f"{label} Beam {beam}")
+            fig.tight_layout()
+            if figname is not None:
+                filename = f"{figname}_b{beam}.png"
+                print(f"Save MO RDT plot to {filename}")
+                fig.savefig(filename, dpi=300)
+            return ax
 
     def plot_w(self, beam=None):
         if beam is None:

@@ -299,7 +299,6 @@ class LHCXsuiteModel:
                     print(f"Update {wname} from {self[wname]:15.6g} to {value:15.6g}")
                 self[wname] = value
 
-
     def show_knob(self, knobname):
         print(f"Knob: {knobname} = {self[knobname]:15.6g}")
         for deps in self.mgr.rdeps.get(self.ref[knobname], {}):
@@ -549,45 +548,44 @@ class LHCXsuiteModel:
     def get(self, key, default=None):
         return self._var_values.get(key, default)
 
-    def get_mo_rdt(self,qx=62.270, qy=60.295, i_mo=40):
-        lhc=self.env
-        print("Setting detuning knobs for dqx and dqy")
-        lhc["dqx.b1"]=(qx-62.31)
-        lhc["dqy.b1"]=(qy-60.32)
-        lhc["dqx.b2"]=(qx-62.31)
-        lhc["dqy.b2"]=(qy-60.32)
-        tw1, tw2 = lhc.b1.twiss(method="4d"), lhc.b2.twiss(method="4d",reverse=False)
-        print(f"Tunes {tw1.qx:.6f} {tw1.qy:.6f} {tw2.qx:.6f} {tw2.qy:.6f}")
-        # Octupolar RDT
-        print("Setting MO knobs for i_mo and on_mo")
-        motf=lhc['kmax_mo']/lhc['imax_mo']/lhc.b1.particle_ref.rigidity0[0]
-        lhc['i_mo.b1']=0;lhc['on_mo.b1']=0
-        for ko in lhc.vars.get_table().rows['ko[fd].a..b1'].name:
-            lhc[ko]=f"i_mo.b1*{motf} - 6*on_mo.b1"
-        lhc.vars['i_mo.b2']=0;lhc.vars['on_mo.b2']=0
-        for ko in lhc.vars.get_table().rows['ko[fd].a..b2'].name:
-            lhc[ko]=f"i_mo.b2*{motf} - 6*on_mo.b2"
-        lhc['i_mo.b1']=i_mo
-        lhc['i_mo.b2']=i_mo
-        rdts=["f4000", "f0004", "f2002"]
-        stt1=lhc.b1.get_table(attr=True)
-        stt2=lhc.b2.get_table(attr=True)
-        rdt1 = xt.rdt_first_order_perturbation(
-        rdt=rdts, twiss=tw1, strengths=stt1
-        )
-        rdt2 = xt.rdt_first_order_perturbation(
-        rdt=rdts, twiss=tw2, strengths=stt2
-        )
-        for rr in rdts:
-            avg1=np.mean(np.abs(rdt1[rr]))/1e4
-            avg2=np.mean(np.abs(rdt2[rr]))/1e4
-            print(f"{rr:10}/1e4 {avg1:15.6g} {avg2:15.6g}")
-        print("Setting MO to 0")
-        for ko in lhc.vars.get_table().rows['ko[fd].a..b[12]'].name:
-            lhc[ko]=0
-        lhc["dqx.b1"]=0; lhc["dqy.b1"]=0; lhc["dqx.b2"]=0; lhc["dqy.b2"]=0
-        return rdt1, rdt2
-
+    def get_mo_rdt(self, qx=62.270, qy=60.295, i_mo=40, beam=None, verbose=True):
+        if beam is None:
+            tw1, rdt1 = self.get_mo_rdt(qx=qx, qy=qy, i_mo=i_mo, beam=1, verbose=False)
+            tw2, rdt2 = self.get_mo_rdt(qx=qx, qy=qy, i_mo=i_mo, beam=2, verbose=False)
+            if verbose:
+                print(f"Avg. RDTs {'Beam 1':>15} {'Beam 2':>15}")
+                for rr in ["f4000", "f0004", "f2002"]:
+                    avg1 = np.mean(np.abs(rdt1[rr])) / 1e4
+                    avg2 = np.mean(np.abs(rdt2[rr])) / 1e4
+                    print(f"{rr}/1e4 {avg1:15.6g} {avg2:15.6g}")
+            return (tw1, rdt1), (tw2, rdt2)
+        else:
+            lhc = self.env
+            lhc[f"dqx.b{beam}"] = qx - 62.31
+            lhc[f"dqy.b{beam}"] = qy - 60.32
+            line = lhc.b1 if beam == 1 else lhc.b2
+            tw = line.twiss(method="4d", reverse=False)
+            if verbose:
+                print(
+                    f"Setting dqx.b{beam} dqy.b{beam} for tunes {tw.qx:.6f} {tw.qy:.6f}"
+                )
+                print("Setting MO knobs for i_mo and on_mo")
+            motf = lhc["kmax_mo"] / lhc["imax_mo"] / lhc.b1.particle_ref.rigidity0[0]
+            lhc[f"i_mo.b{beam}"] = 0
+            lhc[f"on_mo.b{beam}"] = 0
+            for ko in lhc.vars.get_table().rows[f"ko[fd].a..b{beam}"].name:
+                lhc[ko] = f"i_mo.b{beam}*{motf} - 6*on_mo.b{beam}"
+            lhc[f"i_mo.b{beam}"] = i_mo
+            rdts = ["f4000", "f0004", "f2002"]
+            stt = line.get_table(attr=True)
+            rdt = xt.rdt_first_order_perturbation(rdt=rdts, twiss=tw, strengths=stt)
+            if verbose:
+                print("Setting MO to 0")
+            for ko in lhc.vars.get_table().rows[f"ko[fd].a..b{beam}"].name:
+                lhc[ko] = 0
+            lhc[f"dqx.b{beam}"] = 0
+            lhc[f"dqy.b{beam}"] = 0
+            return (tw, rdt)
 
     def get_p0c(self):
         return self.env.b1.particle_ref.p0c[0]
