@@ -37,6 +37,12 @@ _opl = ["_op", "_sq", ""]
 def set_ip_labels(ax, tw):
     ips = tw.rows["ip[1-8]"].s
     lbl = [s.upper() for s in tw.rows["ip[1-8]"].name]
+    if lbl[0] == "IP1" and ips[0]==0:
+        ips=list(ips)+[tw.s[-1]]
+        lbl=lbl+["IP1"]
+    elif lbl[-1] == "IP1" and ips[-1]==tw.s[-1]:
+        ips=[tw.s[0]]+list(ips)
+        lbl=["IP1"]+lbl
     ax.set_xticks(ips, labels=lbl)
     ax.set_xlabel(None)
 
