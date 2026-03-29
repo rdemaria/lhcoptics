@@ -1,0 +1,26 @@
+
+
+call, file="acc-models-lhc/lhc.seq";
+
+beam, sequence=lhcb1, bv= 1, particle=proton, charge=1, mass=0.938272046,
+pc= 450.0,   npart=1.2e11,kbunch=2556, ex=5.2126224777777785e-09,ey=5.2126224777777785e-09;
+beam, sequence=lhcb2, bv=-1, particle=proton, charge=1, mass=0.938272046,
+pc= 450.0,   npart=1.2e11,kbunch=2556, ex=5.2126224777777785e-09,ey=5.2126224777777785e-09;
+
+call, file="acc-models-lhc/toolkit/zero-strengths.madx";
+! call, file="acc-models-lhc/strengths/ATS_Nominal/VdM_2024/19_2m_IP8.madx";
+call,file="/afs/cern.ch/work/e/efthymio/public/vdm_optics/vdm2025/opticsfile_2025.1";
+
+call, file="acc-models-lhc/toolkit/reset-bump-flags.madx";
+call, file="acc-models-lhc/toolkit/match-lumiknobs.madx";
+call, file="acc-models-lhc/toolkit/generate-op-tune-knobs-non-ats.madx";
+call, file="acc-models-lhc/toolkit/generate-op-chroma-knobs-non-ats.madx";
+call, file="acc-models-lhc/toolkit/generate-op-coupling-knobs-non-ats.madx";
+
+! call,file="acc-models-lhc/scenarios/pp_vdm/PHYSICS-6.8TeV-2024RP-VdM_V1/160/model.madx";
+call,file="acc-models-lhc/aperture/aperture.b1.madx";
+call,file="acc-models-lhc/aperture/aperture.b2.madx";
+call,file="acc-models-lhc/aperture/aper_tol.b1.madx";
+call,file="acc-models-lhc/aperture/aper_tol.b2.madx";
+use,sequence=lhcb1;
+use,sequence=lhcb2;
