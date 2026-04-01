@@ -1082,7 +1082,7 @@ class LHCOptics:
             madx.call("acc-models-lhc/aperture/aperture_upgrade_MS.madx")
             if nrj < 500:
                 madx.input("""
-                on_sepv1:= 2;on_x1hs:=295;on_sol_atlas:=0;on_crab1:=0;
+                on_sep1v:= 2;on_x1hs:=295;on_sol_atlas:=0;on_crab1:=0;
                 on_sep5h:= 2;on_x5vs:=295;on_sol_cms  :=0;on_crab5:=0;
                 on_sep2h:=-3.5;on_x2v:= 170;on_a2h=40;on_alice:=7000/nrj;on_sol_alice:=0;
                 on_sep8v:=-3.5;on_x8h:=-170;on_a8v=-40;on_lhcb :=7000/nrj;
@@ -1511,6 +1511,40 @@ class LHCOptics:
                         print(f"{color}{cc:10.2f}\033[0m ", end="")
                 print()
 
+    def print_ats_phase(self):
+        out = {}
+        tw1,tw2= self.twiss(strengths=False, chrom=False)
+        for ipn in [1,5]:
+            for tw,beam in ((tw1,1),(tw2,2)):
+                muxip= tw["mux", f"ip{ipn}"]
+                muyip= tw["muy", f"ip{ipn}"]
+                print(f"IP{ipn} B{beam} mux={muxip:.3f} muy={muyip:.3f}")
+                betx= tw["betx", f"ms.15r{ipn}.b{beam}"]
+                bety= tw["bety", f"ms.15r{ipn}.b{beam}"]
+                if betx>bety:
+                    nn=14,15
+                else:
+                    nn=15,14
+                msfr = tw["mux", f"ms.{nn[1]}r{ipn}.b{beam}"]
+                msdr = tw["muy", f"ms.{nn[0]}r{ipn}.b{beam}"]
+                msfl = tw["mux", f"ms.{nn[0]}l{ipn}.b{beam}"]
+                msdl = tw["muy", f"ms.{nn[1]}l{ipn}.b{beam}"]
+                out[f"dmuxip{ipn}b{beam}_ms{nn[1]}r"] = msfr-muxip
+                out[f"dmuyip{ipn}b{beam}_ms{nn[0]}r"] = msdr-muyip
+                out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] = muxip-msfl
+                out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] = muyip-msdl
+                if ipn==1: #or cycle
+                      out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"]+=tw.qx
+                      out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"]+=tw.qy
+
+        for k,ph in out.items():
+            #print(f"{k:15} -> {(ph):9.3f}")
+            print(f"{k:15} -> {(ph%0.5)*360:9.3f} deg")
+
+
+
+
+
     def rephase_a2334_diff(self, dmux=0.0, dmuy=0.0):
         """
         This procedure rebalances the MQT strengths in the arcs a23 and a34 in case there is a large difference between Beam 1 and Beam 2 in a single arc.
@@ -1759,14 +1793,14 @@ class LHCOptics:
 
         return LHCOpticsTable([self.copy()] + list(rows))
 
-    def twiss(self, beam=None, chrom=False, strengths=True):
+    def twiss(self, beam=None, chrom=False, strengths=True, init_at=None):
         if beam is None:
             return [
-                self.twiss(beam=1, strengths=strengths, chrom=chrom),
-                self.twiss(beam=2, strengths=strengths, chrom=chrom),
+                self.twiss(beam=1, strengths=strengths, chrom=chrom, init_at=init_at),
+                self.twiss(beam=2, strengths=strengths, chrom=chrom, init_at=init_at),
             ]
         return getattr(self.model, f"b{beam}").twiss(
-            compute_chromatic_properties=chrom, strengths=strengths
+            compute_chromatic_properties=chrom, strengths=strengths, init_at=init_at
         )
 
     def update(

@@ -1020,7 +1020,6 @@ class CouplingKnob(Knob):
                 print(f"Knob {self.name!r} has no weights, pre-setting default weights")
             self.preset_weights()
 
-
         model = self.parent.model
         xt = model._xt
 
@@ -1238,7 +1237,7 @@ class DispKnob(Knob):
         initl, initr = [tw.get_twiss_init(ii) for ii in (self.ipl, self.ipr)]
         return initl, initr
 
-    def match(self, verbose=True,steps=100):
+    def match(self, verbose=True, steps=100):
         """
         In general the problem is to find
 
@@ -1263,7 +1262,7 @@ class DispKnob(Knob):
         for beam in [1, 2]:
             model[self.ipknobname] = 0
             model[self.name] = 0
-            initl, initr = self.get_inits(beam=beam) #inits needs to be clean
+            initl, initr = self.get_inits(beam=beam)  # inits needs to be clean
             model[self.ipknobname] = self.match_value
             model[self.name] = self.match_value
 
@@ -1332,7 +1331,7 @@ class DispKnob(Knob):
                 print(f"Failed to match {self.name}")
                 model.update_knob(self)
                 if verbose:
-                   print("restoring bumps")
+                    print("restoring bumps")
                 self.parent.set_bumps(bumps, verbose=verbose)
                 raise (ex)
 
@@ -1429,6 +1428,18 @@ class CrabKnob(Knob):
             },
         }
         msg = []
+        if verbose:
+            for beam in "12":
+                for lr in "lr":
+                    for ab in "ab":
+                        wn = f"vcrab{ab}4{lr}{self.ip}.b{beam}"
+                        print(f"Weight {wn}: {model[wn]}")
+            crabs=model.search(f"acfca[hv].[ab]4[lr]{self.ip}.b[1]").items()
+            for k, v in crabs:
+                print(f"{k} voltage: {v.crab_voltage}")
+            for k, v in crabs:
+                print(f"{k} frequency: {v.frequency}")
+
         for beam, e_v in expected_values.items():
             tw = getattr(model, beam).twiss(strengths=False)
             for (at, tt), expected in e_v.items():
@@ -1436,11 +1447,11 @@ class CrabKnob(Knob):
                 delta = actual - expected
                 if verbose:
                     print(
-                        f"Check: {tt:8} at {at} = {actual:23.15g}, expected = {expected:23.15g}, delta = {delta:23.15g}"
+                        f"Check: {tt:8} {beam} at {at} = {actual:15.9g}, expected = {expected:15.9g}, delta = {delta:15.9g}"
                     )
                 if abs(delta) > threshold:
                     msg.append(
-                        f"Error: {tt} at {at} = {actual:23.15g}, delta = {delta:23.15g} != {expected:23.15g}"
+                        f"Error: {tt} {beam} at {at} = {actual:15.9g}, delta = {delta:15.9g} != {expected:15.9g}"
                     )
         model[self.name] = old_value
         if len(msg) > 0:

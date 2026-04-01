@@ -445,19 +445,22 @@ class LHCXsuiteModel:
         end=None,
         init=None,
         init_at=None,
+        zero_at=None,
         beam=None,
         full=True,
         chrom=False,
         strengths=True,
     ):
         """
+        :param init: None gives periodic solution, else propagate init to "start" and "end"
+        :param start: Starting point of the output twiss table
+        :param end: Ending point of the output twiss table
+
         Examples
         - twiss(): periodic solution, full machine, start/end of the line
         - twiss(start="ip8", end="ip2"): as before by data at the start/end of the line
-        - twiss(start="ip8", end="ip2", full=True): full machine, start/end of the line
         - twiss(start="ip8", end="ip2", init_at="ip1"): periodic solution, full machine, start/end of the line, s,mux,muy=0 at ip1
         - twiss(start="ip8", end="ip2", init="init"):
-
 
         NB: Still fails when full=False and boundaries are reversed w.r.t the line orde
         """

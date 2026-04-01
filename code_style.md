@@ -8,15 +8,14 @@ The packages are organized as following:
   - internal packages sorted alphabetically
 
 - module attributes sorted alphabetically
-
 - free functions sorted alphabetically
 
-- classes sorted sorted alphabetically
-  - class name
+- classes sorted alphabetically. Each class has
+  - class declaration
   - doc string
   - class attributes sorted alphabetically
-  - __init__
   - static methods sorted alphabetically
+  - __init__
   - class methods sorted alphabetically
   - dunder methods sorted alphabetically
   - properties sorted alphabetically
