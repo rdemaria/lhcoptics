@@ -285,6 +285,45 @@ abxws.r8      := +0.000045681598453109894*on_lhcb   ;
     """
 
     extra_defs_hllhc = """
+! Solenoids and spectrometers
+abas               := 12.00/6.0*clight/(7e12)*on_sol_atlas ;
+abls               := 6.05/12.1*clight/(7e12)*on_sol_alice ;
+abcs               := 52.00/13.0*clight/(7e12)*on_sol_cms ;
+abxwt.l2           := -0.0000772587268993839836*on_alice ;
+abwmd.l2           := +0.0001472587268993839840*on_alice ;
+abaw.r2            := -0.0001335474860334838000*on_alice ;
+abxwt.r2           := +0.0000635474860334838004*on_alice ;
+abxws.l8           := -0.000045681598453109894*on_lhcb ;
+abxwh.l8           := +0.000180681598453109894*on_lhcb ;
+ablw.r8            := -0.000180681598453109894*on_lhcb ;
+abxws.r8           := +0.000045681598453109894*on_lhcb ;
+
+! Triplet helper
+kqx.l1             := kqx2a.l1           ;
+ktqx1.l1           := kqx1.l1-kqx2a.l1   ;
+ktqx3.l1           := kqx3.l1-kqx2a.l1   ;
+kqx.r1             := kqx2a.r1           ;
+ktqx1.r1           := kqx1.r1-kqx2a.r1   ;
+ktqx3.r1           := kqx3.r1-kqx2a.r1   ;
+
+kqx.l5             := kqx2a.l5           ;
+ktqx1.l5           := kqx1.l5-kqx2a.l5   ;
+ktqx3.l5           := kqx3.l5-kqx2a.l5   ;
+kqx.r5             := kqx2a.r5           ;
+ktqx1.r5           := kqx1.r5-kqx2a.r5   ;
+ktqx3.r5           := kqx3.r5-kqx2a.r5   ;
+
+! Main dipole strength
+kb.a12             := ab.a12/l.mb        ;
+kb.a23             := ab.a23/l.mb        ;
+kb.a34             := ab.a34/l.mb        ;
+kb.a45             := ab.a45/l.mb        ;
+kb.a56             := ab.a56/l.mb        ;
+kb.a67             := ab.a67/l.mb        ;
+kb.a78             := ab.a78/l.mb        ;
+kb.a81             := ab.a81/l.mb        ;
+
+! Nominal D1-4 strengths
 kd1.l1             := ad1.l1/l.mbxf      ;
 kd1.r1             := ad1.r1/l.mbxf      ;
 kd2.l1             := ad2.l1/l.mbrd      ;
@@ -300,13 +339,13 @@ kd3.r4             := ad3.r4/l.mbrs      ;
 kd4.l4             := ad4.l4/l.mbrb      ;
 kd4.r4             := ad4.r4/l.mbrb      ;
 kd34.lr3           := ad3.lr3/l.mbw      ;
-kd34.lr7           := ad3.lr7/l.mbw      ;
 kd1.l5             := ad1.l5/l.mbxf      ;
 kd1.r5             := ad1.r5/l.mbxf      ;
 kd2.l5             := ad2.l5/l.mbrd      ;
 kd2.r5             := ad2.r5/l.mbrd      ;
 kd3.lr7            := ad3.lr7/l.mbw      ;
 kd4.lr7            := ad4.lr7/l.mbw      ;
+kd34.lr7           := ad3.lr7/l.mbw      ;
 kd1.l8             := ad1.l8/l.mbx       ;
 kd1.r8             := ad1.r8/l.mbx       ;
 kd2.l8             := ad2.l8/l.mbrc      ;
@@ -319,42 +358,10 @@ ksumd2.r1b2        := kd2.l1             ;
 ksumd2.r2b2        := kd2.l2             ;
 ksumd2.r5b2        := kd2.l5             ;
 ksumd2.r8b2        := kd2.l8             ;
-kb.a12             := ab.a12/l.mb        ;
-kb.a23             := ab.a23/l.mb        ;
-kb.a34             := ab.a34/l.mb        ;
-kb.a45             := ab.a45/l.mb        ;
-kb.a56             := ab.a56/l.mb        ;
-kb.a67             := ab.a67/l.mb        ;
-kb.a78             := ab.a78/l.mb        ;
-kb.a81             := ab.a81/l.mb        ;
-
-abas               := 12.00/6.0*clight/(7e12)*on_sol_atlas ;
-abls               := 6.05/12.1*clight/(7e12)*on_sol_alice ;
-abcs               := 52.00/13.0*clight/(7e12)*on_sol_cms ;
-abxwt.l2           := -0.0000772587268993839836*on_alice ;
-abwmd.l2           := +0.0001472587268993839840*on_alice ;
-abaw.r2            := -0.0001335474860334838000*on_alice ;
-abxwt.r2           := +0.0000635474860334838004*on_alice ;
-abxws.l8           := -0.000045681598453109894*on_lhcb ;
-abxwh.l8           := +0.000180681598453109894*on_lhcb ;
-ablw.r8            := -0.000180681598453109894*on_lhcb ;
-abxws.r8           := +0.000045681598453109894*on_lhcb ;
-
-kqx.l1             := kqx2a.l1           ;
-ktqx1.l1           := kqx1.l1-kqx2a.l1   ;
-ktqx3.l1           := kqx3.l1-kqx2a.l1   ;
-kqx.r1             := kqx2a.r1           ;
-ktqx1.r1           := kqx1.r1-kqx2a.r1   ;
-ktqx3.r1           := kqx3.r1-kqx2a.r1   ;
-
-kqx.l5             := kqx2a.l5           ;
-ktqx1.l5           := kqx1.l5-kqx2a.l5   ;
-ktqx3.l5           := kqx3.l5-kqx2a.l5   ;
-kqx.r5             := kqx2a.r5           ;
-ktqx1.r5           := kqx1.r5-kqx2a.r5   ;
-ktqx3.r5           := kqx3.r5-kqx2a.r5   ;
 
 
+
+! Optimal D1 and D2 strengths
 ! D1 and D2 angles [rad]
 ad1.l1 = 1.5009443796e-03;
 ad1.l2 = 1.5325070050e-03;
@@ -469,29 +476,52 @@ shift.bw.b6r7 = 1.5988412068e-02;
 shift.bw.c6l7 = 2.8794781954e-03;
 shift.bw.c6r7 = 2.8794781954e-03;
 shift.bw.d6l7 = 2.0802104882e-03;
-shift.bw.d6r7 = 2.0802104882e-03;! D1 and D2 strengths [1/m]
-kd1.l1 = 2.3938497863e-04;
-kd1.l2 = 1.6216998996e-04;
-kd1.l5 = 2.3938497863e-04;
-kd1.l8 = 1.6216998996e-04;
-kd1.r1 = 2.3938497863e-04;
-kd1.r2 = 1.6216998996e-04;
-kd1.r5 = 2.3938497863e-04;
-kd1.r8 = 1.6216998996e-04;
-kd2.l1 = 1.9297297712e-04;
-kd2.l2 = 1.6216998996e-04;
-kd2.l5 = 1.9297297712e-04;
-kd2.l8 = 1.6216998996e-04;
-kd2.r1 = 1.9297297712e-04;
-kd2.r2 = 1.6216998996e-04;
-kd2.r5 = 1.9297297712e-04;
-kd2.r8 = 1.6216998996e-04;! k0 for RBends in IR3
-kd34.lr3 = 5.5508556629e-05;! IR4 RBend k0
-kd3.l4 = 1.6630743049e-04;
-kd3.r4 = 1.6630743049e-04;
-kd4.l4 = 1.6630730577e-04;
-kd4.r4 = 1.6630730577e-04;! k0 for RBends in IR7
+shift.bw.d6r7 = 2.0802104882e-03;
+
+! Sep dipole strength corrections
+kd1.l1 = 0.00023938497863369427;
+kd2.l1 = 0.0001929729771192161;
+kd1.r1 = 0.00023938497863369422;
+kd2.r1 = 0.00019297297711921607;
+kd1.l2 = 0.00016216998996044585;
+kd2.l2 = 0.00016216998996044585;
+kd1.r2 = 0.00016216998996044585;
+kd2.r2 = 0.00016216998996044585;
+kd1.l5 = 0.00023938497863369427;
+kd2.l5 = 0.0001929729771192161;
+kd1.r5 = 0.00023938497863369422;
+kd2.r5 = 0.00019297297711921607;
+kd1.l8 = 0.00016216998996044585;
+kd2.l8 = 0.00016216998996044585;
+kd1.r8 = 0.00016216998996044585;
+kd2.r8 = 0.00016216998996044585;
+kd34.lr3 = 5.5508556629e-05;
+e_kd3.l3 = -2.3380076269952575e-15;
+e_kd4.l3 = -2.3379970162010004e-15;
+e_kd3.r3 = -2.338008321555881e-15;
+e_kd4.r3 = -2.3380189323500575e-15;
 kd34.lr7 = 5.5508555673e-05;
+e_kd3.l7 = -2.6314720697379465e-15;
+e_kd4.l7 = -2.6314680732113866e-15;
+e_kd3.r7 = -2.6314486486963916e-15;
+e_kd4.r7 = -2.631452645222881e-15;
+kd3.l4 = 0.0001663074304915815;
+kd4.l4 = 0.00016630730577215885;
+kd3.r4 = 0.00016630743049158152;
+kd4.r4 = 0.00016630730577215882;
+
+
+! Main dipole strength corrections
+kb.a12             := ab.a12/l.mb*(1+6.9e-13)      ;
+kb.a23             := ab.a23/l.mb*(1+6.9e-13)      ;
+kb.a34             := ab.a34/l.mb*(1+6.9e-13)      ;
+kb.a45             := ab.a45/l.mb*(1+6.9e-13)      ;
+kb.a56             := ab.a56/l.mb*(1+6.9e-13)      ;
+kb.a67             := ab.a67/l.mb*(1+6.9e-13)      ;
+kb.a78             := ab.a78/l.mb*(1+6.9e-13)      ;
+kb.a81             := ab.a81/l.mb*(1+6.9e-13)      ;
+
+
 """
 
     extra_madx = (
@@ -546,6 +576,14 @@ use, sequence=lhcb2;
             madx.input(cls.extra_madx)
         return cls(madx)
 
+    def __getitem__(self, key):
+        return self.madx.globals[key]
+
+    def __setitem__(self, key, value):
+        self.madx.globals[key] = value
+
+    def __contains__(self, key):
+        return key in self.madx.globals
     def twiss(self, sequence=None, **kwargs):
         if sequence is None:
             return (self.b1.twiss(**kwargs), self.b2.twiss(**kwargs))
@@ -662,14 +700,6 @@ use, sequence=lhcb2;
         othervar = {k: v for k, v in other.madx.globals.items() if isinstance(v, float)}
         print_diff_dict_float(selfvar, othervar)
 
-    def __getitem__(self, key):
-        return self.madx.globals[key]
-
-    def __setitem__(self, key, value):
-        self.madx.globals[key] = value
-
-    def __contains__(self, key):
-        return key in self.madx.globals
 
     def get_ap_ir(self, irn, beam,verbose=True):
         Path("temp").mkdir(exist_ok=True)
