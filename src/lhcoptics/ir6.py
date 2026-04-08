@@ -246,7 +246,7 @@ class LHCIR6(LHCIR):
                     line="b1",
                     tar="betx",
                     at="tcdqa.a4r6.b1",
-                    value=490,
+                    value=xt.GreaterThan(490),  # 490
                     tol=20,
                     tag="ex_betx_tcdqa",
                 ),
@@ -355,7 +355,7 @@ class LHCIR6(LHCIR):
                     line="b2",
                     tar="betx",
                     at="tcdqa.a4l6.b2",
-                    value=490,
+                    value=xt.GreaterThan(490),
                     tol=20,
                     tag="ex_betx_tcdqa",
                 ),
