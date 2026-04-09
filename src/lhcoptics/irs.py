@@ -52,6 +52,7 @@ def gen_acb_full_names(s1, s2, irn):
         f"acb{s1}{hv}{s2}.{lr}{irn}b{bb}" for hv in "hv" for lr in "lr" for bb in "12"
     ]
 
+
 def gen_param_names(irn):
     out = []
     for param in "betx bety alfx alfy dx dpx".split():
@@ -63,7 +64,6 @@ def gen_param_names(irn):
             out.append(f"{param}ip{irn}b{beam}_l")
             out.append(f"{param}ip{irn}b{beam}_r")
     return out
-
 
 
 class LHCIR(LHCSection):
@@ -224,6 +224,22 @@ class LHCIR(LHCSection):
     def skew_quads(self):
         return {k: v for k, v in self.strengths.items() if re.match("kqs", k)}
 
+    def check_acb_names(self, verbose=True):
+        gen = set(self.gen_acb_names())
+        mod = set()
+        for pattern in [
+            f"mcb[xcyr].*[lr]{self.irn}.*",
+            f"mcbc?[hv].1[0-3].*[lr]{self.irn}.b[12]",
+        ]:
+            mod |= set(self.parent.model.get_acb_names(pattern).values())
+        extra = gen - mod
+        missing = mod - gen
+        passed = not extra and not missing
+        if verbose and not passed:
+            print(f"Extra ACB names in model: {extra}")
+            print(f"Missing ACB names in model: {missing}")
+        return passed
+
     def check_quad_strengths(
         self,
         verbose=True,
@@ -248,6 +264,7 @@ class LHCIR(LHCSection):
         return out
 
     def get_kqx(self, n, lr):
+        "Get the strength of the kqx{n}.{lr}{irn} the individual quadrupoles"
         if self.variant.startswith("hl") and self.irn in [1, 5]:
             if n == 1:
                 kq = self.strengths[f"kqx1.{lr}{self.irn}"]

@@ -6,6 +6,8 @@ Fixes:
 - lhc.vars.load() does not create the knob structure with name expected by opt.update()
   a workaround is needed. LHCOptics.from_xsuite does the correct thing, but it is not atomic
   very dangerous...
+- after matching we want to update all the parameters, but not those that would be slightly mismatched,
+  even after a proper rematching. Rounding is not really an option because some the parameters are set from linear scans.
 
 - opt.get_params(full=True) still give atsfactor=1 and betxip1 not correct
 - investigate strange bug, dqx.b12 knobs are matched but

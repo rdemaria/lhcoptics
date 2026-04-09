@@ -52,12 +52,12 @@ class LHCIR1(LHCIR):
         out.extend(gen_acb_full_names("y", "s4", self.irn))
         if self.variant.startswith("hl"):
             out.extend(gen_acb_alt_names("y", [4], 1, "lr", self.irn))
-            out.extend(gen_acb_alt_names("c", range(5, 11), 0, "lr", self.irn))
-            out.extend(gen_acb_alt_names("", [12, 13], 0, "lr", self.irn))
+            out.extend(gen_acb_alt_names("c", range(5, 10), 0, "lr", self.irn))
+            out.extend(gen_acb_alt_names("", range(10, 14), 0, "lr", self.irn))
         else:
             out.extend(gen_acb_alt_names("y", [4], 1, "lr", self.irn))
-            out.extend(gen_acb_alt_names("c", range(5, 10), 0, "lr", self.irn))
-            out.extend(gen_acb_alt_names("", [11, 12, 13], 0, "lr", self.irn))
+            out.extend(gen_acb_alt_names("c", range(5, 11), 0, "lr", self.irn))
+            out.extend(gen_acb_alt_names("", range(11, 14), 0, "lr", self.irn))
         return out
 
     def gen_crab_names(self):
