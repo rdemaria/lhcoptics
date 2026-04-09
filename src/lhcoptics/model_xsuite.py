@@ -446,6 +446,7 @@ class LHCXsuiteModel:
         self.jsonfile = jsonfile
         self._var_values = env._xdeps_vref._owner
         self.ref = env._xdeps_vref
+        self.eref = env._xdeps_eref
         self.mgr = env._xdeps_manager
         self.madxfile = madxfile
         self.sequence = {1: env.b1, 2: env.b2}
@@ -675,86 +676,86 @@ class LHCXsuiteModel:
     def _match_d12r(self, ipn):
         lhc = self.env
         ipr = f"ip{ipn}"
-        mqyr = f"mqy.4r{ipn}.b1" if ipn in [1, 5] else f"mqy.a4r{ipn}.b1"
-        print(f"match {ipr} right from {ipr} to {mqyr}")
+        sds = f"s.ds.r{ipn}.b1"
+        print(f"match {ipr} right from {ipr} to {sds}")
         lhc.b1.match(
             vary=xt.VaryList([f"kd1.r{ipn}", f"kd2.r{ipn}"], step=1e-12),
-            targets=xt.TargetSet(at=mqyr, px=0, x=0, tol=1e-16),
+            targets=xt.TargetSet(at=sds, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
             start=ipr,
-            end=mqyr,
+            end=sds,
         )
 
     def _match_d12l(self, ipn):
         lhc = self.env
         ipl = "ip1.l1" if ipn == 1 else f"ip{ipn}"
-        mqyl = f"mqy.4l{ipn}.b1" if ipn in [1, 5] else f"mqy.a4l{ipn}.b1"
-        print(f"match {ipl} left from {mqyl} to {ipl}")
+        eds = f"e.ds.l{ipn}.b1"
+        print(f"match {ipl} left from {eds} to {ipl}")
         lhc.b1.match(
             vary=xt.VaryList([f"kd1.l{ipn}", f"kd2.l{ipn}"], step=1e-12),
             targets=xt.TargetSet(at=ipl, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
-            start=mqyl,
+            start=eds,
             end=ipl,
         )
 
     def _match_d34l(self, ipn):
         lhc = self.env
         ipl = f"ip{ipn}"
-        q6 = f"mqtlh.a6l{ipn}.b1"
-        print(f"match {ipl} left from {q6} to {ipl}")
+        eds = f"e.ds.l{ipn}.b1"
+        print(f"match {ipl} left from {eds} to {ipl}")
 
         lhc.b1.match(
             vary=xt.VaryList([f"e_kd3.l{ipn}", f"e_kd4.l{ipn}"], step=1e-12),
             targets=xt.TargetSet(at=ipl, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
-            start=q6,
+            start=eds,
             end=ipl,
         )
 
     def _match_d34r(self, ipn):
         lhc = self.env
         ipr = f"ip{ipn}"
-        q6 = f"mqtlh.a6r{ipn}.b1"
-        print(f"match {ipr} right from {ipr} to {q6}")
+        sds = f"s.ds.r{ipn}.b1"
+        print(f"match {ipr} right from {ipr} to {sds}")
         lhc.b1.match(
             vary=xt.VaryList([f"e_kd3.r{ipn}", f"e_kd4.r{ipn}"], step=1e-12),
-            targets=xt.TargetSet(at=q6, px=0, x=0, tol=1e-16),
+            targets=xt.TargetSet(at=sds, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
             start=ipr,
-            end=q6,
+            end=sds,
         )
 
     def _match_d34l4(self):
         lhc = self.env
         ipl = "ip4"
-        q4 = "mqy.6l4.b1"
-        print(f"match {ipl} left from {q4} to {ipl}")
+        eds = "e.ds.l4.b1"
+        print(f"match {ipl} left from {eds} to {ipl}")
         lhc.b1.match(
             vary=xt.VaryList([f"kd3.l4", f"kd4.l4"], step=1e-12),
             targets=xt.TargetSet(at=ipl, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
-            start=q4,
+            start=eds,
             end=ipl,
         )
 
     def _match_d34r4(self):
         lhc = self.env
         ipr = "ip4"
-        q4 = "mqy.6r4.b1"
-        print(f"match {ipr} right from {ipr} to {q4}")
+        sds = "s.ds.r4.b1"
+        print(f"match {ipr} right from {ipr} to {sds}")
         lhc.b1.match(
             vary=xt.VaryList([f"kd3.r4", f"kd4.r4"], step=1e-12),
-            targets=xt.TargetSet(at=q4, px=0, x=0, tol=1e-16),
+            targets=xt.TargetSet(at=sds, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
             start=ipr,
-            end=q4,
+            end=sds,
         )
 
     def aperture(
@@ -853,6 +854,21 @@ class LHCXsuiteModel:
     def filter(self, pattern):
         var_values = list(self._var_values.keys())
         return list(filter(lambda item: re.match(pattern, item), var_values))
+
+    def get_acb_names(self, pattern="mcb", debug=False):
+        out={}
+        for k,v in self.search(pattern).items():
+            if hasattr(v, "knl"):
+                if "h" in k:
+                    exp=self.eref[k].knl[0]._expr
+                else:
+                    exp=self.eref[k].ksl[0]._expr
+                if exp is not None:
+                     out[k]=exp._get_dependencies().pop()._key
+                elif debug:
+                    print(f"Warning: no expression found for {k}")
+        return out
+
 
     def get(self, key, default=None):
         return self._var_values.get(key, default)

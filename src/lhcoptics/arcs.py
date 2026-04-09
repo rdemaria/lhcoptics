@@ -3,7 +3,7 @@ import numpy as np
 import xtrack as xt
 
 from .model_xsuite import LHCMadxModel
-from .section import LHCSection
+from .section import LHCSection, gen_acb_alt_names
 from .utils import match_compare_log
 
 
@@ -101,6 +101,39 @@ class LHCArc(LHCSection):
             return f"<LHCArc {self.name}>"
         else:
             return f"<LHCArc {self.name} in {self.parent.name!r}>"
+
+    def gen_skewquad_names(self):
+        a = self.i1 % 2 + 1
+        b = self.i2 % 2 + 1
+        return [f"kqs.{self.name}b{a}", f"kqs.r{self.i1}b{b}", f"kqs.l{self.i2}b{b}"]
+
+    def gen_acb_names(self):
+        out = []
+        if self.i1%2==1:
+            out.extend(gen_acb_alt_names("", range(14, 34), 0, "r", self.i1))
+            out.extend(gen_acb_alt_names("", range(34, 13, -1), 1, "l", self.i2))
+        else:
+            out.extend(gen_acb_alt_names("", range(14, 34), 1, "r", self.i1))
+            out.extend(gen_acb_alt_names("", range(34, 13, -1), 0, "l", self.i2))
+        return out
+
+    def check_acb_names(self, verbose=True):
+        gen = set(self.gen_acb_names())
+        mod=set()
+        for pattern in [
+            f"mcb[hv].[23][0-9].*l{self.i2}.b[12]",
+            f"mcb[hv].1[4-9].*l{self.i2}.b[12]",
+            f"mcb[hv].[23][0-9].*r{self.i1}.b[12]",
+            f"mcb[hv].1[4-9].*r{self.i1}.b[12]",
+        ]:
+            mod |= set(self.parent.model.get_acb_names(pattern).values())
+        extra = gen - mod
+        missing = mod - gen
+        passed=not extra and not missing
+        if verbose and not passed:
+            print(f"Extra ACB names in model: {extra}")
+            print(f"Missing ACB names in model: {missing}")
+        return passed
 
     def get_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""

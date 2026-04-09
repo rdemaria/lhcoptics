@@ -19,6 +19,21 @@ _ac = {
     1: [("h", "l", "2"), ("v", "l", "2"), ("h", "r", "1"), ("v", "r", "1")],
 }
 
+def gen_acb_alt_names(s1, nns, pol, lr, irn):
+    """
+    Return alternate names for the acb. pol select the symmetry.
+    """
+    out=[]
+    for nn in nns:
+        if lr == "lr":
+            hvlrb = ["hl1", "hr2","vr1","vl2"] if nn%2==pol else ["hr1", "hl2","vr2","vl1"]
+        elif lr == "l":
+            hvlrb = ["hl1","vl2"] if nn%2==pol else ["hl2","vl1"]
+        elif lr == "r":
+            hvlrb = ["hr2","vr1"] if nn%2==pol else ["hr1","vr2"]
+        out.extend([f"acb{s1}{hv}{nn}.{lr}{irn}b{bb}" for hv, lr,bb in hvlrb])
+    return out
+
 
 def sort_n(lst):
     out = []

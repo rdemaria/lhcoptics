@@ -13,6 +13,59 @@ def is_hllhc(variant):
     return variant.startswith("hl")
 
 
+def gen_ttlhc(irn):
+    return [f"k{ss}.{lr}{irn}" for ss in ["qx", "tqx1", "tqx2"] for lr in "lr"]
+
+
+def gen_tthl(irn):
+    return [f"kqx{nn}.{lr}{irn}" for nn in [1, "2a", "2b", 3] for lr in "lr"]
+
+
+def gen_qq(nns, irn):
+    return [f"kq{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
+
+
+def gen_qt(nns, irn):
+    return [f"kqt{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
+
+
+def gen_qtl(nns, irn):
+    return [f"kqtl{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
+
+
+def gen_crab_names(irn):
+    return [
+        f"{lv}crab{ab}4{lr}{irn}.b{bb}"
+        for lv in "lv"
+        for bb in "12"
+        for lr in "lr"
+        for ab in "ab"
+    ]
+
+
+def gen_acbx_names(irn):
+    return [f"acbx{hv}{nn}.{lr}{irn}" for nn in "123" for hv in "hv" for lr in "lr"]
+
+
+def gen_acb_full_names(s1, s2, irn):
+    return [
+        f"acb{s1}{hv}{s2}.{lr}{irn}b{bb}" for hv in "hv" for lr in "lr" for bb in "12"
+    ]
+
+def gen_param_names(irn):
+    out = []
+    for param in "betx bety alfx alfy dx dpx".split():
+        for beam in "12":
+            out.append(f"{param}ip{irn}b{beam}")
+    for param in "mux muy".split():
+        for beam in "12":
+            out.append(f"{param}ip{irn}b{beam}")
+            out.append(f"{param}ip{irn}b{beam}_l")
+            out.append(f"{param}ip{irn}b{beam}_r")
+    return out
+
+
+
 class LHCIR(LHCSection):
     """
     Model of an LHC Interaction Region
@@ -127,7 +180,7 @@ class LHCIR(LHCSection):
         self.endb2 = f"e.ds.r{irn}.b2"
         self.startb12 = (self.startb1, self.startb2)
         self.endb12 = (self.endb1, self.endb2)
-        self.param_names = self._get_param_default_names()
+        self.param_names = gen_param_names(self.irn)
         self.param_names.extend(self._extra_param_names)
 
     def __getitem__(self, key):
@@ -142,19 +195,6 @@ class LHCIR(LHCSection):
             return f"<LHCIR{self.irn} from {self.filename!r}>"
         else:
             return f"<LHCIR{self.irn}>"
-
-    def _get_param_default_names(self):
-        ipname = self.ipname
-        params = []
-        for param in "betx bety alfx alfy dx dy".split():
-            for beam in "12":
-                params.append(f"{param}{ipname}{beam}")
-        for param in "mux muy".split():
-            for beam in "12":
-                params.append(f"{param}{ipname}b{beam}")
-                params.append(f"{param}{ipname}b{beam}_l")
-                params.append(f"{param}{ipname}b{beam}_r")
-        return params
 
     @property
     def arc_left(self):

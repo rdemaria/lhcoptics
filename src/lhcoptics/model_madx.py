@@ -520,8 +520,6 @@ kb.a56             := ab.a56/l.mb*(1+6.9e-13)      ;
 kb.a67             := ab.a67/l.mb*(1+6.9e-13)      ;
 kb.a78             := ab.a78/l.mb*(1+6.9e-13)      ;
 kb.a81             := ab.a81/l.mb*(1+6.9e-13)      ;
-
-
 """
 
     extra_madx = (
