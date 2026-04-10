@@ -869,6 +869,16 @@ class LHCXsuiteModel:
                     print(f"Warning: no expression found for {k}")
         return out
 
+    def get_kq_names(self, pattern="mq[^s]", debug=False):
+        out={}
+        for k,v in self.search(pattern).items():
+            if hasattr(v, "k1"):
+                exp=self.eref[k].k1._expr
+                if exp is not None:
+                     out[k]=exp._get_dependencies().pop()._key
+                elif debug:
+                    print(f"Warning: no expression found for {k}")
+        return out
 
     def get(self, key, default=None):
         return self._var_values.get(key, default)

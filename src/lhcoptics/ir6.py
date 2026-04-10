@@ -2,54 +2,13 @@ import numpy as np
 
 import xtrack as xt
 
-from .irs import LHCIR
+from .irs import LHCIR, gen_qq, gen_qt, gen_qtl
+from .section import gen_acb_alt_names
 
 
 def beta_dump(bet, alf):
     al_dump = 761
     return bet - 2 * alf * al_dump + al_dump**2 * (1 + alf**2) / bet
-
-
-def tcdq_mingap(bet, dx):
-    nsig = 10.1
-    dpoverp = 2e-4
-    emitx = 2.5e-6 / (7000 / 0.9382720814)
-    maxorbitdrift = 0.6e-3
-    return nsig * np.sqrt(emitx * bet) - 3e-4 - abs(dx * dpoverp) - maxorbitdrift
-
-
-def tcdq_gap(bet):
-    nsigma = 10.1
-    emitx = 2.5e-6 / (7000 / 0.9382720814)
-    return nsigma * np.sqrt(emitx * bet)
-
-
-def dmuxkickb1(tw1):
-    muxmkdb1 = tw1["mux", "mkd.h5l6.b1"]
-    dmuxb1 = np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"]) - muxmkdb1
-    return abs(dmuxb1 - 0.25).max()
-
-
-def dmuxkickb2(tw2):
-    muxmkdb2 = tw2["mux", "mkd.h5r6.b2"]
-    dmuxb2 = muxmkdb2 - np.array([tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"])
-    return abs(dmuxb2 - 0.25).max()
-
-
-def dmuxkickb1_bds(tw1):
-    return tw1["mux", "mkd.h5l6.b1"] - tw1["mux", "s.ds.l6.b1"]
-
-
-def dmuxkickb2_bds(tw2):
-    return tw2["mux", "mkd.h5r6.b2"] - tw2["mux", "s.ds.l6.b2"]
-
-
-def dmuxkickb1_eds(tw1):
-    return tw1["mux", "e.ds.r6.b1"] - tw1["mux", "mkd.h5l6.b1"]
-
-
-def dmuxkickb2_eds(tw2):
-    return tw2["mux", "e.ds.r6.b2"] - tw2["mux", "mkd.h5r6.b2"]
 
 
 def betxdump(tw):
@@ -62,6 +21,48 @@ def betydump(tw):
 
 def betxydump(tw):
     return np.sqrt(betxdump(tw) * betydump(tw))
+
+
+def dmuxkickb1(tw1):
+    muxmkdb1 = tw1["mux", "mkd.h5l6.b1"]
+    dmuxb1 = np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"]) - muxmkdb1
+    return abs(dmuxb1 - 0.25).max()
+
+
+def dmuxkickb1_bds(tw1):
+    return tw1["mux", "mkd.h5l6.b1"] - tw1["mux", "s.ds.l6.b1"]
+
+
+def dmuxkickb1_eds(tw1):
+    return tw1["mux", "e.ds.r6.b1"] - tw1["mux", "mkd.h5l6.b1"]
+
+
+def dmuxkickb2(tw2):
+    muxmkdb2 = tw2["mux", "mkd.h5r6.b2"]
+    dmuxb2 = muxmkdb2 - np.array([tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"])
+    return abs(dmuxb2 - 0.25).max()
+
+
+def dmuxkickb2_bds(tw2):
+    return tw2["mux", "mkd.h5r6.b2"] - tw2["mux", "s.ds.l6.b2"]
+
+
+def dmuxkickb2_eds(tw2):
+    return tw2["mux", "e.ds.r6.b2"] - tw2["mux", "mkd.h5r6.b2"]
+
+
+def tcdq_gap(bet):
+    nsigma = 10.1
+    emitx = 2.5e-6 / (7000 / 0.9382720814)
+    return nsigma * np.sqrt(emitx * bet)
+
+
+def tcdq_mingap(bet, dx):
+    nsig = 10.1
+    dpoverp = 2e-4
+    emitx = 2.5e-6 / (7000 / 0.9382720814)
+    maxorbitdrift = 0.6e-3
+    return nsig * np.sqrt(emitx * bet) - 3e-4 - abs(dx * dpoverp) - maxorbitdrift
 
 
 class LHCIR6(LHCIR):
@@ -80,17 +81,19 @@ class LHCIR6(LHCIR):
             vvb = twb[kk, f"e.ds.r2.b{beam}"] - twb[kk][0]
             print(f"{kk:5} at ip1: {vva:9.6f} {vvb:9.6f}")
 
-    def get_mux_ats(self, beam):
-        line = self.model.sequence[beam]
-        ir5 = self.parent.ir5
-        ds = f"s.ds.l6.b{beam}"
-        tw = line.twiss(
-            start="ip5",
-            end=ds,
-            betx=ir5.params[f"betxip5b{beam}"],
-            bety=ir5.params[f"betyip5b{beam}"],
-        )
-        return tw["mux", ds], tw["muy", ds]
+    def gen_acb_names(self):
+        out = []
+        out.extend(gen_acb_alt_names("y", [4,5], 1, "lr", self.irn))
+        out.extend(gen_acb_alt_names("c", range(8, 11), 1, "lr", self.irn))
+        out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
+        return out
+
+    def gen_quad_names(self):
+        quads = []
+        quads.extend(gen_qq([4,5,8,9,10], self.irn))
+        quads.extend(gen_qtl([11], self.irn))
+        quads.extend(gen_qt([12, 13], self.irn))
+        return quads
 
     def get_init_ats(self, beam):
         rx = self.parent.params["rx_ip5"]
@@ -109,6 +112,18 @@ class LHCIR6(LHCIR):
         init.mux -= mux
         init.muy -= muy
         return init
+
+    def get_mux_ats(self, beam):
+        line = self.model.sequence[beam]
+        ir5 = self.parent.ir5
+        ds = f"s.ds.l6.b{beam}"
+        tw = line.twiss(
+            start="ip5",
+            end=ds,
+            betx=ir5.params[f"betxip5b{beam}"],
+            bety=ir5.params[f"betyip5b{beam}"],
+        )
+        return tw["mux", ds], tw["muy", ds]
 
     def get_params_from_twiss(self, tw1, tw2):
         params = LHCIR.get_params_from_twiss(self, tw1, tw2)

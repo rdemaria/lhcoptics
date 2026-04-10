@@ -117,6 +117,22 @@ class LHCArc(LHCSection):
             out.extend(gen_acb_alt_names("", range(34, 13, -1), 0, "l", self.i2))
         return out
 
+    def gen_quad_names(self):
+        return [
+        f"kqf.{self.name}",
+        f"kqd.{self.name}",
+        f"kqtf.{self.name}b1",
+        f"kqtf.{self.name}b2",
+        f"kqtd.{self.name}b1",
+        f"kqtd.{self.name}b2"]
+
+    def gen_sext_names(self):
+        return [f"ks{fd}{nn}.{self.name}b{bb}" for fd in "fd" for nn in "12" for bb in "12"]
+
+    def gen_oct_names(self):
+        return [f"ko{fd}.{self.name}b{bb}" for fd in "fd" for bb in "12"]
+
+
     def check_acb_names(self, verbose=True):
         gen = set(self.gen_acb_names())
         mod=set()

@@ -228,7 +228,7 @@ class LHCIR(LHCSection):
         gen = set(self.gen_acb_names())
         mod = set()
         for pattern in [
-            f"mcb[xcyr].*[lr]{self.irn}.*",
+            f"mcb[xcyrw].*[lr]{self.irn}.*",
             f"mcbc?[hv].1[0-3].*[lr]{self.irn}.b[12]",
         ]:
             mod |= set(self.parent.model.get_acb_names(pattern).values())

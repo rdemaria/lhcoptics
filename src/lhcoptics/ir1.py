@@ -63,8 +63,22 @@ class LHCIR1(LHCIR):
     def gen_crab_names(self):
         return gen_crab_names(self.irn)
 
-    def gen_param_names(self):
-        return gen_param_names(self.irn)
+    def gen_knob_names(self):
+        out = []
+        if self.variant.startswith("hl"):
+            out.extend(
+                f"on_{kk}{self.irn}{hv}" for kk in ["a", "o", "sep"] for hv in "hv"
+            )
+            out.extend(f"on_x{self.irn}{hv}{ls}" for ls in "ls" for hv in "hv")
+            out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
+            out.append(f"on_crab{self.irn}")
+        else:
+            out.extend(
+                f"on_{kk}{self.irn}_{hv}" for kk in ["x", "sep"] for hv in "hv"
+            )
+            out.extend(f"on_o{hv}{self.irn}" for hv in "hv")
+            out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
+        return out
 
     def gen_quad_names(self):
         quads = []

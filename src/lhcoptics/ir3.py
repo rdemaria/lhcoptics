@@ -1,11 +1,10 @@
-from .irs import LHCIR
+from .irs import LHCIR, gen_qt, gen_qtl, gen_qq
 from .model_xsuite import SinglePassDispersion
+from .section import gen_acb_alt_names
 
 
 class LHCIR3(LHCIR):
-    name = "ir3"
-
-    colls_ir3b1 = [
+    collimators = [
         "tcp.6l3.b1",
         "tcsg.5l3.b1",
         "tcsg.4r3.b1",
@@ -15,8 +14,6 @@ class LHCIR3(LHCIR):
         "tcla.b5r3.b1",
         "tcla.6r3.b1",
         "tcla.7r3.b1",
-    ]
-    colls_ir3b2 = [
         "tcp.6r3.b2",
         "tcsg.5r3.b2",
         "tcsg.4l3.b2",
@@ -28,7 +25,8 @@ class LHCIR3(LHCIR):
         "tcla.7l3.b2",
     ]
 
-    collimators = colls_ir3b1 + colls_ir3b2
+    colls_ir3b1 = collimators[:9]
+    colls_ir3b2 = collimators[9:]
 
     knobsRematched13b_mu = {
         "kqt4.l3": 0.0006887129999999986,
@@ -68,6 +66,24 @@ class LHCIR3(LHCIR):
         "kqt12.r3b2": -9.48176531256308e-05,
         "kqt13.r3b2": -0.005098976136482916,
     }
+    name = "ir3"
+
+
+    def gen_acb_names(self):
+        out = []
+        out.extend(gen_acb_alt_names("w", [4,5], 0, "lr", self.irn))
+        out.extend(gen_acb_alt_names("c", range(6, 11), 0, "lr", self.irn))
+        out.extend(gen_acb_alt_names("", range(11, 14), 0, "lr", self.irn))
+        return out
+
+    def gen_quad_names(self):
+        quads = []
+        quads.extend(["kq4.lr3","kqt4.l3","kqt4.r3"])
+        quads.extend(["kq5.lr3","kqt5.l3","kqt5.r3"])
+        quads.extend(gen_qq([6], self.irn))
+        quads.extend(gen_qtl(range(7,12), self.irn))
+        quads.extend(gen_qt([12, 13], self.irn))
+        return quads
 
     def get_params_from_twiss(self, tw1, tw2):
         params = LHCIR.get_params_from_twiss(self, tw1, tw2)

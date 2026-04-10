@@ -2,15 +2,14 @@ from .irs import (
     LHCIR,
     gen_acb_full_names,
     gen_acbx_names,
-    gen_crab_names,
     gen_param_names,
     gen_qq,
     gen_qt,
     gen_qtl,
-    gen_tthl,
     gen_ttlhc,
 )
 from .section import gen_acb_alt_names
+
 
 class LHCIR2(LHCIR):
     """IR2-specific optics model."""
@@ -30,7 +29,6 @@ class LHCIR2(LHCIR):
     ]
     name = "ir2"
 
-
     def check_ats(self, beam):
         twa = self.twiss_ats_ip(beam)
         twb = self.twiss_ats_init(beam)
@@ -44,21 +42,35 @@ class LHCIR2(LHCIR):
             vvb = twb[kk, f"e.ds.r2.b{beam}"] - twb[kk][0]
             print(f"{kk:5} at ip1: {vva:9.6f} {vvb:9.6f}")
 
-
     def gen_acb_names(self):
         out = []
         out.extend(gen_acbx_names(self.irn))
         out.extend(gen_acb_full_names("y", "s4", self.irn))
         out.extend(gen_acb_alt_names("y", [4], 1, "lr", self.irn))
-        out.extend(f"acbc{hv}s5.r2b{beam}" for hv in "hv" for beam in "12")
-        out.extend(f"acby{hv}s5.l2b{beam}" for hv in "hv" for beam in "12")
-        out.extend(["acbyh5.l2b1", "acbyv5.l2b2","acbcv5.r2b1", "acbch5.r2b2"])
+        out.extend(f"acbc{hv}s5.l2b{beam}" for hv in "hv" for beam in "12")
+        out.extend(f"acby{hv}s5.r2b{beam}" for hv in "hv" for beam in "12")
+        out.extend(["acbyh5.l2b1", "acbyv5.l2b2", "acbcv5.r2b1", "acbch5.r2b2"])
         out.extend(gen_acb_alt_names("c", range(6, 11), 1, "lr", self.irn))
         out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
         return out
 
-    def gen_param_names(self):
-        return gen_param_names(self.irn)
+
+    def gen_knob_names(self):
+        out = []
+        if self.variant.startswith("hl"):
+            out.extend(
+                f"on_{kk}{self.irn}{hv}" for kk in ["a", "o", "sep", "x"] for hv in "hv"
+            )
+            out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
+        else:
+            out.append(f"on_a{self.irn}")
+            out.extend(
+                f"on_{kk}{self.irn}{hv}" for kk in ["x", "sep"] for hv in "hv"
+            )
+            out.extend(f"on_o{hv}{self.irn}" for hv in "hv")
+            out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
+        return out
+
 
     def gen_quad_names(self):
         quads = []
@@ -66,8 +78,7 @@ class LHCIR2(LHCIR):
         quads.extend(gen_qq(range(4, 11), self.irn))
         quads.extend(gen_qtl([11], self.irn))
         quads.extend(gen_qt([12, 13], self.irn))
-        return quads  
-
+        return quads
 
     def get_init_ats(self, beam):
         rx = self.parent.params["rx_ip1"]

@@ -1,13 +1,11 @@
-from pytest import fail
 import xtrack as xt
 
-from .irs import LHCIR, match_compare_log
+from .irs import LHCIR, match_compare_log, gen_qq, gen_qt, gen_qtl
+from .section import gen_acb_alt_names
 from .model_xsuite import SinglePassDispersion
 
 
 class LHCIR7(LHCIR):
-    name = "ir7"
-
     collimators = [
         "tcp.c6l7.b1",
         "tcp.d6l7.b1",
@@ -73,6 +71,23 @@ class LHCIR7(LHCIR):
         "kq4.lr7": 0.0011653779946877393,
         "kq5.lr7": -0.001202569087048791,
     }
+    name = "ir7"
+
+    def gen_acb_names(self):
+        out = []
+        out.extend(gen_acb_alt_names("w", [4, 5], 0, "lr", self.irn))
+        out.extend(gen_acb_alt_names("c", range(6, 11), 0, "lr", self.irn))
+        out.extend(gen_acb_alt_names("", range(11, 14), 0, "lr", self.irn))
+        return out
+
+    def gen_quad_names(self):
+        quads = []
+        quads.extend(["kq4.lr7","kqt4.l7","kqt4.r7"])
+        quads.extend(["kq5.lr7"])
+        quads.extend(gen_qq([6], self.irn))
+        quads.extend(gen_qtl(range(7,12), self.irn))
+        quads.extend(gen_qt([12, 13], self.irn))
+        return quads
 
     def get_params_from_twiss(self, tw1, tw2):
         params = LHCIR.get_params_from_twiss(self, tw1, tw2)

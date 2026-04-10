@@ -1,8 +1,17 @@
-from .irs import LHCIR
+from .irs import (
+    LHCIR,
+    gen_acb_full_names,
+    gen_acbx_names,
+    gen_param_names,
+    gen_qq,
+    gen_qt,
+    gen_qtl,
+    gen_ttlhc,
+)
+from .section import gen_acb_alt_names
 
 
 class LHCIR8(LHCIR):
-    name = "ir8"
     knob_names = [
         "on_x8h",
         "on_sep8h",
@@ -17,6 +26,7 @@ class LHCIR8(LHCIR):
         "on_yip8b1",
         "on_yip8b2",
     ]
+    name = "ir8"
 
     def check_ats(self, beam):
         twa = self.twiss_ats_ip(beam)
@@ -31,18 +41,28 @@ class LHCIR8(LHCIR):
             vvb = twb[kk, "ip1"] - twb[kk][0]
             print(f"{kk:5} at ip1: {vva:9.6f} {vvb:9.6f}")
 
-    def get_mux_ats(self, beam):
-        line = self.model.sequence[beam]
-        ir1 = self.parent.ir1
-        ds = f"e.ds.r8.b{beam}"
-        tw = line.twiss(
-            start=ds,
-            end="ip1",
-            init_at="ip1",
-            betx=ir1.params[f"betxip1b{beam}"],
-            bety=ir1.params[f"betyip1b{beam}"],
-        )
-        return -tw["mux", ds], -tw["muy", ds]
+    def gen_acb_names(self):
+        out = []
+        out.extend(gen_acbx_names(self.irn))
+        out.extend(gen_acb_full_names("y", "s4", self.irn))
+        out.extend(gen_acb_alt_names("y", [4], 1, "lr", self.irn))
+        out.extend(f"acbc{hv}s5.l8b{beam}" for hv in "hv" for beam in "12")
+        out.extend(f"acby{hv}s5.r8b{beam}" for hv in "hv" for beam in "12")
+        out.extend(["acbch5.l8b1", "acbcv5.l8b2", "acbyv5.r8b1", "acbyh5.r8b2"])
+        out.extend(gen_acb_alt_names("c", range(6, 11), 1, "lr", self.irn))
+        out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
+        return out
+
+    def gen_param_names(self):
+        return gen_param_names(self.irn)
+
+    def gen_quad_names(self):
+        quads = []
+        quads.extend(gen_ttlhc(self.irn))
+        quads.extend(gen_qq(range(4, 11), self.irn))
+        quads.extend(gen_qtl([11], self.irn))
+        quads.extend(gen_qt([12, 13], self.irn))
+        return quads
 
     def get_init_ats(self, beam):
         rx = self.parent.params["rx_ip1"]
@@ -62,6 +82,19 @@ class LHCIR8(LHCIR):
         dmux = -tw["mux", ds] - mux
         dmuy = -tw["muy", ds] - muy
         return init, dmux, dmuy
+
+    def get_mux_ats(self, beam):
+        line = self.model.sequence[beam]
+        ir1 = self.parent.ir1
+        ds = f"e.ds.r8.b{beam}"
+        tw = line.twiss(
+            start=ds,
+            end="ip1",
+            init_at="ip1",
+            betx=ir1.params[f"betxip1b{beam}"],
+            bety=ir1.params[f"betyip1b{beam}"],
+        )
+        return -tw["mux", ds], -tw["muy", ds]
 
     def set_init_ats(self, beam):
         initb, dmuxb, dmuyb = self.get_init_ats(beam)

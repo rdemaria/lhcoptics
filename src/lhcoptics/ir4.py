@@ -1,4 +1,5 @@
-from .irs import LHCIR
+from .irs import LHCIR, gen_qq, gen_qt, gen_qtl
+from .section import gen_acb_alt_names
 
 
 class LHCIR4(LHCIR):
@@ -17,18 +18,19 @@ class LHCIR4(LHCIR):
             vvb = twb[kk, "ip5"] - twb[kk][0]
             print(f"{kk:5} at ip5: {vva:9.6f} {vvb:9.6f}")
 
-    def get_mux_ats(self, beam):
-        line = self.model.sequence[beam]
-        ir5 = self.parent.ir5
-        ds = f"e.ds.r4.b{beam}"
-        tw = line.twiss(
-            start=ds,
-            end="ip5",
-            init_at="ip5",
-            betx=ir5.params[f"betxip5b{beam}"],
-            bety=ir5.params[f"betyip5b{beam}"],
+    def gen_acb_names(self):
+        out = []
+        out.extend(gen_acb_alt_names("y", [5, 6], 1, "lr", self.irn))
+        out.extend(gen_acb_alt_names("c", range(7, 11), 1, "lr", self.irn))
+        out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
+        return out
+
+    def gen_quad_names(self):
+        return (
+            gen_qq(range(5, 11), self.irn)
+            + gen_qtl([11], self.irn)
+            + gen_qt(range(12, 14), self.irn)
         )
-        return -tw["mux", ds], -tw["muy", ds]
 
     def get_init_ats(self, beam):
         rx = self.parent.params["rx_ip5"]
@@ -48,6 +50,19 @@ class LHCIR4(LHCIR):
         dmux = -tw["mux", ds] - mux
         dmuy = -tw["muy", ds] - muy
         return init, dmux, dmuy
+
+    def get_mux_ats(self, beam):
+        line = self.model.sequence[beam]
+        ir5 = self.parent.ir5
+        ds = f"e.ds.r4.b{beam}"
+        tw = line.twiss(
+            start=ds,
+            end="ip5",
+            init_at="ip5",
+            betx=ir5.params[f"betxip5b{beam}"],
+            bety=ir5.params[f"betyip5b{beam}"],
+        )
+        return -tw["mux", ds], -tw["muy", ds]
 
     def set_init_ats(self, beam):
         initb, dmuxb, dmuyb = self.get_init_ats(beam)
