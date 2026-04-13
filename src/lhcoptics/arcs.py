@@ -117,6 +117,9 @@ class LHCArc(LHCSection):
             out.extend(gen_acb_alt_names("", range(34, 13, -1), 0, "l", self.i2))
         return out
 
+    def gen_bend_names(self):
+        return [f"ab.{self.name}",f"kb.{self.name}"]
+
     def gen_quad_names(self):
         return [
         f"kqf.{self.name}",

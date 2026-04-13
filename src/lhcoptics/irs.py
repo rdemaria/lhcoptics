@@ -9,8 +9,29 @@ from .section import LHCSection, lhcprev, lhcsucc, sort_n
 from .utils import match_compare_log
 
 
-def is_hllhc(variant):
-    return variant.startswith("hl")
+def gen_acb_full_names(s1, s2, irn):
+    return [
+        f"acb{s1}{hv}{s2}.{lr}{irn}b{bb}" for hv in "hv" for lr in "lr" for bb in "12"
+    ]
+
+def gen_acbx_names(irn):
+    return [f"acbx{hv}{nn}.{lr}{irn}" for nn in "123" for hv in "hv" for lr in "lr"]
+
+def gen_d12_names(irn):
+    out=[f"ad{nn}.{lr}{irn}" for nn in "12" for lr in "lr"]
+    out.extend(f"sep_mid_d1.{lr}{irn}" for lr in "lr")
+    out.extend(f"shift_d2.{lr}{irn}" for lr in "lr")
+    out.extend(f"kd{nn}.{lr}{irn}" for nn in "12" for lr in "lr")
+    return out
+
+def gen_crab_names(irn):
+    return [
+        f"{lv}crab{ab}4{lr}{irn}.b{bb}"
+        for lv in "lv"
+        for bb in "12"
+        for lr in "lr"
+        for ab in "ab"
+    ]
 
 
 def gen_ttlhc(irn):
@@ -33,24 +54,6 @@ def gen_qtl(nns, irn):
     return [f"kqtl{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
 
 
-def gen_crab_names(irn):
-    return [
-        f"{lv}crab{ab}4{lr}{irn}.b{bb}"
-        for lv in "lv"
-        for bb in "12"
-        for lr in "lr"
-        for ab in "ab"
-    ]
-
-
-def gen_acbx_names(irn):
-    return [f"acbx{hv}{nn}.{lr}{irn}" for nn in "123" for hv in "hv" for lr in "lr"]
-
-
-def gen_acb_full_names(s1, s2, irn):
-    return [
-        f"acb{s1}{hv}{s2}.{lr}{irn}b{bb}" for hv in "hv" for lr in "lr" for bb in "12"
-    ]
 
 
 def gen_param_names(irn):
@@ -64,6 +67,9 @@ def gen_param_names(irn):
             out.append(f"{param}ip{irn}b{beam}_l")
             out.append(f"{param}ip{irn}b{beam}_r")
     return out
+
+def is_hllhc(variant):
+    return variant.startswith("hl")
 
 
 class LHCIR(LHCSection):

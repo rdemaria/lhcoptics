@@ -25,6 +25,10 @@ class LHCIR4(LHCIR):
         out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
         return out
 
+    def gen_bend_names(self):
+        out = [f"{tt}{nn}.{lr}4" for tt in ["ad", "kd"] for nn in "34" for lr in "lr"]
+        return out
+
     def gen_quad_names(self):
         return (
             gen_qq(range(5, 11), self.irn)

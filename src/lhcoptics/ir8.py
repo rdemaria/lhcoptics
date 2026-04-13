@@ -2,6 +2,7 @@ from .irs import (
     LHCIR,
     gen_acb_full_names,
     gen_acbx_names,
+    gen_d12_names,
     gen_param_names,
     gen_qq,
     gen_qt,
@@ -51,6 +52,29 @@ class LHCIR8(LHCIR):
         out.extend(["acbch5.l8b1", "acbcv5.l8b2", "acbyv5.r8b1", "acbyh5.r8b2"])
         out.extend(gen_acb_alt_names("c", range(6, 11), 1, "lr", self.irn))
         out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
+        return out
+
+    def gen_bend_names(self):
+        return gen_d12_names(self.irn)
+
+    def gen_experiment_names(self):
+        return ["abxws.l8","abxwh.l8","ablw.r8","abxws.r8"]
+
+    def gen_knob_names(self):
+        out = []
+        if self.variant.startswith("hl"):
+            out.extend(
+                f"on_{kk}{self.irn}{hv}" for kk in ["a", "o", "sep", "x"] for hv in "hv"
+            )
+            out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
+        else:
+            out.append(f"on_a{self.irn}")
+            out.extend(
+                f"on_{kk}{self.irn}{hv}" for kk in ["x", "sep"] for hv in "hv"
+            )
+            out.extend(f"on_o{hv}{self.irn}" for hv in "hv")
+            out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
+        out.append(f"on_lhcb")
         return out
 
     def gen_param_names(self):

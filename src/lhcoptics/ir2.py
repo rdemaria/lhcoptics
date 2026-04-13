@@ -2,6 +2,7 @@ from .irs import (
     LHCIR,
     gen_acb_full_names,
     gen_acbx_names,
+    gen_d12_names,
     gen_param_names,
     gen_qq,
     gen_qt,
@@ -54,6 +55,11 @@ class LHCIR2(LHCIR):
         out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
         return out
 
+    def gen_bend_names(self):
+        return gen_d12_names(self.irn)
+
+    def gen_experiment_names(self):
+        return ["abls","abxwt.l2","abwmd.l2","abaw.r2","abxwt.r2"]
 
     def gen_knob_names(self):
         out = []
@@ -69,7 +75,10 @@ class LHCIR2(LHCIR):
             )
             out.extend(f"on_o{hv}{self.irn}" for hv in "hv")
             out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
+        out.append(f"on_alice","on_sol_alice")
         return out
+
+ 
 
 
     def gen_quad_names(self):

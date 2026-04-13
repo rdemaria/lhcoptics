@@ -37,12 +37,12 @@ _opl = ["_op", "_sq", ""]
 def set_ip_labels(ax, tw):
     ips = tw.rows["ip[1-8]"].s
     lbl = [s.upper() for s in tw.rows["ip[1-8]"].name]
-    if lbl[0] == "IP1" and ips[0]==0:
-        ips=list(ips)+[tw.s[-1]]
-        lbl=lbl+["IP1"]
-    elif lbl[-1] == "IP1" and ips[-1]==tw.s[-1]:
-        ips=[tw.s[0]]+list(ips)
-        lbl=["IP1"]+lbl
+    if lbl[0] == "IP1" and ips[0] == 0:
+        ips = list(ips) + [tw.s[-1]]
+        lbl = lbl + ["IP1"]
+    elif lbl[-1] == "IP1" and ips[-1] == tw.s[-1]:
+        ips = [tw.s[0]] + list(ips)
+        lbl = ["IP1"] + lbl
     ax.set_xticks(ips, labels=lbl)
     ax.set_xlabel(None)
 
@@ -755,6 +755,26 @@ class LHCOptics:
         return {
             knob for knob in knobs.items() if sum(map(abs, knob.weights.values())) == 0
         }
+
+    def gen_knob_names(self):
+        """Generate global knob names."""
+        out = []
+        for tt in ["dqx", "dqy", "dqpx", "dqpy", "cmis", "cmir"]:
+            for b in "12":
+                for op in ["", "_op", "_sq"]:
+                    out.append(f"{tt}{x}.b{b}{op}")
+        if self.variant == "hl":
+            out.extend(['dp_trim.b1',"dp_trim.b2"] )
+            out.extend([f"on_dx{irn}{hv}{sl}" for irn in "15" for hv in "hv" for sl in "sl"])
+            out.extend([f"on_dsep{irn}{hv}" for irn in "15" for hv in "hv"])
+            out.extend(["on_mo","i_mo"])
+        else:
+            out.extend(['dp_trim.b1',"dp_trim.b2"] )
+            out.extend(['phase_change.b1', "phase_change.b2"])
+            out.extend(['on_ssep1_h', 'on_xx1_v', 'on_ssep5_v', 'on_xx5_h'])
+            out.extend(['dqxdjy.b1'])
+
+        return out
 
     def get(self, k, default=None, full=True):
         """
@@ -1513,37 +1533,33 @@ class LHCOptics:
 
     def print_ats_phase(self):
         out = {}
-        tw1,tw2= self.twiss(strengths=False, chrom=False)
-        for ipn in [1,5]:
-            for tw,beam in ((tw1,1),(tw2,2)):
-                muxip= tw["mux", f"ip{ipn}"]
-                muyip= tw["muy", f"ip{ipn}"]
+        tw1, tw2 = self.twiss(strengths=False, chrom=False)
+        for ipn in [1, 5]:
+            for tw, beam in ((tw1, 1), (tw2, 2)):
+                muxip = tw["mux", f"ip{ipn}"]
+                muyip = tw["muy", f"ip{ipn}"]
                 print(f"IP{ipn} B{beam} mux={muxip:.3f} muy={muyip:.3f}")
-                betx= tw["betx", f"ms.15r{ipn}.b{beam}"]
-                bety= tw["bety", f"ms.15r{ipn}.b{beam}"]
-                if betx>bety:
-                    nn=14,15
+                betx = tw["betx", f"ms.15r{ipn}.b{beam}"]
+                bety = tw["bety", f"ms.15r{ipn}.b{beam}"]
+                if betx > bety:
+                    nn = 14, 15
                 else:
-                    nn=15,14
+                    nn = 15, 14
                 msfr = tw["mux", f"ms.{nn[1]}r{ipn}.b{beam}"]
                 msdr = tw["muy", f"ms.{nn[0]}r{ipn}.b{beam}"]
                 msfl = tw["mux", f"ms.{nn[0]}l{ipn}.b{beam}"]
                 msdl = tw["muy", f"ms.{nn[1]}l{ipn}.b{beam}"]
-                out[f"dmuxip{ipn}b{beam}_ms{nn[1]}r"] = msfr-muxip
-                out[f"dmuyip{ipn}b{beam}_ms{nn[0]}r"] = msdr-muyip
-                out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] = muxip-msfl
-                out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] = muyip-msdl
-                if ipn==1: #or cycle
-                      out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"]+=tw.qx
-                      out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"]+=tw.qy
+                out[f"dmuxip{ipn}b{beam}_ms{nn[1]}r"] = msfr - muxip
+                out[f"dmuyip{ipn}b{beam}_ms{nn[0]}r"] = msdr - muyip
+                out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] = muxip - msfl
+                out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] = muyip - msdl
+                if ipn == 1:  # or cycle
+                    out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] += tw.qx
+                    out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] += tw.qy
 
-        for k,ph in out.items():
-            #print(f"{k:15} -> {(ph):9.3f}")
-            print(f"{k:15} -> {(ph%0.5)*360:9.3f} deg")
-
-
-
-
+        for k, ph in out.items():
+            # print(f"{k:15} -> {(ph):9.3f}")
+            print(f"{k:15} -> {(ph % 0.5) * 360:9.3f} deg")
 
     def rephase_a2334_diff(self, dmux=0.0, dmuy=0.0):
         """

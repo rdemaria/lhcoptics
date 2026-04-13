@@ -1,6 +1,7 @@
 # Issues
 
 Fixes:
+- make json: add correction in d3d4 in ir3/7; add triplet helper in json; add triplet helper in madx files for MADX-compatibility
 - symplify opt creation from simple madx files (e.g.no knob structure)
 - restructure strengths manangement (use metadata list) and insert dipoles as well (in view of knobs using D1/D2)
 - lhc.vars.load() does not create the knob structure with name expected by opt.update()

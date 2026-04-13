@@ -80,6 +80,11 @@ class LHCIR7(LHCIR):
         out.extend(gen_acb_alt_names("", range(11, 14), 0, "lr", self.irn))
         return out
 
+    def gen_bend_names(self):
+        out = [f"{tt}.{nn}7{lr}" for tt in ["abw", "adiff.bw", "shift.bw"] for nn in "abcd" for lr in "lr"]
+        out.extend(["kd34.l7", "e_kd3.l7", "e_kd3.r7", "e_kd4.l7", "e_kd4.r7"])
+        return out
+
     def gen_quad_names(self):
         quads = []
         quads.extend(["kq4.lr7","kqt4.l7","kqt4.r7"])
