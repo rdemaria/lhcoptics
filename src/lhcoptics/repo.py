@@ -1171,7 +1171,7 @@ call, file="acc-models-lhc/{settings_path}";
         knob_structure = self.parent.parent.get_knob_structure()
 
         name = f"{self.parent.name}_{self.name}_{ts}"
-        opt = LHCOptics.from_madx(
+        opt = LHCOptics.from_cpymad(
             madx=madx,
             name=name,
             xsuite_model=xsuite_model,
@@ -1268,7 +1268,7 @@ call, file="acc-models-lhc/{settings_path}";
             xsuite_model = self.parent.parent.get_xsuite_json()
         else:
             xsuite_model = None
-        opt = LHCOptics.from_madx(
+        opt = LHCOptics.from_cpymad(
             madx=madx,
             name=name,
             xsuite_model=xsuite_model,

@@ -233,7 +233,7 @@ lhc.y2023.ions.gen_repo_data()
 
 from lhcoptics import LHCOptics
 madx=lhc.y2023.pp.ramp.get_madx_model(idx=0)
-opt=LHCOptics.from_madx(madx,make_model='xsuite')
+opt=LHCOptics.from_cpymad(madx,make_model='xsuite')
 opt.model.env.to_json("/home/rdemaria/local/acc-models-lhc/2023/xsuite/lhc.json")
 
 ## High Beta 2023 processes
@@ -373,7 +373,7 @@ lhc.y2022.vdm.gen_repo_data()
 
 from lhcoptics import LHCOptics
 madx=lhc.y2022.pp.ramp.get_madx_model(idx=0)
-opt=LHCOptics.from_madx(madx,make_model='xsuite')
+opt=LHCOptics.from_cpymad(madx,make_model='xsuite')
 opt.model.env.to_json("/home/rdemaria/local/acc-models-lhc/2022/xsuite/lhc.json")
 
 ### 2021 ###
@@ -575,7 +575,7 @@ lhc.y2018.ions.gen_repo_data()
 # xsuite  model
 from lhcoptics import LHCOptics
 madx=lhc.y2018.pp.ramp.get_madx_model(idx=0)
-opt=LHCOptics.from_madx(madx,make_model='xsuite')
+opt=LHCOptics.from_cpymad(madx,make_model='xsuite')
 opt.model.env.to_json("/home/rdemaria/local/acc-models-lhc/2018/xsuite/lhc.json")
 
 

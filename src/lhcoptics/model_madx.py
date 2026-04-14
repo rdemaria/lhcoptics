@@ -564,12 +564,13 @@ use, sequence=lhcb2;
         return out
 
     @classmethod
-    def from_madxfile(cls, madxfile, extra=True):
+    def from_madxfile(cls, *madxfiles, extra=True):
         from cpymad.madx import Madx
 
         madx = Madx()
         madx.options(echo=False, warn=False, info=False)
-        madx.call(str(madxfile))
+        for madxfile in madxfiles:
+            madx.call(str(madxfile))
         if extra:
             madx.input(cls.extra_madx)
         return cls(madx)

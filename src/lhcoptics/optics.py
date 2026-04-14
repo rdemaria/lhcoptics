@@ -88,6 +88,26 @@ class LHCOptics:
             out.extend(ss.knob_names)
         return out
 
+    def gen_knob_names(self):
+        """Generate global knob names."""
+        out = []
+        for tt in ["dqx", "dqy", "dqpx", "dqpy", "cmis", "cmir"]:
+            for b in "12":
+                for op in ["", "_op", "_sq"]:
+                    out.append(f"{tt}{x}.b{b}{op}")
+        if self.variant == "hl":
+            out.extend(['dp_trim.b1',"dp_trim.b2"] )
+            out.extend([f"on_dx{irn}{hv}{sl}" for irn in "15" for hv in "hv" for sl in "sl"])
+            out.extend([f"on_dsep{irn}{hv}" for irn in "15" for hv in "hv"])
+            out.extend(["on_mo","i_mo"])
+        else:
+            out.extend(['dp_trim.b1',"dp_trim.b2"] )
+            out.extend(['phase_change.b1', "phase_change.b2"])
+            out.extend(['on_ssep1_h', 'on_xx1_v', 'on_ssep5_v', 'on_xx5_h'])
+            out.extend(['dqxdjy.b1'])
+
+        return out
+
     @classmethod
     def from_dict(
         cls,
@@ -160,7 +180,7 @@ class LHCOptics:
             return out
 
     @classmethod
-    def from_madx(
+    def from_cpymad(
         cls,
         madx,
         knob_structure,
@@ -170,7 +190,7 @@ class LHCOptics:
         xsuite_model=None,
         circuits=None,
         verbose=False,
-        variant="2025",
+        variant=None,
     ):
         """
         Create an LHCOptics object from a MADX model.
@@ -192,7 +212,10 @@ class LHCOptics:
             8. Set the ciruits if needed
         """
         madmodel = LHCMadxModel(madx)
-        knob_structure = read_knob_structure(knob_structure)
+        if 'mqxfa.a1r1' in madmodel.madx.elements:
+            variant = "hl"
+        else:
+            variant = "2025"
         knobs = madmodel.make_and_set0_knobs(
             knob_structure.get("global", []), variant=variant
         )
@@ -356,7 +379,7 @@ class LHCOptics:
         madx.call(filename)
         if name is None:
             name = str(filename)
-        return cls.from_madx(
+        return cls.from_cpymad(
             madx,
             name=name,
             knob_structure=knob_structure,
@@ -756,25 +779,6 @@ class LHCOptics:
             knob for knob in knobs.items() if sum(map(abs, knob.weights.values())) == 0
         }
 
-    def gen_knob_names(self):
-        """Generate global knob names."""
-        out = []
-        for tt in ["dqx", "dqy", "dqpx", "dqpy", "cmis", "cmir"]:
-            for b in "12":
-                for op in ["", "_op", "_sq"]:
-                    out.append(f"{tt}{x}.b{b}{op}")
-        if self.variant == "hl":
-            out.extend(['dp_trim.b1',"dp_trim.b2"] )
-            out.extend([f"on_dx{irn}{hv}{sl}" for irn in "15" for hv in "hv" for sl in "sl"])
-            out.extend([f"on_dsep{irn}{hv}" for irn in "15" for hv in "hv"])
-            out.extend(["on_mo","i_mo"])
-        else:
-            out.extend(['dp_trim.b1',"dp_trim.b2"] )
-            out.extend(['phase_change.b1', "phase_change.b2"])
-            out.extend(['on_ssep1_h', 'on_xx1_v', 'on_ssep5_v', 'on_xx5_h'])
-            out.extend(['dqxdjy.b1'])
-
-        return out
 
     def get(self, k, default=None, full=True):
         """

@@ -6,7 +6,8 @@ import xtrack as xt
 from lhcoptics import LHCOptics
 from lhcoptics.circuits import LHCCircuits
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data" / "hllhc"
+HL_DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data" / "hllhc"
+LHC_DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data" / "lhc"
 
 
 def load_optics(data_dir, circuits):
@@ -24,7 +25,11 @@ def fresh_optics_hl(hllhc_data_dir, circuits_hl):
 
 @pytest.fixture(scope="session")
 def hllhc_data_dir():
-    return DATA_DIR
+    return HL_DATA_DIR
+
+@pytest.fixture(scope="session")
+def lhc_data_dir():
+    return LHC_DATA_DIR
 
 @pytest.fixture(scope="session")
 def circuits_hl(hllhc_data_dir):

@@ -489,7 +489,6 @@ class LHCXsuiteModel:
                 )
                 lhc.lines[f"{line_name}s"] = sliced_line
 
-        lhc.metadata["knob_structure"] = knob_structure
         return cls(env=lhc, madxfile=madxfile)
 
     @classmethod
