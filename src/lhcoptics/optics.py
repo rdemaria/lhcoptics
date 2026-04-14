@@ -215,7 +215,7 @@ class LHCOptics:
             madmodel[k] = knob.value
         self = cls(name, irs, arcs, knobs=knobs, variant=variant)
         if make_model == "xsuite":
-            xsuite_model = LHCXsuiteModel.from_madx(
+            xsuite_model = LHCXsuiteModel.from_cpymad(
                 madx, sliced=sliced, knob_structure=knob_structure
             )
         elif make_model == "madx":

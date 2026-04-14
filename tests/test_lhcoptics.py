@@ -5,6 +5,11 @@ def test_lhcoptics_from_xsuite_uses_hllhc_data(optics_hl):
     assert optics_hl.circuits is not None
 
 
+def test_lhcoptics_reuses_session_circuits(circuits_hl, optics_hl, fresh_optics_hl):
+    assert optics_hl.circuits is circuits_hl
+    assert fresh_optics_hl.circuits is circuits_hl
+
+
 def test_lhcoptics_copy_preserves_variant(optics_hl):
     copied = optics_hl.copy(name="copy")
 

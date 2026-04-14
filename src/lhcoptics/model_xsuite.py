@@ -10,7 +10,7 @@ import xtrack as xt
 
 from .knob import Knob
 from .model_madx import LHCMadxModel
-from .utils import match_compare_log, read_knob_structure
+from .utils import match_compare_log
 
 rbend_data = {
     # D1 and D2 angles [rad]
@@ -453,14 +453,7 @@ class LHCXsuiteModel:
         self._aperture = None
 
     @classmethod
-    def from_json(cls, jsonfile):
-        jsonfile = str(jsonfile)
-        lhc = xt.Environment.from_json(jsonfile)
-        return cls(lhc, jsonfile=jsonfile)
-
-    @classmethod
-    def from_madx(cls, madx, sliced=False, madxfile=None, knob_structure=None):
-        knob_structure = read_knob_structure(knob_structure)
+    def from_cpymad(cls, madx, sliced=False, madxfile=None):
 
         if not madx.sequence.lhcb1.has_beam:
             madx.use(sequence="lhcb1")
@@ -500,18 +493,15 @@ class LHCXsuiteModel:
         return cls(env=lhc, madxfile=madxfile)
 
     @classmethod
-    def from_madxfile(cls, madxfile, sliced=False):
-        """Create an `LHCXsuiteModel` from a MAD-X input file."""
-
-        madmodel = LHCMadxModel.from_madxfile(madxfile)
-        model = cls.from_madx(madmodel.madx, sliced=sliced, madxfile=madxfile)
-        model.madxfile = madxfile
-        return model
+    def from_json(cls, jsonfile):
+        jsonfile = str(jsonfile)
+        lhc = xt.Environment.from_json(jsonfile)
+        return cls(lhc, jsonfile=jsonfile)
 
     @classmethod
-    def make_json_from_sequence(cls, sequencefile, jsonfile, knobfile):
-        print("Loading sequence into Xsuite...")
-        seq_text = open(sequencefile).read().lower()
+    def from_madx_sequence(cls, filename):
+        """Create an `LHCXsuiteModel` from a MAD-X sequence file."""
+        seq_text = open(filename).read().lower()
         # Recover expressions in at arguments of the sequences
         assert " at=" in seq_text
         assert ",at=" not in seq_text
@@ -553,7 +543,23 @@ class LHCXsuiteModel:
 
         lhc["lagrf400.b1"] = 0.5
         lhc["vrf400"] = 6.5
-        lhc.metadata["knob_structure"] = read_knob_structure(knobfile)
+        return cls(env=lhc)
+
+
+    @classmethod
+    def from_madxfile(cls, madxfile, sliced=False):
+        """Create an `LHCXsuiteModel` from a MAD-X input file."""
+
+        madmodel = LHCMadxModel.from_madxfile(madxfile)
+        model = cls.from_cpymad(madmodel.madx, sliced=sliced, madxfile=madxfile)
+        model.madxfile = madxfile
+        return model
+
+    @classmethod
+    def make_json_from_sequence(cls, sequencefile, jsonfile, knobfile):
+        print("Loading sequence into Xsuite...")
+        model=cls.from_madx_sequence(sequencefile)
+        lhc=model.env
         print(f"Saving JSON model to {jsonfile!r}...")
         lhc.to_json(jsonfile)
 

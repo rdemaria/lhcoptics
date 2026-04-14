@@ -1,7 +1,23 @@
 # Issues
 
 Fixes:
-- make json: add correction in d3d4 in ir3/7; add triplet helper in json; add triplet helper in madx files for MADX-compatibility
+- add knobs: on_sol_atlas , on_sol_alice, on_sol_cms, on_alice, on_lhcb, i_mo, on_mo
+
+- create LHCOptics
+  - from madx instance
+  - from madx optics file
+
+- create madx optics file
+  - from LHCOptics
+
+
+- check read optics files without model
+  - from old lhc files
+  - from old hllhc files
+
+- check save-read json optics files to json with/without model
+
+
 - symplify opt creation from simple madx files (e.g.no knob structure)
 - restructure strengths manangement (use metadata list) and insert dipoles as well (in view of knobs using D1/D2)
 - lhc.vars.load() does not create the knob structure with name expected by opt.update()
