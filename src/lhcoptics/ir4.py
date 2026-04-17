@@ -36,6 +36,13 @@ class LHCIR4(LHCIR):
             + gen_qt(range(12, 14), self.irn)
         )
 
+    def gen_strength_names(self):
+        out = []
+        out.extend(self.gen_quad_names())
+        out.extend(self.gen_bend_names())
+        out.extend(self.gen_acb_names())
+        return out
+
     def get_init_ats(self, beam):
         rx = self.parent.params["rx_ip5"]
         ry = self.parent.params["ry_ip5"]

@@ -56,12 +56,11 @@ class LHCIR15(LHCIR):
             )
             out.extend(f"on_o{hv}{self.irn}" for hv in "hv")
             out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
-        if self.name == "ir1":
-            out.append(f"on_sol_atlas")
-        elif self.name == "ir5":
-            out.append(f"on_sol_cms")
-        else:
-            raise ValueError(f"unknown IR {self.name}")
+        #TODO need to support energy dependent knobs
+        #if self.name == "ir1":
+        #    out.append(f"on_sol_atlas")
+        #elif self.name == "ir5":
+        #    out.append(f"on_sol_cms")
         return out
 
     def gen_quad_names(self):
@@ -74,6 +73,15 @@ class LHCIR15(LHCIR):
         quads.extend(gen_qtl([11], self.irn))
         quads.extend(gen_qt([12, 13], self.irn))
         return quads
+
+    def gen_strength_names(self):
+        out = []
+        out.extend(self.gen_quad_names())
+        out.extend(self.gen_bend_names())
+        out.extend(self.gen_acb_names())
+        out.extend(self.gen_crab_names())
+        out.extend(self.gen_experiment_names())
+        return out
 
 
     def has_ats_phase(self):

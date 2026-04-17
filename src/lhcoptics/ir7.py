@@ -94,6 +94,13 @@ class LHCIR7(LHCIR):
         quads.extend(gen_qt([12, 13], self.irn))
         return quads
 
+    def gen_strength_names(self):
+        out = []
+        out.extend(self.gen_quad_names())
+        out.extend(self.gen_bend_names())
+        out.extend(self.gen_acb_names())
+        return out
+
     def get_params_from_twiss(self, tw1, tw2):
         params = LHCIR.get_params_from_twiss(self, tw1, tw2)
         for col_name in self.collimators:

@@ -26,28 +26,24 @@ class LHCArc(LHCSection):
     default_twiss_method = "periodic"
 
     @classmethod
-    def from_madx(cls, madx, name, knob_names=None, variant="2025"):
-        madmodel = LHCMadxModel(madx)
-        return cls.from_model(madmodel, name, knob_names=knob_names, variant=variant)
-
-    @classmethod
-    def from_model(cls, model, name, knob_names=None, variant="2025"):
+    def from_model(cls, model, name=None, variant=None):
+        if name is None:
+            name = cls.name
+        if variant is None:
+            variant = model.get_variant()
         i1, i2 = int(name[1]), int(name[2])
-        strength_names = []
-        strength_names += model.filter(f"kq[fd]\\.*{name}$")
-        strength_names += model.filter(f"kqt[fd]\\.*{name}b[12]$")
-        strength_names += model.filter(f"kqs\\.*{name}b[12]$")
-        strength_names += model.filter(f"ksq\\.*r{i1}b[12]$")
-        strength_names += model.filter(f"ksq\\.*l{i2}b[12]$")
-        strength_names += model.filter(f"ks[fd][12]\\.*{name}b[12]$")
-        strength_names += model.filter(f"ko[fd]\\.*{name}b[12]$")
-        if knob_names is not None:
-            knobs = model.make_and_set0_knobs(knob_names, variant=variant)
-        else:
-            knobs = {}
-        params = {}
-        strengths = {st: model[st] for st in strength_names}
-        return cls(name, strengths, params, knobs, variant=variant)
+        arc = cls(name=name, strengths={}, params={}, knobs={}, variant=variant)
+        knobs = model.make_and_set0_knobs(
+            knob_names=arc.gen_knob_names(), variant=variant
+        )
+        arc.knobs.update(knobs)
+        for strength in arc.gen_strength_names():
+            if strength in model:
+                arc.strengths[strength] = model[strength]
+        for param in arc.gen_param_names():
+            if param in model:
+                arc.params[param] = model[param]
+        return arc
 
     def __init__(
         self,
@@ -59,8 +55,10 @@ class LHCArc(LHCSection):
         end=None,
         filename=None,
         parent=None,
-        variant="2025",
+        variant=None,
     ):
+        if name is None:
+            name = self.__class__.name
         i1, i2 = int(name[1]), int(name[2])
         start = f"s.ds.r{i1}"
         end = f"e.ds.l{i2}"
@@ -95,6 +93,12 @@ class LHCArc(LHCSection):
             f"mux{self.name}b2",
             f"muy{self.name}b2",
         ]
+        self.cell_phase_names = [
+            f"muxcell{self.name[1:]}b1",
+            f"muycell{self.name[1:]}b1",
+            f"muxcell{self.name[1:]}b2",
+            f"muycell{self.name[1:]}b2",
+        ]
 
     def __repr__(self):
         if self.parent is None:
@@ -109,7 +113,7 @@ class LHCArc(LHCSection):
 
     def gen_acb_names(self):
         out = []
-        if self.i1%2==1:
+        if self.i1 % 2 == 1:
             out.extend(gen_acb_alt_names("", range(14, 34), 0, "r", self.i1))
             out.extend(gen_acb_alt_names("", range(34, 13, -1), 1, "l", self.i2))
         else:
@@ -118,27 +122,42 @@ class LHCArc(LHCSection):
         return out
 
     def gen_bend_names(self):
-        return [f"ab.{self.name}",f"kb.{self.name}"]
+        return [f"ab.{self.name}", f"kb.{self.name}"]
 
     def gen_quad_names(self):
         return [
-        f"kqf.{self.name}",
-        f"kqd.{self.name}",
-        f"kqtf.{self.name}b1",
-        f"kqtf.{self.name}b2",
-        f"kqtd.{self.name}b1",
-        f"kqtd.{self.name}b2"]
+            f"kqf.{self.name}",
+            f"kqd.{self.name}",
+            f"kqtf.{self.name}b1",
+            f"kqtf.{self.name}b2",
+            f"kqtd.{self.name}b1",
+            f"kqtd.{self.name}b2",
+        ]
 
     def gen_sext_names(self):
-        return [f"ks{fd}{nn}.{self.name}b{bb}" for fd in "fd" for nn in "12" for bb in "12"]
+        return [
+            f"ks{fd}{nn}.{self.name}b{bb}" for fd in "fd" for nn in "12" for bb in "12"
+        ]
 
     def gen_oct_names(self):
         return [f"ko{fd}.{self.name}b{bb}" for fd in "fd" for bb in "12"]
 
+    def gen_param_names(self):
+        return self.phase_names + self.cell_phase_names
+
+    def gen_strength_names(self):
+        out = []
+        out.extend(self.gen_quad_names())
+        out.extend(self.gen_bend_names())
+        out.extend(self.gen_acb_names())
+        out.extend(self.gen_skewquad_names())
+        out.extend(self.gen_sext_names())
+        out.extend(self.gen_oct_names())
+        return out
 
     def check_acb_names(self, verbose=True):
         gen = set(self.gen_acb_names())
-        mod=set()
+        mod = set()
         for pattern in [
             f"mcb[hv].[23][0-9].*l{self.i2}.b[12]",
             f"mcb[hv].1[4-9].*l{self.i2}.b[12]",
@@ -148,7 +167,7 @@ class LHCArc(LHCSection):
             mod |= set(self.parent.model.get_acb_names(pattern).values())
         extra = gen - mod
         missing = mod - gen
-        passed=not extra and not missing
+        passed = not extra and not missing
         if verbose and not passed:
             print(f"Extra ACB names in model: {extra}")
             print(f"Missing ACB names in model: {missing}")
@@ -461,3 +480,39 @@ class LHCArc(LHCSection):
             res["muy"] = res["muy"] - res["muy", start_arc]
 
             return res
+
+
+class LHCA12(LHCArc):
+    name = "a12"
+
+
+class LHCA12(LHCArc):
+    name = "a12"
+
+
+class LHCA23(LHCArc):
+    name = "a23"
+
+
+class LHCA34(LHCArc):
+    name = "a34"
+
+
+class LHCA45(LHCArc):
+    name = "a45"
+
+
+class LHCA56(LHCArc):
+    name = "a56"
+
+
+class LHCA67(LHCArc):
+    name = "a67"
+
+
+class LHCA78(LHCArc):
+    name = "a78"
+
+
+class LHCA81(LHCArc):
+    name = "a81"

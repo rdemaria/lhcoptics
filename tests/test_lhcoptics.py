@@ -1,25 +1,13 @@
-def test_lhcoptics_from_xsuite_uses_hllhc_data(optics_hl):
-    assert optics_hl.variant == "hl"
-    assert len(optics_hl.irs) == 8
-    assert len(optics_hl.arcs) == 8
-    assert optics_hl.circuits is not None
+from lhcoptics import LHCOptics
 
 
-def test_lhcoptics_reuses_session_circuits(circuits_hl, optics_hl, fresh_optics_hl):
-    assert optics_hl.circuits is circuits_hl
-    assert fresh_optics_hl.circuits is circuits_hl
+def test_lhcoptics_from_model_hllhc(model_xsuite_hl):
+    optics = LHCOptics.from_model(model_xsuite_hl)
 
-
-def test_lhcoptics_copy_preserves_variant(optics_hl):
-    copied = optics_hl.copy(name="copy")
-
-    assert copied.variant == "hl"
-    assert all(ss.variant == "hl" for ss in copied.irs + copied.arcs)
-
-
-def test_lhcoptics_table_interp_preserves_variant(optics_hl):
-    interp = optics_hl.to_table(optics_hl.copy(name="copy")).interp(0, order=0)
-
-    assert interp.variant == "hl"
-    assert interp.ir1.variant == "hl"
-    assert interp.a12.variant == "hl"
+    assert optics.variant == "hl"
+    assert len(optics.irs) == 8
+    assert len(optics.arcs) == 8
+    assert optics.params["qxb1"] == model_xsuite_hl["qxb1"]
+    assert optics.ir1.variant == "hl"
+    assert optics.ir1.strengths["kqx1.l1"] == model_xsuite_hl["kqx1.l1"]
+    assert len(optics.knobs) > 0

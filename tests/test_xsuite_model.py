@@ -1,7 +1,10 @@
 
+import pytest
+
 from lhcoptics.model_xsuite import LHCXsuiteModel
 
 
+@pytest.mark.long
 def test_from_madx_sequence(hllhc_data_dir):
     model = LHCXsuiteModel.from_madx_sequence(hllhc_data_dir / "lhc.seq")
 

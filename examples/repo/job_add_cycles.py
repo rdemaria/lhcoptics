@@ -1,5 +1,5 @@
-from lhcoptics import LHC, get_lsa
-lhc=LHC()
+from lhcoptics import LHCDev, get_lsa
+lhc=LHCDev()
 
 lsa=get_lsa()
 

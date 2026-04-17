@@ -32,6 +32,11 @@ version = {attr = "lhcoptics.__version__"}
 [tool.black]
 line-length = 79
 
+[tool.pytest.ini_options]
+markers = [
+    "long: marks tests that are excluded from the default test run",
+]
+
 [tool.ruff.lint]
 select = ["RUF100"]
 

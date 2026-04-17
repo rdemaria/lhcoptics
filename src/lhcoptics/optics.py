@@ -10,7 +10,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from cpymad.madx import Madx
 
-from .arcs import LHCArc
+from .arcs import (
+    LHCArc,
+    LHCA12,
+    LHCA23,
+    LHCA34,
+    LHCA45,
+    LHCA56,
+    LHCA67,
+    LHCA78,
+    LHCA81,
+)
 from .circuits import LHCCircuits
 from .ir1 import LHCIR1
 from .ir2 import LHCIR2
@@ -53,17 +63,9 @@ class LHCOptics:
     Section contains strengths, local knobs, local parameters
     """
 
-    _arcs = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
+    _arc_names = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
+    _arcs = [LHCA12, LHCA23, LHCA34, LHCA45, LHCA56, LHCA67, LHCA78, LHCA81]
     _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
-
-    knob_names = [f"dq{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
-    knob_names += [f"dqp{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
-    knob_names += [f"cm{x}s.b{b}{op}" for x in "ir" for b in "12" for op in _opl]
-    knob_names += [
-        f"{kk}.b{b}" for kk in ["on_mo", "phase_change", "dp_trim"] for b in "12"
-    ]
-    knob_names += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
-    knob_names += ["dqxdjy.b1", "dqxdjy.b1"]
 
     _global_param_names = [
         "p0c",
@@ -82,30 +84,27 @@ class LHCOptics:
     ]
 
     @classmethod
+    def _gen_knob_names(cls, variant):
+        """Generate the knob names from the optics and its sections."""
+        _opl = ["", "_op", "_sq"]
+        out = [f"dq{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
+        out += [f"dqp{x}.b{b}{op}" for x in "xy" for b in "12" for op in _opl]
+        out += [f"cm{x}s.b{b}{op}" for x in "ir" for b in "12" for op in _opl]
+        if variant == "hl":
+            out += [f"on_dx{irn}{hv}{ls}" for irn in "15" for hv in "hv" for ls in "ls"]
+            out += [f"on_dsep{irn}{hv}" for irn in "15" for hv in "hv"]
+            out += [f"on_mo", "on_imo.b1", "on_imo.b2", "dqxdjy.b1", "dqxdjy.b2"]
+        else:
+            out += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
+            out += [f"{kk}.b{b}" for kk in ["phase_change", "dp_trim"] for b in "12"]
+            out += ["on_mo", "dqxdjy.b1", "dqxdjy.b1"]
+        return out
+
+    @classmethod
     def get_default_knob_names(cls):
         out = cls.knob_names[:]
         for ss in cls._irs:
             out.extend(ss.knob_names)
-        return out
-
-    def gen_knob_names(self):
-        """Generate global knob names."""
-        out = []
-        for tt in ["dqx", "dqy", "dqpx", "dqpy", "cmis", "cmir"]:
-            for b in "12":
-                for op in ["", "_op", "_sq"]:
-                    out.append(f"{tt}{x}.b{b}{op}")
-        if self.variant == "hl":
-            out.extend(['dp_trim.b1',"dp_trim.b2"] )
-            out.extend([f"on_dx{irn}{hv}{sl}" for irn in "15" for hv in "hv" for sl in "sl"])
-            out.extend([f"on_dsep{irn}{hv}" for irn in "15" for hv in "hv"])
-            out.extend(["on_mo","i_mo"])
-        else:
-            out.extend(['dp_trim.b1',"dp_trim.b2"] )
-            out.extend(['phase_change.b1', "phase_change.b2"])
-            out.extend(['on_ssep1_h', 'on_xx1_v', 'on_ssep5_v', 'on_xx5_h'])
-            out.extend(['dqxdjy.b1'])
-
         return out
 
     @classmethod
@@ -120,11 +119,10 @@ class LHCOptics:
         name=None,
     ):
         variant = data.get("variant", "2025")
-        irs = [
-            globals()[f"LHCIR{n + 1}"].from_dict(d, variant=variant)
-            for n, d in enumerate(data["irs"])
+        irs = [IR.from_dict(d, variant=variant) for IR, d in zip(cls._irs, data["irs"])]
+        arcs = [
+            Arc.from_dict(d, variant=variant) for Arc, d in zip(cls._arcs, data["arcs"])
         ]
-        arcs = [LHCArc.from_dict(d, variant=variant) for d in data["arcs"]]
         if isinstance(xsuite_model, str) or isinstance(xsuite_model, Path):
             xsuite_model = LHCXsuiteModel.from_json(xsuite_model)
         out = cls(
@@ -212,7 +210,7 @@ class LHCOptics:
             8. Set the ciruits if needed
         """
         madmodel = LHCMadxModel(madx)
-        if 'mqxfa.a1r1' in madmodel.madx.elements:
+        if "mqxfa.a1r1" in madmodel.madx.elements:
             variant = "hl"
         else:
             variant = "2025"
@@ -232,7 +230,7 @@ class LHCOptics:
                 knob_names=knob_structure.get(arc),
                 variant=variant,
             )
-            for arc in cls._arcs
+            for arc in cls._arc_names
         ]
         for k, knob in knobs.items():
             madmodel[k] = knob.value
@@ -254,6 +252,27 @@ class LHCOptics:
         if circuits is not None:
             self.set_circuits(circuits)
         return self
+
+    @classmethod
+    def from_model(
+        cls,
+        model,
+        name=None,
+        variant=None,
+    ):
+        if variant is None:
+            variant = model.get_variant()
+
+        knobs = model.make_and_set0_knobs(
+            knob_names=cls._gen_knob_names(variant), variant=variant
+        )
+        irs = [IR.from_model(model, variant=variant) for IR in cls._irs]
+        arcs = [Arc.from_model(model, variant=variant) for Arc in cls._arcs]
+        params = {k: model[k] for k in cls._global_param_names if k in model}
+        opt = cls(
+            name=name, irs=irs, arcs=arcs, params=params, knobs=knobs, variant=variant
+        )
+        return opt
 
     @classmethod
     def from_xsuite(
@@ -294,11 +313,10 @@ class LHCOptics:
         elif hasattr(xsuite_model, "to_json"):
             xsuite_model = LHCXsuiteModel(xsuite_model)
 
-        if variant is None:
-            if "mqxfa.b1r1/b1" in xsuite_model.env.element_dict:
-                variant = "hl"
-            else:
-                variant = "2025"
+        if variant is None and xsuite_model is not None:
+            variant = xsuite_model.get_variant()
+        else:
+            raise ValueError("Variant must be provided if xsuite_model is not provided")
 
         if knob_structure is None:
             knob_structure = read_knob_structure(
@@ -321,7 +339,7 @@ class LHCOptics:
             LHCArc.from_model(
                 xsuite_model, arc, knob_names=knob_structure.get(arc), variant=variant
             )
-            for arc in cls._arcs
+            for arc in cls._arc_names
         ]
         self = cls(name, irs, arcs, knobs=knobs, variant=variant)
         self.model = (
@@ -448,7 +466,7 @@ class LHCOptics:
         if irs is None:
             irs = [IR(variant=variant) for IR in self._irs]
         if arcs is None:
-            arcs = [LHCArc(arc, variant=variant) for arc in self._arcs]
+            arcs = [LHCArc(arc, variant=variant) for arc in self._arc_names]
         for ir in irs:
             setattr(self, ir.name, ir)
             ir.parent = self
@@ -491,7 +509,7 @@ class LHCOptics:
     @property
     def arcs(self):
         """List of arcs"""
-        return [getattr(self, arc) for arc in self._arcs]
+        return [getattr(self, arc) for arc in self._arc_names]
 
     @property
     def irs(self):
@@ -778,7 +796,6 @@ class LHCOptics:
         return {
             knob for knob in knobs.items() if sum(map(abs, knob.weights.values())) == 0
         }
-
 
     def get(self, k, default=None, full=True):
         """
@@ -1710,7 +1727,7 @@ class LHCOptics:
 
     def set_madx_model(self, model):
         if Path(model).exists():
-            model = LHCMadxModel.from_madxfile(model)
+            model = LHCMadxModel.from_madx_scripts(model)
         self.model = model
         self.update_model()
         return self

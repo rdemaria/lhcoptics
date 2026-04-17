@@ -1,230 +1,43 @@
-import re
 from pathlib import Path
+import re
 
-import numpy as np
 import matplotlib.pyplot as plt
-
+import numpy as np
 import xdeps as xd
-
 
 from .knob import Knob
 from .utils import print_diff_dict_float
 
+
 def get_ap_limit(section, ap, verbose=True):
-    energy=ap.energy
+    energy = ap.energy
     if energy < 500e9:
-        limit=12.6
+        limit = 12.6
     else:
-        limit=14.6
-    n1=ap.n1.copy()
-    n1[ap.name=='tcdqm.b4l6.b1:1']*=1.2
-    n1[ap.name=='tcdqm.a4l6.b1:1']*=1.2
-    n1[ap.name=='tcdqm.a4r6.b1:1']*=1.2
-    n1[ap.name=='tcdqm.b4r6.b1:1']*=1.2
-    n1[ap.name=='tcdqm.b4l6.b2:1']*=1.1
-    n1[ap.name=='tcdqm.a4l6.b2:1']*=1.1
-    n1[ap.name=='tcdqm.a4r6.b2:1']*=1.1
-    n1[ap.name=='tcdqm.b4r6.b2:1']*=1.1
-    minap=np.argmin(n1)
-    n1min=n1[minap]
-    smin=ap.s[minap]
-    namemin=ap.name[minap]
-    name2min=namemin.lower()[:-2]
+        limit = 14.6
+    n1 = ap.n1.copy()
+    n1[ap.name == "tcdqm.b4l6.b1:1"] *= 1.2
+    n1[ap.name == "tcdqm.a4l6.b1:1"] *= 1.2
+    n1[ap.name == "tcdqm.a4r6.b1:1"] *= 1.2
+    n1[ap.name == "tcdqm.b4r6.b1:1"] *= 1.2
+    n1[ap.name == "tcdqm.b4l6.b2:1"] *= 1.1
+    n1[ap.name == "tcdqm.a4l6.b2:1"] *= 1.1
+    n1[ap.name == "tcdqm.a4r6.b2:1"] *= 1.1
+    n1[ap.name == "tcdqm.b4r6.b2:1"] *= 1.1
+    minap = np.argmin(n1)
+    n1min = n1[minap]
+    smin = ap.s[minap]
+    namemin = ap.name[minap]
+    name2min = namemin.lower()[:-2]
     if verbose:
-        reset="\033[0m"
-        if n1min<limit:
-            color="\033[91m" #red
+        reset = "\033[0m"
+        if n1min < limit:
+            color = "\033[91m"  # red
         else:
-            color="\033[92m" #green
-        print(f"{section}: limit {name2min:20} {color}{n1min:9.3f}{reset} σ at s={smin:.1f} m")
-
-class RMatrix:
-    def __init__(self, matrix):
-        self.matrix = matrix
-
-    @classmethod
-    def from_twiss(cls, tw):
-        pass
-
-
-class TwissInit:
-    def __init__(
-        self,
-        betx=1,
-        alfx=1,
-        mux=0,
-        bety=1,
-        alfy=0,
-        muy=0,
-        x=0,
-        px=0,
-        y=0,
-        py=0,
-        t=0,
-        pt=0,
-        dx=0,
-        dpx=0,
-        dy=0,
-        dpy=0,
-        wx=0,
-        phix=0,
-        dmux=0,
-        wy=0,
-        phiy=0,
-        dmuy=0,
-        ddx=0,
-        ddpx=0,
-        ddy=0,
-        ddpy=0,
-        r11=0,
-        r12=0,
-        r21=0,
-        r22=0,
-    ):
-        self.betx = betx
-        self.alfx = alfx
-        self.mux = mux
-        self.bety = bety
-        self.alfy = alfy
-        self.muy = muy
-        self.x = x
-        self.px = px
-        self.y = y
-        self.py = py
-        self.t = t
-        self.pt = pt
-        self.dx = dx
-        self.dpx = dpx
-        self.dy = dy
-        self.dpy = dpy
-        self.wx = wx
-        self.phix = phix
-        self.dmux = dmux
-        self.wy = wy
-        self.phiy = phiy
-        self.dmuy = dmuy
-        self.ddx = ddx
-        self.ddpx = ddpx
-        self.ddy = ddy
-        self.ddpy = ddpy
-        self.r11 = r11
-        self.r12 = r12
-        self.r21 = r21
-        self.r22 = r22
-
-
-class MADSequence:
-    def __init__(self, madx, sequence_name):
-        self.madx = madx
-        self.sequence = sequence_name
-
-    @property
-    def madx_sequence(self):
-        return self.madx.sequence[self.sequence]
-
-    @property
-    def start(self):
-        self.madx_sequence.elements[1].name
-
-    @property
-    def end(self):
-        self.madx_sequence.elements[-2].name
-
-    def twiss(
-        self,
-        start=None,
-        end=None,
-        betx=None,
-        bety=None,
-        alfx=None,
-        alfy=None,
-        dx=None,
-        dpx=None,
-        dy=None,
-        dpy=None,
-        init=None,
-        s=0,
-        at=None,
-        full=True,
-    ):
-        """
-        Parameters:
-        - full: if False consider only the portion from start to end
-        - at: location to which initial conditions are to be set
-        - init, betx, .... : initial conditions if all are None, then they are taken from the periodic solution at `at`
-        - start, end: start and end of the twiss output
-        """
-        if set([betx, bety, alfx, alfy, dx, dpx, dy, dpy, init]) == {
-            None
-        }:  # is periodic
-            self.madx.use(sequence=self.sequence, range=f"{start}/{end}")
-            tw = self.madx.twiss(sequence=self.sequence)
-        if full is False:  # consider only the machine from start to end
-            if start is None:
-                start = self.madx.sequence
-            if end is None:
-                end = self.madx.globals[self.sequence].sequence.end
-        else:
-            tw = self.madx.twiss(
-                betx=betx,
-                bety=bety,
-                alfx=alfx,
-                alfy=alfy,
-                sequence=self.sequence,
-            )
-        return xd.Table(tw)
-
-    def twiss_periodic(self, use=False):
-        if use:
-            self.madx.use(sequence=self.sequence)
-        tw = self.madx.twiss(sequence=self.sequence)
-        return xd.Table(tw)
-
-    def twiss_line(self, betx=1, bety=1, alfx=0, alfy=0):
-        tw = self.madx.twiss(
-            betx=betx, bety=bety, alfx=alfx, alfy=alfy, sequence=self.sequence
+            color = "\033[92m"  # green
+        print(
+            f"{section}: limit {name2min:20} {color}{n1min:9.3f}{reset} σ at s={smin:.1f} m"
         )
-        return xd.Table(tw)
-
-    def rmatrix(self, start=None, end=None):
-        if start is None:
-            start = self.start
-        if end is None:
-            end = self.end
-        self.madx.use(sequence=self.sequence, range=f"{start}/{end}")
-        tw = self.madx.twiss(betx=1, bety=1, rmatrix=True)
-        return RMatrix(tw.getmat("re", -1, 6, 6))
-
-    def twiss_line_back(self, start, end, betx=1, bety=1, alfx=0, alfy=0, dx=0, dpx=0):
-        self.madx.use(sequence=self.sequence, range=f"{start}/{end}")
-        tw = self.madx.twiss(betx=1, bety=1, rmatrix=True)
-        rmat = tw.getmat("re", -1, 6, 6)
-        r11 = rmat[0, 0]
-        r12 = rmat[0, 1]
-        r21 = rmat[1, 0]
-        r22 = rmat[1, 1]
-        r33 = rmat[2, 2]
-        r34 = rmat[2, 3]
-        r43 = rmat[3, 2]
-        r44 = rmat[3, 3]
-        r16 = rmat[0, 5]
-        r26 = rmat[1, 5]
-        bx2 = betx
-        by2 = bety
-        ax2 = alfx
-        ay2 = alfy
-        dx2 = dx
-        dpx2 = dpx
-        gx2 = (1 + ax2**2) / bx2
-        gy2 = (1 + ay2**2) / by2
-        bx1 = r22**2 * bx2 + 2 * r22 * r12 * ax2 + r12**2 * gx2
-        ax1 = r22 * r21 * bx2 + (r11 * r22 + r12 * r21) * ax2 + r12 * r11 * gx2
-        by1 = r44**2 * by2 + 2 * r44 * r34 * ay2 + r34**2 * gy2
-        ay1 = r44 * r43 * by2 + (r33 * r44 + r34 * r43) * ay2 + r34 * r33 * gy2
-        dx1 = r22 * (dx2 - r16) - r12 * (dpx2 - r26)
-        dpx1 = -r21 * (dx2 - r16) + r11 * (dpx2 - r26)
-        tw = self.madx.twiss(betx=bx1, bety=by1, alfx=ax1, alfy=ay1, dx=dx1, dpx=dpx1)
-        return tw
 
 
 class LHCMadxModel:
@@ -532,11 +345,6 @@ use, sequence=lhcb2;
     """
     )
 
-    def __init__(self, madx):
-        self.madx = madx
-        self.b1 = MADSequence(self.madx, "lhcb1")
-        self.b2 = MADSequence(self.madx, "lhcb2")
-
     @staticmethod
     def knobs_to_expr(knobs, strengths=None):
         """
@@ -563,11 +371,16 @@ use, sequence=lhcb2;
             out.append(f"{st} :=\n  {rhs};")
         return out
 
+    def __init__(self, madx):
+        self.madx = madx
+        self.b1 = MADSequence(self.madx, "lhcb1")
+        self.b2 = MADSequence(self.madx, "lhcb2")
+
     @classmethod
-    def from_madxfile(cls, *madxfiles, extra=True):
+    def from_madx_scripts(cls, *madxfiles, extra=True, stdout=False):
         from cpymad.madx import Madx
 
-        madx = Madx()
+        madx = Madx(stdout=stdout)
         madx.options(echo=False, warn=False, info=False)
         for madxfile in madxfiles:
             madx.call(str(madxfile))
@@ -575,71 +388,66 @@ use, sequence=lhcb2;
             madx.input(cls.extra_madx)
         return cls(madx)
 
+    def __contains__(self, key):
+        return key in self.madx.globals
+
     def __getitem__(self, key):
         return self.madx.globals[key]
 
     def __setitem__(self, key, value):
         self.madx.globals[key] = value
 
-    def __contains__(self, key):
-        return key in self.madx.globals
-    def twiss(self, sequence=None, **kwargs):
-        if sequence is None:
-            return (self.b1.twiss(**kwargs), self.b2.twiss(**kwargs))
-        else:
-            return getattr(self, f"b{sequence}").twiss(**kwargs)
-
     def call(self, filename):
         self.madx.call(filename)
         return self
 
+    def diff(self, other):
+        selfvar = {k: v for k, v in self.madx.globals.items() if isinstance(v, float)}
+        othervar = {k: v for k, v in other.madx.globals.items() if isinstance(v, float)}
+        print_diff_dict_float(selfvar, othervar)
+
     def filter(self, pattern):
         return [k for k in self.madx.globals if re.match(pattern, k)]
 
-    def update_vars(self, strengths, verbose=False):
-        for k, v in strengths.items():
-            if verbose:
-                print(f"{k:20} {self[k]:15.6g} -> {v:15.6g}")
-            self[k] = v
+    def get_ap_arc(self, arc, beam):
+        Path("temp").mkdir(exist_ok=True)
+        self.madx.exec(f"mk_aparc({arc},b{beam})")
+        tab = xd.Table(self.madx.table.aperture)
+        tab._data.update(self.madx.table.aperture.summary)
+        return tab
 
-    def update_knobs(self, knobs, verbose=False, knobs_off=False, knobs_check=False):
-        for k, knob in knobs.items():
-            if not knobs_off:
-                if verbose:
-                    print(f"{k:20} {self[k]:15.6g} -> {knob.value:15.6g}")
-                self[k] = knob.value
-            for wn, value in knob.weights.items():
-                name = f"{wn}_from_{k}"
-                self[name] = value
-                if expr := self.madx.globals.cmdpar[wn].expr:
-                    if expr is not None and k in expr and name not in expr:
-                        raise ValueError(f"{wn} depends on {k} but not on {name}")
-                if expr is None:
-                    wnvalue = self[wn]
-                    self.madx.input(f"{wn} := {wnvalue} + ({name} * {k});")
-                elif expr is not None and k not in expr:
-                    self.madx.input(f"{wn} := {expr} + ({name} * {k});")
+    def get_ap_ir(self, irn, beam, verbose=True):
+        Path("temp").mkdir(exist_ok=True)
+        self.madx.exec(f"mk_apir({irn},b{beam})")
+        tab = xd.Table(self.madx.table.aperture)
+        tab._data.update(self.madx.table.aperture.summary)
+        if verbose:
+            get_ap_limit(f"IR{irn} B{beam}", tab, verbose=True)
+        return tab
 
-    def update(self, src, knobs_check=True):
-        if hasattr(src, "strengths"):
-            self.update_vars(src.strengths)
+    def get_ap_irs(self, verbose=True):
+        out = {}
+        for ir in range(1, 9):
+            for beam in [1, 2]:
+                tab = self.get_ap_ir(ir, beam)
+                out[f"ir{ir}b{beam}"] = tab
+
+        if verbose:
+            for kk, tab in out.items():
+                get_ap_limit(kk, tab, verbose=verbose)
+        return out
+
+    def get_variant(self):
+        vv = self.madx.globals
+        if "acbrdh4.l1b1" in vv:
+            variant = "hl"
+        elif vv["kqx.l1"] > 0:
+            variant = "lhc2024"
+        elif vv["kqx.l5"] > 0:
+            variant = "lhc2025"
         else:
-            self.update_vars(src)
-        if hasattr(src, "knobs"):
-            self.update_knobs(src.knobs, knobs_check=knobs_check)
-
-    def mad_mkknob(self, name, variant=None):
-        madx = self.madx
-        base = dict(madx.globals)
-        value = madx.globals.get(name, 0)
-        dvalue = value + 1
-        weights = {}
-        for s in base:
-            dvalue = madx.globals[s] - base[s]
-            if dvalue != 0:
-                weights[s] = dvalue
-        madx.globals[name] = value
-        return Knob(name, value, weights, variant=variant).specialize()
+            variant = "lhc"
+        return variant
 
     def mad_find_and_set0_knobs(madx, strengths, variant=None):
         """
@@ -664,6 +472,19 @@ use, sequence=lhcb2;
             madx.globals[knob] = 0
             knobs[knob] = Knob(knob, value, weights, variant=variant).specialize()
         return knobs
+
+    def mad_mkknob(self, name, variant=None):
+        madx = self.madx
+        base = dict(madx.globals)
+        value = madx.globals.get(name, 0)
+        dvalue = value + 1
+        weights = {}
+        for s in base:
+            dvalue = madx.globals[s] - base[s]
+            if dvalue != 0:
+                weights[s] = dvalue
+        madx.globals[name] = value
+        return Knob(name, value, weights, variant=variant).specialize()
 
     def make_and_set0_knobs(self, knob_names, variant=None):
         """
@@ -693,53 +514,6 @@ use, sequence=lhcb2;
             madx.globals[knob] = 0
             knobs[knob] = Knob(knob, value, weights, variant=variant).specialize()
         return knobs
-
-    def diff(self, other):
-        selfvar = {k: v for k, v in self.madx.globals.items() if isinstance(v, float)}
-        othervar = {k: v for k, v in other.madx.globals.items() if isinstance(v, float)}
-        print_diff_dict_float(selfvar, othervar)
-
-
-    def get_ap_ir(self, irn, beam,verbose=True):
-        Path("temp").mkdir(exist_ok=True)
-        self.madx.exec(f"mk_apir({irn},b{beam})")
-        tab = xd.Table(self.madx.table.aperture)
-        tab._data.update(self.madx.table.aperture.summary)
-        if verbose:
-            get_ap_limit(f"IR{irn} B{beam}", tab, verbose=True)
-        return tab
-
-    def get_ap_arc(self, arc, beam):
-        Path("temp").mkdir(exist_ok=True)
-        self.madx.exec(f"mk_aparc({arc},b{beam})")
-        tab = xd.Table(self.madx.table.aperture)
-        tab._data.update(self.madx.table.aperture.summary)
-        return tab
-
-    def get_ap_irs(self, verbose=True):
-        out = {}
-        for ir in range(1, 9):
-            for beam in [1, 2]:
-                tab = self.get_ap_ir(ir, beam)
-                out[f"ir{ir}b{beam}"] = tab
-
-        if verbose:
-            for kk, tab in out.items():
-                get_ap_limit(kk, tab, verbose=verbose)
-        return out
-
-    def print_ip(self):
-        tw1,tw2=self.twiss()
-        print(f"{'':7}", end="")
-        for ir in [1,2,5,8]:
-             print(f"    IR{ir}B1     IR{ir}B2", end="")
-        print()
-        for cc, scale in zip('betx bety x y px py'.split(),[1,1,1e3,1e3,1e6,1e6]):
-            print(f"{cc:7}", end="")
-            for ir in [1,2,5,8]:
-                ipn=f"ip{ir}:1"
-                print (f"{tw1[cc,ipn]*scale:9.3f} {tw2[cc,ipn]*scale:9.3f}", end="")
-            print()
 
     def plot(self, beam=None, left="betx bety", right="dx"):
         ylabels = {
@@ -777,36 +551,278 @@ use, sequence=lhcb2;
     def plot_ap_ir(self, irn, beam):
         apb = self.get_ap_ir(irn, beam)
         fig, ax = plt.subplots(num=f"MAD IR{irn} B{beam} aperture", clear=True)
-        n1=apb.n1
-        n1[(n1>30)|(n1==0)]=30
-        ax.plot(apb.s, n1, 'b', label="n1")
+        n1 = apb.n1
+        n1[(n1 > 30) | (n1 == 0)] = 30
+        ax.plot(apb.s, n1, "b", label="n1")
         ax.set_xlabel("s [m]")
         ax.set_ylabel("$n_1$ [σ]")
         ax.legend()
-        idx=np.argmin(apb.n1)
-        ax.axvline(apb.s[idx], color='k', ls='--')
+        idx = np.argmin(apb.n1)
+        ax.axvline(apb.s[idx], color="k", ls="--")
 
     def plot_ap_orbit(self, irn):
-        apb1=self.get_ap_ir(irn, 1)
-        apb2=self.get_ap_ir(irn, 2)
+        apb1 = self.get_ap_ir(irn, 1)
+        apb2 = self.get_ap_ir(irn, 2)
         fig, ax = plt.subplots(2, 1, num=f"MAD IR{irn} orbit", clear=True)
-        ax[0].plot(apb1.s, apb1.x, 'b', label="x B1")
-        ax[0].plot(apb2.s, apb2.x, 'r',label="x B2")
+        ax[0].plot(apb1.s, apb1.x, "b", label="x B1")
+        ax[0].plot(apb2.s, apb2.x, "r", label="x B2")
         ax[0].set_xlabel("s [m]")
         ax[0].set_ylabel("x [m]")
         ax[0].legend()
-        idx=np.argmin(apb1.n1)
-        ax[0].axvline(apb1.s[idx], color='k', ls='--')
-        ax[1].plot(apb1.s, apb1.y, 'b', label="y B1")
-        ax[1].plot(apb2.s, apb2.y, 'r', label="y B2")
+        idx = np.argmin(apb1.n1)
+        ax[0].axvline(apb1.s[idx], color="k", ls="--")
+        ax[1].plot(apb1.s, apb1.y, "b", label="y B1")
+        ax[1].plot(apb2.s, apb2.y, "r", label="y B2")
         ax[1].set_xlabel("s [m]")
         ax[1].set_ylabel("y [m]")
         ax[1].legend()
-        idx=np.argmin(apb2.n1)
-        ax[1].axvline(apb2.s[idx], color='k', ls='--')
+        idx = np.argmin(apb2.n1)
+        ax[1].axvline(apb2.s[idx], color="k", ls="--")
 
     def plot_beta(self):
         self.plot(left="betx bety", right="dx")
 
     def plot_orbit(self):
         self.plot(left="x y", right="dx dy")
+
+    def print_ip(self):
+        tw1, tw2 = self.twiss()
+        print(f"{'':7}", end="")
+        for ir in [1, 2, 5, 8]:
+            print(f"    IR{ir}B1     IR{ir}B2", end="")
+        print()
+        for cc, scale in zip("betx bety x y px py".split(), [1, 1, 1e3, 1e3, 1e6, 1e6]):
+            print(f"{cc:7}", end="")
+            for ir in [1, 2, 5, 8]:
+                ipn = f"ip{ir}:1"
+                print(
+                    f"{tw1[cc, ipn] * scale:9.3f} {tw2[cc, ipn] * scale:9.3f}", end=""
+                )
+            print()
+
+    def twiss(self, sequence=None, **kwargs):
+        if sequence is None:
+            return (self.b1.twiss(**kwargs), self.b2.twiss(**kwargs))
+        else:
+            return getattr(self, f"b{sequence}").twiss(**kwargs)
+
+    def update(self, src, knobs_check=True):
+        if hasattr(src, "strengths"):
+            self.update_vars(src.strengths)
+        else:
+            self.update_vars(src)
+        if hasattr(src, "knobs"):
+            self.update_knobs(src.knobs, knobs_check=knobs_check)
+
+    def update_knobs(self, knobs, verbose=False, knobs_off=False, knobs_check=False):
+        for k, knob in knobs.items():
+            if not knobs_off:
+                if verbose:
+                    print(f"{k:20} {self[k]:15.6g} -> {knob.value:15.6g}")
+                self[k] = knob.value
+            for wn, value in knob.weights.items():
+                name = f"{wn}_from_{k}"
+                self[name] = value
+                if expr := self.madx.globals.cmdpar[wn].expr:
+                    if expr is not None and k in expr and name not in expr:
+                        raise ValueError(f"{wn} depends on {k} but not on {name}")
+                if expr is None:
+                    wnvalue = self[wn]
+                    self.madx.input(f"{wn} := {wnvalue} + ({name} * {k});")
+                elif expr is not None and k not in expr:
+                    self.madx.input(f"{wn} := {expr} + ({name} * {k});")
+
+    def update_vars(self, strengths, verbose=False):
+        for k, v in strengths.items():
+            if verbose:
+                print(f"{k:20} {self[k]:15.6g} -> {v:15.6g}")
+            self[k] = v
+
+
+class MADSequence:
+    def __init__(self, madx, sequence_name):
+        self.madx = madx
+        self.sequence = sequence_name
+
+    @property
+    def end(self):
+        self.madx_sequence.elements[-2].name
+
+    @property
+    def madx_sequence(self):
+        return self.madx.sequence[self.sequence]
+
+    @property
+    def start(self):
+        self.madx_sequence.elements[1].name
+
+    def rmatrix(self, start=None, end=None):
+        if start is None:
+            start = self.start
+        if end is None:
+            end = self.end
+        self.madx.use(sequence=self.sequence, range=f"{start}/{end}")
+        tw = self.madx.twiss(betx=1, bety=1, rmatrix=True)
+        return RMatrix(tw.getmat("re", -1, 6, 6))
+
+    def twiss(
+        self,
+        start=None,
+        end=None,
+        betx=None,
+        bety=None,
+        alfx=None,
+        alfy=None,
+        dx=None,
+        dpx=None,
+        dy=None,
+        dpy=None,
+        init=None,
+        s=0,
+        at=None,
+        full=True,
+    ):
+        """
+        Parameters:
+        - full: if False consider only the portion from start to end
+        - at: location to which initial conditions are to be set
+        - init, betx, .... : initial conditions if all are None, then they are taken from the periodic solution at `at`
+        - start, end: start and end of the twiss output
+        """
+        if set([betx, bety, alfx, alfy, dx, dpx, dy, dpy, init]) == {
+            None
+        }:  # is periodic
+            self.madx.use(sequence=self.sequence, range=f"{start}/{end}")
+            tw = self.madx.twiss(sequence=self.sequence)
+        if full is False:  # consider only the machine from start to end
+            if start is None:
+                start = self.madx.sequence
+            if end is None:
+                end = self.madx.globals[self.sequence].sequence.end
+        else:
+            tw = self.madx.twiss(
+                betx=betx,
+                bety=bety,
+                alfx=alfx,
+                alfy=alfy,
+                sequence=self.sequence,
+            )
+        return xd.Table(tw)
+
+    def twiss_line(self, betx=1, bety=1, alfx=0, alfy=0):
+        tw = self.madx.twiss(
+            betx=betx, bety=bety, alfx=alfx, alfy=alfy, sequence=self.sequence
+        )
+        return xd.Table(tw)
+
+    def twiss_line_back(self, start, end, betx=1, bety=1, alfx=0, alfy=0, dx=0, dpx=0):
+        self.madx.use(sequence=self.sequence, range=f"{start}/{end}")
+        tw = self.madx.twiss(betx=1, bety=1, rmatrix=True)
+        rmat = tw.getmat("re", -1, 6, 6)
+        r11 = rmat[0, 0]
+        r12 = rmat[0, 1]
+        r21 = rmat[1, 0]
+        r22 = rmat[1, 1]
+        r33 = rmat[2, 2]
+        r34 = rmat[2, 3]
+        r43 = rmat[3, 2]
+        r44 = rmat[3, 3]
+        r16 = rmat[0, 5]
+        r26 = rmat[1, 5]
+        bx2 = betx
+        by2 = bety
+        ax2 = alfx
+        ay2 = alfy
+        dx2 = dx
+        dpx2 = dpx
+        gx2 = (1 + ax2**2) / bx2
+        gy2 = (1 + ay2**2) / by2
+        bx1 = r22**2 * bx2 + 2 * r22 * r12 * ax2 + r12**2 * gx2
+        ax1 = r22 * r21 * bx2 + (r11 * r22 + r12 * r21) * ax2 + r12 * r11 * gx2
+        by1 = r44**2 * by2 + 2 * r44 * r34 * ay2 + r34**2 * gy2
+        ay1 = r44 * r43 * by2 + (r33 * r44 + r34 * r43) * ay2 + r34 * r33 * gy2
+        dx1 = r22 * (dx2 - r16) - r12 * (dpx2 - r26)
+        dpx1 = -r21 * (dx2 - r16) + r11 * (dpx2 - r26)
+        tw = self.madx.twiss(betx=bx1, bety=by1, alfx=ax1, alfy=ay1, dx=dx1, dpx=dpx1)
+        return tw
+
+    def twiss_periodic(self, use=False):
+        if use:
+            self.madx.use(sequence=self.sequence)
+        tw = self.madx.twiss(sequence=self.sequence)
+        return xd.Table(tw)
+
+
+class RMatrix:
+    def __init__(self, matrix):
+        self.matrix = matrix
+
+    @classmethod
+    def from_twiss(cls, tw):
+        pass
+
+
+class TwissInit:
+    def __init__(
+        self,
+        betx=1,
+        alfx=1,
+        mux=0,
+        bety=1,
+        alfy=0,
+        muy=0,
+        x=0,
+        px=0,
+        y=0,
+        py=0,
+        t=0,
+        pt=0,
+        dx=0,
+        dpx=0,
+        dy=0,
+        dpy=0,
+        wx=0,
+        phix=0,
+        dmux=0,
+        wy=0,
+        phiy=0,
+        dmuy=0,
+        ddx=0,
+        ddpx=0,
+        ddy=0,
+        ddpy=0,
+        r11=0,
+        r12=0,
+        r21=0,
+        r22=0,
+    ):
+        self.betx = betx
+        self.alfx = alfx
+        self.mux = mux
+        self.bety = bety
+        self.alfy = alfy
+        self.muy = muy
+        self.x = x
+        self.px = px
+        self.y = y
+        self.py = py
+        self.t = t
+        self.pt = pt
+        self.dx = dx
+        self.dpx = dpx
+        self.dy = dy
+        self.dpy = dpy
+        self.wx = wx
+        self.phix = phix
+        self.dmux = dmux
+        self.wy = wy
+        self.phiy = phiy
+        self.dmuy = dmuy
+        self.ddx = ddx
+        self.ddpx = ddpx
+        self.ddy = ddy
+        self.ddpy = ddpy
+        self.r11 = r11
+        self.r12 = r12
+        self.r21 = r21
+        self.r22 = r22

@@ -24,7 +24,7 @@ from .model_xsuite import LHCXsuiteModel
 from .optics import LHCOptics
 from .opttable import LHCOpticsTable, LHCIRTable, LHCArcTable
 from .rdmsignal import poly_fit, poly_val
-from .repo import LHC, LHCRepo, LHCCycle
+from .repo import LHCDev, LHCRepo, LHCCycle
 from .aperture import LHCAperture
 from .utils import get_yaml, string_to_unixtime, unixtime_to_string, xmltodict
 
@@ -34,7 +34,7 @@ __all__ = [
     "get_nxcals",
     "NXCals",
     "Knob",
-    "LHC",
+    "LHCDev",
     "LHCRepo",
     "LHCCycle",
     "LHCAperture",

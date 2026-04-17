@@ -4,7 +4,6 @@ import numpy as np
 import xtrack as xt
 import matplotlib.pyplot as plt
 
-from .model_madx import LHCMadxModel
 from .section import LHCSection, lhcprev, lhcsucc, sort_n
 from .utils import match_compare_log
 
@@ -14,15 +13,18 @@ def gen_acb_full_names(s1, s2, irn):
         f"acb{s1}{hv}{s2}.{lr}{irn}b{bb}" for hv in "hv" for lr in "lr" for bb in "12"
     ]
 
+
 def gen_acbx_names(irn):
     return [f"acbx{hv}{nn}.{lr}{irn}" for nn in "123" for hv in "hv" for lr in "lr"]
 
+
 def gen_d12_names(irn):
-    out=[f"ad{nn}.{lr}{irn}" for nn in "12" for lr in "lr"]
+    out = [f"ad{nn}.{lr}{irn}" for nn in "12" for lr in "lr"]
     out.extend(f"sep_mid_d1.{lr}{irn}" for lr in "lr")
     out.extend(f"shift_d2.{lr}{irn}" for lr in "lr")
     out.extend(f"kd{nn}.{lr}{irn}" for nn in "12" for lr in "lr")
     return out
+
 
 def gen_crab_names(irn):
     return [
@@ -54,8 +56,6 @@ def gen_qtl(nns, irn):
     return [f"kqtl{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
 
 
-
-
 def gen_param_names(irn):
     out = []
     for param in "betx bety alfx alfy dx dpx".split():
@@ -67,6 +67,7 @@ def gen_param_names(irn):
             out.append(f"{param}ip{irn}b{beam}_l")
             out.append(f"{param}ip{irn}b{beam}_r")
     return out
+
 
 def is_hllhc(variant):
     return variant.startswith("hl")
@@ -86,65 +87,23 @@ class LHCIR(LHCSection):
     default_twiss_method = "init"
 
     @classmethod
-    def from_madx(cls, madx, name=None, knob_names=None, variant="2025"):
-        madmodel = LHCMadxModel(madx)
-        return cls.from_model(madmodel, name, knob_names=knob_names, variant=variant)
-
-    @classmethod
-    def from_model(cls, model, name=None, knob_names=None, variant="2025"):
+    def from_model(cls, model, name=None, variant=None):
         if name is None:
             name = cls.name
-        irn = int(name[-1])
-        strength_names = []
-        quads = []
-        if is_hllhc(variant) and irn in [1, 5]:
-            triplets = model.filter(f"kqx[123][ab]?\\.[lr]{irn}$")
-        else:
-            triplets = model.filter(f"kqx\\.[lr]{irn}$")
-            triplets += model.filter(f"ktqx[12]\\.[lr]{irn}$")
-        quads += triplets
-        quads += model.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
-        quads += model.filter(f"kqt?[45]\\.[lr]+{irn}$")
-        quads += model.filter(f"kqt?l?[0-9][0-9]?\\..*[lr]{irn}b[12]$")
-        if irn == 7:
-            if "kqt5.l7" in quads:
-                quads.remove("kqt5.l7")
-            if "kqt5.r7" in quads:
-                quads.remove("kqt5.r7")
-        strength_names += sort_n(quads)
-        strength_names += model.filter(f"kqs\\..*[lr]{irn}b[12]$")
-        crabs = model.filter(f"[lv]crab[ab]4[lr]{irn}\\.b[12]$")
-        strength_names += sort_n(crabs)
-        acb = model.filter(f"acbx.*[lr]{irn}$")
-        acb += model.filter(f"acb.*[lr]{irn}b[12]$")
-        strength_names += sort_n(acb)
-        if knob_names is None:
-            knob_names = cls.knob_names
-        knobs = model.make_and_set0_knobs(knob_names, variant=variant)
-        strengths = {st: model[st] for st in strength_names}
-        for knob in knobs:
-            model[knob] = knobs[knob].value
-        params = {}
-        for param in "betx bety alfx alfy dx dpx".split():
-            for beam in "12":
-                ppname = f"{param}ip{irn}b{beam}"
-                if ppname in model:
-                    params[ppname] = model[ppname]
-        for param in "mux muy".split():
-            for beam in "12":
-                for suffix in ["", "_l", "_r"]:
-                    ppname = f"{param}ip{irn}b{beam}{suffix}"
-                    if ppname in model:
-                        params[ppname] = model[ppname]
-        return cls(name, strengths, params, knobs, variant=variant)
-
-    @classmethod
-    def from_madxfile(cls, filename, name=None, stdout=False, variant="2025"):
-        from cpymad.madx import Madx
-
-        madx = Madx(stdout=stdout)
-        madx.call(filename)
-        return cls.from_madx(madx, name, variant=variant)
+        if variant is None:
+            variant = model.get_variant()
+        ir = cls(name=cls.name, strengths={}, params={}, knobs={}, variant=variant)
+        knobs = model.make_and_set0_knobs(
+            knob_names=ir.gen_knob_names(), variant=variant
+        )
+        ir.knobs.update(knobs)
+        for strength in ir.gen_strength_names():
+            if strength in model:
+                ir.strengths[strength] = model[strength]
+        for param in ir.gen_param_names():
+            if param in model:
+                ir.params[param] = model[param]
+        return ir
 
     def __init__(
         self,
@@ -152,11 +111,9 @@ class LHCIR(LHCSection):
         strengths=None,
         params=None,
         knobs=None,
-        start=None,
-        end=None,
         filename=None,
         parent=None,
-        variant="2025",
+        variant=None,
     ):
         if name is None:
             name = self.__class__.name
@@ -186,8 +143,6 @@ class LHCIR(LHCSection):
         self.endb2 = f"e.ds.r{irn}.b2"
         self.startb12 = (self.startb1, self.startb2)
         self.endb12 = (self.endb1, self.endb2)
-        self.param_names = gen_param_names(self.irn)
-        self.param_names.extend(self._extra_param_names)
 
     def __getitem__(self, key):
         if re.match(r"kqx[123]\.[lr]", key):
@@ -268,6 +223,9 @@ class LHCIR(LHCSection):
                     if verbose:
                         print(f"{k:20} {v:12.8f} {kmin * 100:5.1f}% {kmax * 100:5.1f}%")
         return out
+
+    def gen_param_names(self):
+        return gen_param_names(self.irn)
 
     def get_kqx(self, n, lr):
         "Get the strength of the kqx{n}.{lr}{irn} the individual quadrupoles"

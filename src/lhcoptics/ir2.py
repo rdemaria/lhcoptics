@@ -75,7 +75,9 @@ class LHCIR2(LHCIR):
             )
             out.extend(f"on_o{hv}{self.irn}" for hv in "hv")
             out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
-        out.append(f"on_alice","on_sol_alice")
+
+        #TODO need to support energy dependent knobs
+        #out.extend([f"on_alice", f"on_sol_alice"])
         return out
 
  
@@ -88,6 +90,14 @@ class LHCIR2(LHCIR):
         quads.extend(gen_qtl([11], self.irn))
         quads.extend(gen_qt([12, 13], self.irn))
         return quads
+
+    def gen_strength_names(self):
+        out = []
+        out.extend(self.gen_quad_names())
+        out.extend(self.gen_bend_names())
+        out.extend(self.gen_acb_names())
+        out.extend(self.gen_experiment_names())
+        return out
 
     def get_init_ats(self, beam):
         rx = self.parent.params["rx_ip1"]

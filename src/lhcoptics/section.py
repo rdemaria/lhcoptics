@@ -1,56 +1,20 @@
 import json
 import re
 
-import numpy as np
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 from .knob import Knob
 from .model_madx import LHCMadxModel
-from .utils import (
-    deliver_list_str,
-    print_diff_dict_float,
-    print_diff_dict_objs,
-)
+from .model_xsuite import LHCXsuiteModel
+from .utils import deliver_list_str, print_diff_dict_float, print_diff_dict_objs
 
-_lb = [(ll, bb) for ll in "lr" for bb in "12"]
 _ac = {
     0: [("h", "l", "1"), ("v", "l", "1"), ("h", "r", "2"), ("v", "r", "2")],
     1: [("h", "l", "2"), ("v", "l", "2"), ("h", "r", "1"), ("v", "r", "1")],
 }
 
-def gen_acb_alt_names(s1, nns, pol, lr, irn):
-    """
-    Return alternate names for the acb. pol select the symmetry.
-    """
-    out=[]
-    for nn in nns:
-        if lr == "lr":
-            hvlrb = ["hl1", "hr2","vr1","vl2"] if nn%2==pol else ["hr1", "hl2","vr2","vl1"]
-        elif lr == "l":
-            hvlrb = ["hl1","vl2"] if nn%2==pol else ["hl2","vl1"]
-        elif lr == "r":
-            hvlrb = ["hr2","vr1"] if nn%2==pol else ["hr1","vr2"]
-        out.extend([f"acb{s1}{hv}{nn}.{lr}{irn}b{bb}" for hv, lr,bb in hvlrb])
-    return out
-
-
-def sort_n(lst):
-    out = []
-    for s in lst:
-        if m := re.match(r"[a-z]*([0-9][0-9]?)", s):
-            out.append((int(m.group(1)), s))
-        else:
-            out.append((0, s))
-    return [s for _, s in sorted(out)]
-
-
-def lhcprev(n):
-    return (n - 2) % 8 + 1
-
-
-def lhcsucc(n):
-    return n % 8 + 1
+_lb = [(ll, bb) for ll in "lr" for bb in "12"]
 
 
 def filter_lrb12(irn, left=True, right=True, b1=True, b2=True):
@@ -78,6 +42,44 @@ def filter_lrb12(irn, left=True, right=True, b1=True, b2=True):
                 return lambda x: "b2" in x and f"r{irn}" in x
 
 
+def gen_acb_alt_names(s1, nns, pol, lr, irn):
+    """
+    Return alternate names for the acb. pol select the symmetry.
+    """
+    out = []
+    for nn in nns:
+        if lr == "lr":
+            hvlrb = (
+                ["hl1", "hr2", "vr1", "vl2"]
+                if nn % 2 == pol
+                else ["hr1", "hl2", "vr2", "vl1"]
+            )
+        elif lr == "l":
+            hvlrb = ["hl1", "vl2"] if nn % 2 == pol else ["hl2", "vl1"]
+        elif lr == "r":
+            hvlrb = ["hr2", "vr1"] if nn % 2 == pol else ["hr1", "vr2"]
+        out.extend([f"acb{s1}{hv}{nn}.{lr}{irn}b{bb}" for hv, lr, bb in hvlrb])
+    return out
+
+
+def lhcprev(n):
+    return (n - 2) % 8 + 1
+
+
+def lhcsucc(n):
+    return n % 8 + 1
+
+
+def sort_n(lst):
+    out = []
+    for s in lst:
+        if m := re.match(r"[a-z]*([0-9][0-9]?)", s):
+            out.append((int(m.group(1)), s))
+        else:
+            out.append((0, s))
+    return [s for _, s in sorted(out)]
+
+
 class LHCSection:
     """
     Model a section of the machine.
@@ -93,30 +95,6 @@ class LHCSection:
        get_params_from_twiss() method to return the parameters from a twiss table
 
     """
-
-    @classmethod
-    def from_dict(cls, data, filename=None, variant=None):
-        return cls(
-            name=data["name"],
-            start=data["start"],
-            end=data["end"],
-            strengths=data["strengths"],
-            params=data["params"],
-            knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
-            filename=filename,
-            variant=data.get("variant", variant if variant is not None else "2025"),
-        )
-
-    @classmethod
-    def from_json(cls, filename, variant=None):
-        with open(filename) as f:
-            data = json.load(f)
-            return cls.from_dict(data, filename=filename, variant=variant)
-
-    @classmethod
-    def from_madxfile(cls, filename, name=None, variant="2025"):
-        model = LHCMadxModel.from_madxfile(filename)
-        return cls.from_madx(model.madx, name=name, variant=variant)
 
     def __init__(
         self,
@@ -147,6 +125,45 @@ class LHCSection:
         self.filename = filename
         self._model = None
 
+    @classmethod
+    def from_dict(cls, data, filename=None, variant=None):
+        return cls(
+            name=data["name"],
+            start=data["start"],
+            end=data["end"],
+            strengths=data["strengths"],
+            params=data["params"],
+            knobs={k: Knob.from_dict(d) for k, d in data["knobs"].items()},
+            filename=filename,
+            variant=data.get("variant", variant if variant is not None else "2025"),
+        )
+
+    @classmethod
+    def from_json(cls, filename, variant=None):
+        with open(filename) as f:
+            data = json.load(f)
+            return cls.from_dict(data, filename=filename, variant=variant)
+
+    @classmethod
+    def from_cpymad(cls, madx, name=None, variant=None):
+        model = LHCMadxModel(madx)
+        return cls.from_model(model, name, variant=variant)
+
+    @classmethod
+    def from_madx_optics(cls, madx_optics, name=None, variant=None):
+        model=LHCXsuiteModel.from_madx_optics(madx_optics)
+        return cls.from_model(model, name, variant=variant)
+
+    @classmethod
+    def from_madx_scripts(cls, *filenames, name=None, stdout=False, variant=None):
+        model = LHCMadxModel.from_madx_scripts(*filenames, stdout=stdout)
+        return cls.from_model(model, name, variant=variant)
+
+    @classmethod
+    def from_xsuite(cls, env, name=None, variant=None):
+        model = LHCXsuiteModel(env)
+        return cls.from_model(model, name, variant=variant)
+
     def __contains__(self, key):
         return key in self.strengths or key in self.params or key in self.knobs
 
@@ -164,15 +181,15 @@ class LHCSection:
         return f"<LHCSection {self.name} {self.start}/{self.end}>"
 
     @property
-    def model(self):
-        return self.parent.model
-
-    @property
     def circuits(self):
         if hasattr(self, "circuits"):
             return self.circuits
         else:
             return self.parent.circuits
+
+    @property
+    def model(self):
+        return self.parent.model
 
     def check_match(self, verbose=True):
         mtc = self.match(verbose=False, solve=False)
@@ -181,22 +198,6 @@ class LHCSection:
             mtc.vary_status()
             mtc.target_status()
         return mtc._err.last_point_within_tol
-
-    def get_match(self):
-        mtc = self.match(verbose=False, solve=False)
-        return np.sqrt(mtc._err(None, check_limits=False, return_scalar=True))
-
-    def get_param_mismatches(self, tol=1e-6, params=None):
-        if params is None:
-            params = self.get_params()
-        out = []
-        for k, v in self.params.items():
-            if k in params:
-                vtw = params[k]
-                diff = v - vtw
-                if abs(diff) > tol:
-                    out.append((k, v, vtw, diff))
-        return out
 
     def check_params(self, verbose=True, fail=False, tol=1e-6, params=None):
         mismatches = self.get_param_mismatches(tol=tol, params=params)
@@ -231,6 +232,33 @@ class LHCSection:
         self.model.create_knobs(self.knobs, verbose=verbose)
         return self
 
+    def diff(self, other):
+        self.diff_strengths(other)
+        self.diff_knobs(other)
+        self.diff_params(other)
+
+    def diff_knobs(self, other):
+        print_diff_dict_objs(self.knobs, other.knobs)
+
+    def diff_model(self, model=None):
+        if model is None:
+            model = self.parent.model
+        print_diff_dict_float(self.strengths, model, keys=self.strengths.keys())
+
+    def diff_params(self, other):
+        print_diff_dict_float(self.params, other.params)
+
+    def diff_strengths(self, other):
+        print_diff_dict_float(self.strengths, other.strengths)
+
+    def gen_knob_names(self):
+        return ()
+
+    def get_current(self, kname, p0c=7e12):
+        if self.parent.circuit is None:
+            raise ValueError("Circuit not set")
+        return self.parent.circuit.get_current(kname, self[kname], p0c)
+
     def get_match(self):
         mtc = self.match(verbose=False, solve=False)
         err = mtc._err
@@ -238,29 +266,17 @@ class LHCSection:
         err.return_scalar = True
         return np.sqrt(err())
 
-    def diff(self, other):
-        self.diff_strengths(other)
-        self.diff_knobs(other)
-        self.diff_params(other)
-
-    def diff_model(self, model=None):
-        if model is None:
-            model = self.parent.model
-        print_diff_dict_float(self.strengths, model, keys=self.strengths.keys())
-
-    def diff_strengths(self, other):
-        print_diff_dict_float(self.strengths, other.strengths)
-
-    def diff_params(self, other):
-        print_diff_dict_float(self.params, other.params)
-
-    def diff_knobs(self, other):
-        print_diff_dict_objs(self.knobs, other.knobs)
-
-    def get_current(self, kname, p0c=7e12):
-        if self.parent.circuit is None:
-            raise ValueError("Circuit not set")
-        return self.parent.circuit.get_current(kname, self[kname], p0c)
+    def get_param_mismatches(self, tol=1e-6, params=None):
+        if params is None:
+            params = self.get_params()
+        out = []
+        for k, v in self.params.items():
+            if k in params:
+                vtw = params[k]
+                diff = v - vtw
+                if abs(diff) > tol:
+                    out.append((k, v, vtw, diff))
+        return out
 
     def plot(
         self,
@@ -283,16 +299,6 @@ class LHCSection:
             plot.ax.set_title(figlabel)
             return plot
 
-    def set_params(self, mode="from_twiss_init", verbose=False):
-        """
-        Copy all parameters from get_params() to self.params
-        """
-        src = self.get_params(mode=mode, verbose=verbose)
-        if verbose:
-            print(f"Setting parameters from mode {mode} with full=True")
-        self.params.update(src)
-        return self
-
     def set_bumps_off(self):
         pass
 
@@ -303,6 +309,16 @@ class LHCSection:
     def set_knobs_on(self):
         for k, knob in self.knobs.items():
             self.parent.model[k] = knob.value
+
+    def set_params(self, mode="from_twiss_init", verbose=False):
+        """
+        Copy all parameters from get_params() to self.params
+        """
+        src = self.get_params(mode=mode, verbose=verbose)
+        if verbose:
+            print(f"Setting parameters from mode {mode} with full=True")
+        self.params.update(src)
+        return self
 
     def to_dict(self):
         return {
@@ -369,7 +385,7 @@ class LHCSection:
         return self
 
     def update_from_madxfile(self, filename):
-        src = self.__class__.from_madxfile(
+        src = self.__class__.from_madx_scripts(
             filename,
             name=self.name,
             variant=self.variant,
@@ -435,30 +451,6 @@ class LHCSection:
             )
         return self
 
-    def update_strengths(
-        self, src=None, verbose=False, b1=True, b2=True, left=True, right=True
-    ):
-        """
-        Update existing stregnths from self. model or src.strengths or src
-        """
-        if src is None:
-            src = self.model
-        elif hasattr(src, "strengths"):
-            src = src.strengths
-        if hasattr(self, "irn"):
-            filter = filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
-        else:
-
-            def filter(x):
-                return True
-
-        for kk in self.strengths:
-            if kk in src and filter(kk):
-                if verbose and self.strengths[kk] != src[kk]:
-                    print(f"Updating {kk!r} from {self.strengths[kk]} to {src[kk]}")
-                self.strengths[kk] = src[kk]
-        return self
-
     def update_params(
         self,
         src=None,
@@ -503,4 +495,28 @@ class LHCSection:
                             f"Updating {k!r:15} from {self.params[k]:15.6g} to {src[k]:15.6g}"
                         )
                     self.params[k] = src[k]
+        return self
+
+    def update_strengths(
+        self, src=None, verbose=False, b1=True, b2=True, left=True, right=True
+    ):
+        """
+        Update existing stregnths from self. model or src.strengths or src
+        """
+        if src is None:
+            src = self.model
+        elif hasattr(src, "strengths"):
+            src = src.strengths
+        if hasattr(self, "irn"):
+            filter = filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
+        else:
+
+            def filter(x):
+                return True
+
+        for kk in self.strengths:
+            if kk in src and filter(kk):
+                if verbose and self.strengths[kk] != src[kk]:
+                    print(f"Updating {kk!r} from {self.strengths[kk]} to {src[kk]}")
+                self.strengths[kk] = src[kk]
         return self

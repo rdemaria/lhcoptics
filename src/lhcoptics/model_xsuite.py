@@ -449,7 +449,10 @@ class LHCXsuiteModel:
         self.eref = env._xdeps_eref
         self.mgr = env._xdeps_manager
         self.madxfile = madxfile
-        self.sequence = {1: env.b1, 2: env.b2}
+        if hasattr(env, "b1") and hasattr(env, "b2"):
+            self.sequence = {1: env.b1, 2: env.b2}
+        else:
+            self.sequence = None
         self._aperture = None
 
     @classmethod
@@ -498,6 +501,11 @@ class LHCXsuiteModel:
         return cls(lhc, jsonfile=jsonfile)
 
     @classmethod
+    def from_madx_optics(cls, madxfile):
+        env = xt.load(madxfile)
+        return cls(env=env, madxfile=madxfile)
+
+    @classmethod
     def from_madx_sequence(cls, filename):
         """Create an `LHCXsuiteModel` from a MAD-X sequence file."""
         seq_text = open(filename).read().lower()
@@ -544,12 +552,11 @@ class LHCXsuiteModel:
         lhc["vrf400"] = 6.5
         return cls(env=lhc)
 
-
     @classmethod
     def from_madxfile(cls, madxfile, sliced=False):
         """Create an `LHCXsuiteModel` from a MAD-X input file."""
 
-        madmodel = LHCMadxModel.from_madxfile(madxfile)
+        madmodel = LHCMadxModel.from_madx_scripts(madxfile)
         model = cls.from_cpymad(madmodel.madx, sliced=sliced, madxfile=madxfile)
         model.madxfile = madxfile
         return model
@@ -557,8 +564,8 @@ class LHCXsuiteModel:
     @classmethod
     def make_json_from_sequence(cls, sequencefile, jsonfile, knobfile):
         print("Loading sequence into Xsuite...")
-        model=cls.from_madx_sequence(sequencefile)
-        lhc=model.env
+        model = cls.from_madx_sequence(sequencefile)
+        lhc = model.env
         print(f"Saving JSON model to {jsonfile!r}...")
         lhc.to_json(jsonfile)
 
@@ -861,26 +868,26 @@ class LHCXsuiteModel:
         return list(filter(lambda item: re.match(pattern, item), var_values))
 
     def get_acb_names(self, pattern="mcb", debug=False):
-        out={}
-        for k,v in self.search(pattern).items():
+        out = {}
+        for k, v in self.search(pattern).items():
             if hasattr(v, "knl"):
                 if "h" in k:
-                    exp=self.eref[k].knl[0]._expr
+                    exp = self.eref[k].knl[0]._expr
                 else:
-                    exp=self.eref[k].ksl[0]._expr
+                    exp = self.eref[k].ksl[0]._expr
                 if exp is not None:
-                     out[k]=exp._get_dependencies().pop()._key
+                    out[k] = exp._get_dependencies().pop()._key
                 elif debug:
                     print(f"Warning: no expression found for {k}")
         return out
 
     def get_kq_names(self, pattern="mq[^s]", debug=False):
-        out={}
-        for k,v in self.search(pattern).items():
+        out = {}
+        for k, v in self.search(pattern).items():
             if hasattr(v, "k1"):
-                exp=self.eref[k].k1._expr
+                exp = self.eref[k].k1._expr
                 if exp is not None:
-                     out[k]=exp._get_dependencies().pop()._key
+                    out[k] = exp._get_dependencies().pop()._key
                 elif debug:
                     print(f"Warning: no expression found for {k}")
         return out
@@ -971,7 +978,7 @@ class LHCXsuiteModel:
                     if np.isscalar(term._lhs):
                         value = float(term._lhs)
                     else:
-                        value = var_values[term._lhs._key]
+                        value = term._lhs._get_value()
                         if verbose:
                             print(f"   Term: {term}")
                             print(f"   Weight: {value}")
@@ -1094,8 +1101,23 @@ class LHCXsuiteModel:
         dwy5 = (wyip5r - wyip5l) / 2
         return dwx1, dwy1, dwx5, dwy5
 
+    def get_variant(self):
+        vv = self.env.vars
+        if "acbrdh4.l1b1" in vv:
+            variant = "hl"
+        elif vv["kqx.l1"] > 0:
+            variant = "lhc2024"
+        elif vv["kqx.l5"] > 0:
+            variant = "lhc2025"
+        else:
+            variant = "lhc"
+        return variant
+
     def info(self, key):
         return self.env.vars[key]._info(limit=None)
+
+    def is_full(self):
+        return self.b1 is not None and self.b2 is not None
 
     def keys(self):
         return self._var_values.keys()
@@ -1122,6 +1144,10 @@ class LHCXsuiteModel:
     def knob_delete_all(self):
         for variable in self._var_values:
             self[variable] = self[variable]
+
+    def load(self, madxfile):
+        self.env.vars.load(madxfile)
+        return self
 
     def make_and_set0_knobs(self, knob_names, variant=None):
         knobs = {}
@@ -1227,10 +1253,10 @@ class LHCXsuiteModel:
             tw = self.b2.twiss(strengths=False)
             print(f"max orbit is {max(abs(tw.x))} m in b2")
 
-        lhc=self.env
+        lhc = self.env
         var_names = []
         for arc in [12, 23, 34, 45, 56, 67, 78, 81]:
-            lhc[f"kb.a{arc}"]=f"ab.a{arc}/l.mb*(1+6.9e-13)"
+            lhc[f"kb.a{arc}"] = f"ab.a{arc}/l.mb*(1+6.9e-13)"
 
         for ipn in [1, 2, 5, 8]:
             var_names += [f"kd1.l{ipn}", f"kd2.l{ipn}", f"kd1.r{ipn}", f"kd2.r{ipn}"]

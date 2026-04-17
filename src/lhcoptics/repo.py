@@ -16,15 +16,16 @@ optics model:
 """
 
 from pathlib import Path
-import re
 import os
+import re
 import site
 import xml.etree.ElementTree as ET
 
 import numpy as np
 
-
 from .lsa_util import get_lsa
+from .model_xsuite import LHCXsuiteModel
+from .optics import LHCOptics
 from .utils import (
     gitlab_get_branches_and_tags,
     file_one_day_old,
@@ -41,22 +42,19 @@ from .utils import (
     read_knob_structure,
 )
 
-from .optics import LHCOptics
-from .model_xsuite import LHCXsuiteModel
-
 P_MASS = 0.938272046e9  # proton mass in eV/c2
 
 default_basedir = os.getenv(
     "LHCOPTICS_BASEDIR", default=Path(site.getuserbase()) / "acc-models-lhc"
 )
+
 default_basedir = Path(default_basedir)
 
-
-# gitlab projectt_id for API
-projectt_id = 76507
 git_url = os.getenv(
     "LHCOPTICS_GIT_URL", "https://gitlab.cern.ch/acc-models/acc-models-lhc.git"
 )
+
+projectt_id = 76507
 
 
 def check_repobasedir(basedir):
@@ -74,7 +72,7 @@ def check_repobasedir(basedir):
     return basedir
 
 
-class LHC:
+class LHCDev:
     """LHC optics repository
 
     The structure is as follows:
@@ -120,11 +118,11 @@ class LHC:
         else:
             raise KeyError(f"No branch or tag named {name}")
 
-    def _ipython_key_completions_(self):
-        return list(self.branches.keys()) + list(self.tags.keys())
-
     def __repr__(self):
         return f"<LHC Repo at '{self.basedir}'>"
+
+    def _ipython_key_completions_(self):
+        return list(self.branches.keys()) + list(self.tags.keys())
 
     def check_local_branches(self, dry_run=False, force_update=False):
         """
@@ -143,6 +141,15 @@ class LHC:
                     self.branches[branch] = commit
                     if not dry_run:
                         print(git_pull(branch_dir))
+
+    def clone_repo(self, branch_or_tag):
+        """
+        Manually the repository given a branch or tag
+        """
+        repo_dir = self.basedir / branch_or_tag
+        if not repo_dir.exists():
+            print(f"Cloning repository {repo_dir}")
+            git_clone_repo(git_url, repo_dir, branch_or_tag)
 
     def get_branches_and_tags(self, force_update=False):
         """
@@ -182,347 +189,10 @@ class LHC:
     def get_web_url(self):
         return "https://acc-models.web.cern.ch/acc-models/lhc"
 
-    def clone_repo(self, branch_or_tag):
-        """
-        Manually the repository given a branch or tag
-        """
-        repo_dir = self.basedir / branch_or_tag
-        if not repo_dir.exists():
-            print(f"Cloning repository {repo_dir}")
-            git_clone_repo(git_url, repo_dir, branch_or_tag)
-
     def refresh(self):
         """Refresh the repository"""
         self._repo_cache.clear()
         self.check_local_branches(force_update=True)
-
-
-class LHCRepo:
-    """LHC optics for a specific branch or tag"""
-
-    @classmethod
-    def from_basedir(cls, basedir):
-        yaml = read_yaml(Path(basedir) / "scenarios" / "readme.yaml")
-        name = yaml.get("name", basedir.name)
-        return cls(name=basedir.name, basedir=basedir)
-
-    def __init__(self, basedir, name=None, parent=None):
-        self.basedir = Path(basedir)
-        self.yaml = self.basedir / "scenarios" / "readme.yaml"
-        self.parent = parent
-        self.refresh()
-        self.name = str(self.data.get("name", name))
-
-    def __repr__(self):
-        return f"<LHC {self.name} '{self.basedir}', {len(self.cycles)} cycles, {len(self.sets)} sets>"
-
-    def __getattr__(self, name):
-        if name in self.cycles:
-            return self.cycles[name]
-        elif name in self.sets:
-            return self.sets[name]
-        else:
-            raise AttributeError(f"No cycle or set named {name}")
-
-    def __dir__(self):
-        return super().__dir__() + list(self.cycles.keys()) + list(self.sets.keys())
-
-    def add_cycle(self, name, label=None, particles=None, charges=None, masses=None):
-        """Add a new cycle to the repository"""
-        if name in self.cycles:
-            raise ValueError(f"Cycle {name} already exists")
-        (self.basedir / "scenarios" / "cycle" / name).mkdir(parents=True, exist_ok=True)
-        cycle = LHCCycle(
-            name=name,
-            basedir=self.basedir / "scenarios" / "cycle" / name,
-            parent=self,
-        )
-        cycle.label = label
-        if particles is None:
-            particles = ["proton", "proton"]
-        if charges is None:
-            charges = [1, 1]
-        if masses is None and particles == ["proton", "proton"]:
-            masses = [P_MASS, P_MASS]
-        cycle.particles = particles
-        cycle.charges = charges
-        cycle.masses = masses
-        cycle.save_data()
-        self.cycles[name] = cycle
-        self.save_data()
-        return cycle
-
-    def add_set(self, name, label=None):
-        """Add a new optics set to the repository"""
-        if name in self.cycles:
-            raise ValueError(f"Optics set {name} already exists")
-        (self.basedir / "scenarios" / "set" / name).mkdir(parents=True, exist_ok=True)
-        optics_set = LHCOpticsSet(
-            name=name,
-            basedir=self.basedir / "scenarios" / "set" / name,
-            parent=self,
-        )
-        optics_set.label = label
-        optics_set.save_data()
-        self.sets[name] = optics_set
-        self.save_data()
-        return optics_set
-
-    def check_optics_def(self):
-        for cycle in self.cycles.values():
-            cycle.check_optics_def()
-
-    def check_xml_optics_defs(self, xml_file=None):
-        res = True
-        for name in self.find_xml_optics(xml_file=xml_file):
-            path = self.basedir / "operation" / "optics" / f"{name}.madx"
-            if not path.exists():
-                print(f"Optics {name} not found in {path}")
-                res = False
-            else:
-                with open(path) as f:
-                    data = f.read()
-                    try:
-                        madx_defs = self.get_xml_optics_madx(name)
-                    except ValueError as e:
-                        print(e)
-                        res = False
-                        continue
-                    if not data.endswith(madx_defs):
-                        print(data)
-                        print(madx_defs)
-                        print(f"Optics {name} in {path} does not match XML definition")
-                        res = False
-        return res
-
-    def find_xml_optics(self, regexp=".*", xml_file=None):
-        lst = [
-            oo.attrib["name"]
-            for oo in self.get_xml_optics_elements(xml_file=xml_file)
-            if re.match(regexp, oo.attrib["name"])
-        ]
-        return lst
-
-    def gen_html_homepage(self):
-        """Generate the HTML homepage for the repository"""
-        html = "<!DOCTYPE html>\n"
-        html += "<html lang='en'>\n"
-        html += "<head>\n"
-        html += "<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
-        html += "<link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
-        html += "<meta charset='UTF-8'>\n"
-        html += f"<title>{self.label}</title>\n"
-        html += "</head>\n"
-        html += f"<body>\n"
-        linklhc = "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
-        html += f"<h1>{linklhc} / {self.label}</h1>\n"
-        html += f"<p>{self.description}</p>\n"
-        html += "<h2>Cycles</h2>\n"
-        html += "<ul>\n"
-        for cycle in self.cycles.values():
-            cycle_path = f"scenarios/cycle/{cycle.name}"
-            link = f"<a href='{cycle_path}'>{cycle.label}</a>"
-            html += f"<li>{link}</li>\n"
-        html += "</ul>\n"
-        html += "</body>\n</html>\n"
-        return html
-
-    def gen_html_pages(self, eos_repo_path=None):
-        """Generate the HTML pages for the repository"""
-        files = []
-        if eos_repo_path is None:
-            eos_repo_path = self.get_eos_path()
-        else:
-            eos_repo_path = Path(eos_repo_path)
-        homepage = self.gen_html_homepage()
-        homepage_path = eos_repo_path / "index.html"
-        print(f"Writing {homepage_path}")
-        with open(homepage_path, "w") as f:
-            f.write(homepage)
-        files.append(homepage_path)
-        for cycle in self.cycles.values():
-            process_files = cycle.gen_html_pages(eos_repo_path=eos_repo_path)
-            files.extend(process_files)
-        return files
-
-    def gen_repo_data(self):
-        for cycle in self.cycles.values():
-            cycle.gen_repo_data()
-        self.save_data()
-
-    def gen_eos_data(self, eos_repo_path=None):
-        out = []
-        for cycle in self.cycles.values():
-            for process in cycle.beam_processes.values():
-                out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
-        return out
-
-    def gen_xml_optics_madx(self, name, xml_file=None):
-        path = self.basedir / "operation" / "optics" / f"{name}.madx"
-        if path.exists():
-            raise ValueError(f"File {path} already exists")
-        print(f"Writing {path}")
-        madx_defs = self.get_xml_optics_madx(name, xml_file=xml_file)
-        with open(path, "w") as f:
-            f.write(madx_defs)
-
-    def get_afs_path(self):
-        return Path("/afs/cern.ch/eng/acc-models/lhc/") / self.name
-
-    def get_cycles(self):
-        cycles = {}
-        for cycle_name in self.data.get("cycles", []):
-            cycles[cycle_name] = LHCCycle(
-                name=cycle_name,
-                basedir=self.basedir / "scenarios" / "cycle" / cycle_name,
-                parent=self,
-            )
-        return cycles
-
-    def get_eos_path(self):
-        return Path("/eos/project-a/acc-models/public/lhc/") / self.name
-
-    def get_lsa_knobs(self):
-        fn = self.basedir / "operation" / "knobs.txt"
-        if fn.exists():
-            knobs = LHCKnobDefs.from_file(fn)
-        else:
-            knobs = LHCKnobDefs([])
-        knobs.add_knob("nrj", "LHCBEAM/MOMENTUM", 1.0, 1)
-        knobs.add_knob("vrf400", "RFBEAM1/TOTAL_VOLTAGE", 1.0, 1)
-        return knobs
-
-    def get_knob_structure(self):
-        knob_path = self.basedir / "xsuite" / "knobs.yaml"
-        if knob_path.exists():
-            return read_knob_structure(knob_path)
-
-    def get_optics_list(self):
-        out = []
-        for cycle in self.cycles.values():
-            for process in cycle.beam_processes.values():
-                for ts in process.ts:
-                    out.append((cycle.name, process.name, ts))
-        return out
-
-    def get_processes(self):
-        out = []
-        for cycle in self.cycles.values():
-            out.extend(cycle.beam_processes.values())
-        return out
-
-    def get_run_data(self):
-        return LHCRun(self.name)
-
-    def get_sets(self):
-        sets = {}
-        for set_name in self.data.get("sets", []):
-            sets[set_name] = LHCOpticsSet(
-                name=set_name,
-                basedir=self.basedir / "scenarios" / "set" / set_name,
-                parent=self,
-            )
-        return sets
-
-    def get_web_url(self):
-        """Get the web URL for the repository"""
-        url = "https://acc-models.web.cern.ch/acc-models/lhc"
-        return f"{url}/{self.name}"
-
-    def get_web_lhc_json_url(self):
-        return f"{self.get_web_url()}/xsuite/lhc.json"
-
-    def get_xml_optics_elements(self, xml_file=None):
-        if xml_file is None:
-            xml_file = self.basedir / "operation" / "lhc.jmd.xml"
-        if not Path(xml_file).exists():
-            raise ValueError(f"File {xml_file} does not exist")
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
-        return root.find("optics").findall("optic")
-
-    def get_xml_optics_madx(self, name, xml_file=None):
-        for oo in self.get_xml_optics_elements(xml_file=xml_file):
-            if oo.attrib["name"] == name:
-                break
-        else:
-            raise ValueError(f"Optics {name} not found in XML file")
-        out = []
-        for cc in oo.find("init-files").findall("call-file"):
-            path = self.basedir / cc.attrib["path"]
-            if not path.exists():
-                raise ValueError(f"File {path} used in {name} does not exist")
-            out.append(f'call, file="acc-models-lhc/{cc.attrib["path"]}";')
-        out.append("")
-        return "\n".join(out)
-
-    def get_xsuite_json(self, basedir=None):
-        if basedir is None:
-            basedir = self.basedir
-        else:
-            basedir = Path(basedir)
-        return basedir / "xsuite" / "lhc.json"
-
-    def get_xsuite_env(self):
-        import xtrack as xt
-
-        return xt.Environment.from_json(self.get_xsuite_json())
-
-    def get_xsuite_model(self):
-        return LHCXsuiteModel.from_json(self.get_xsuite_json())
-
-    def git_status(self):
-        """Get the git status of the repository"""
-        print(git_status(self.basedir))
-
-    def git_add(self, *args):
-        """Add the changes to the repository"""
-        print(git_add(self.basedir, *args))
-
-    def git_commit(self, message, *args):
-        """Commit the changes to the repository"""
-        print(git_commit(self.basedir, message, *args))
-
-    def git_push(self, *args):
-        print(git_push(self.basedir, *args))
-
-    def read_data(self):
-        if self.yaml.exists():
-            return read_yaml(self.yaml)
-        else:
-            print(f"Repo data file {self.yaml} does not exist")
-            return {}
-
-    def refresh(self, data=None):
-        if data is None:
-            data = self.read_data()
-        self.data = data
-        self.knobs = self.get_lsa_knobs()
-        self.cycles = self.get_cycles()
-        self.sets = self.get_sets()
-        self.start = self.data.get("start", None)
-        self.end = self.data.get("end", None)
-        self.label = self.data.get("label", None)
-        self.description = self.data.get("description", "")
-
-    def save_data(self, level=0):
-        write_yaml(self.to_dict(), self.yaml)
-        if level > 0:
-            for cycle in self.cycles.values():
-                cycle.save_data(level=level - 1)
-            for optics_set in self.sets.values():
-                optics_set.save_data(level=level - 1)
-
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "label": self.label,
-            "description": self.description,
-            "start": self.start,
-            "end": self.end,
-            "cycles": list(self.cycles),
-            "sets": list(self.sets),
-        }
 
 
 class LHCCycle:
@@ -554,14 +224,14 @@ class LHCCycle:
         self.yaml = self.basedir / "readme.yaml"
         self.refresh()
 
+    def __dir__(self):
+        return super().__dir__() + list(self.beam_processes.keys())
+
     def __getattr__(self, name):
         if name in self.beam_processes:
             return self.beam_processes[name]
         else:
             raise AttributeError(f"No process named {name}")
-
-    def __dir__(self):
-        return super().__dir__() + list(self.beam_processes.keys())
 
     def __repr__(self):
         return f"<Cycle {self.name!r} {len(self.beam_processes)} beam_processes>"
@@ -586,12 +256,6 @@ class LHCCycle:
     def check_optics_def(self):
         for process in self.beam_processes.values():
             process.check_optics_def()
-
-    def gen_repo_data(self):
-        """Generate the data in the repository"""
-        for process in self.beam_processes.values():
-            process.gen_repo_data()
-        self.save_data()
 
     def gen_eos_data(self, eos_repo_path=None):
         out = []
@@ -649,6 +313,12 @@ class LHCCycle:
             files.extend(process_files)
         return files
 
+    def gen_repo_data(self):
+        """Generate the data in the repository"""
+        for process in self.beam_processes.values():
+            process.gen_repo_data()
+        self.save_data()
+
     def get_eos_path(self, eos_repo_path=None):
         """Get the EOS path for the cycle"""
         if eos_repo_path is None:
@@ -700,6 +370,18 @@ class LHCCycle:
         self.description = self.data.get("description", "")
         self.optics = self.data.get("optics", {})
 
+    def save_data(self, level=0):
+        data = self.to_dict()
+        write_yaml(data, self.yaml)
+        if level > 0:
+            for process in self.beam_processes.values():
+                process.save_data()
+
+    def set_data_from_lsa(self, start=None, end=None, part="target"):
+        """Set the data from LSA"""
+        for process in self.beam_processes.values():
+            process.set_data_from_lsa(start=start, end=end, part=part)
+
     def to_dict(self):
         return {
             "name": self.name,
@@ -713,17 +395,257 @@ class LHCCycle:
             "optics": self.optics,
         }
 
-    def save_data(self, level=0):
-        data = self.to_dict()
-        write_yaml(data, self.yaml)
-        if level > 0:
-            for process in self.beam_processes.values():
-                process.save_data()
 
-    def set_data_from_lsa(self, start=None, end=None, part="target"):
-        """Set the data from LSA"""
-        for process in self.beam_processes.values():
-            process.set_data_from_lsa(start=start, end=end, part=part)
+class LHCFill:
+    def __init__(self, filln, beam_processes):
+        self.filln = filln
+        self.beam_processes = beam_processes
+        self.start = min([ts for ts, bp in beam_processes])
+        self.end = max([ts for ts, bp in beam_processes])
+
+    def __repr__(self):
+        start = unixtime_to_string(self.start)
+        end = unixtime_to_string(self.end)
+        return f"<LHCFill {self.filln} {len(self.beam_processes)} processes from {start} to {end}>"
+
+    def main_processes(self):
+        """Return the main beam processes without @"""
+        out = []
+        for ts, bp in self.beam_processes:
+            if "@" not in bp and bp not in out:
+                out.append(bp)
+        return out
+
+
+class LHCKnobDef:
+    def __init__(self, mad, lsa, scaling, test):
+        self.mad = str(mad).lower()
+        self.lsa = lsa  # string or None
+        self.scaling = float(scaling)
+        self.test = float(test)
+
+    def __repr__(self):
+        return f"<Knob {self.lsa}:{self.mad}>"
+
+    def interpolate(self, ts, tdata, vdata):
+        return np.interp(ts, tdata, vdata)
+
+    def lsa_value(self, mad_value):
+        return mad_value / self.scaling
+
+    def mad_value(self, lsa_value):
+        return lsa_value * self.scaling
+
+    def to_mad(self, lsa_value):
+        return f"{self.mad}={self.mad_value(lsa_value)};"
+
+
+class LHCKnobDefs:
+    def __init__(self, knob_list):
+        self.mad = {}
+        self.lsa = {}
+        for knob in knob_list:
+            self.mad[knob.mad] = knob
+            self.lsa[knob.lsa] = knob
+
+    @classmethod
+    def from_file(cls, fn):
+        lst = []
+        for ln in open(fn):
+            if ln.startswith("#"):
+                continue
+            if ln.strip() == "":
+                continue
+            lst.append(LHCKnobDef(*ln.strip().split(", ")))
+        return cls(lst)
+
+    def __repr__(self):
+        return f"<LHCKnobDefs {len(self.lsa)} knobs>"
+
+    def add(self, knob):
+        self.mad[knob.mad] = knob
+        self.lsa[knob.lsa] = knob
+
+    def add_knob(self, mad, lsa, scaling, test):
+        self.add(LHCKnobDef(mad, lsa, scaling, test))
+
+    def get_settings(self):
+        return list(self.lsa.keys())
+
+    def lsa_value(self, mad_name, mad_value):
+        """Return the LSA value for a given MAD name and value"""
+        return self.mad[mad_name].lsa_value(mad_value)
+
+    def mad_value(self, lsa_name, lsa_value):
+        """Return the MAD value for a given LSA name and LSA value"""
+        return self.lsa[lsa_name].mad_value(lsa_value)
+
+    def remove(self, lsa=None, mad=None):
+        if lsa is not None:
+            knob = self.lsa[lsa]
+        elif mad is not None:
+            knob = self.lsa[lsa]
+        del self.mad[knob.mad]
+        del self.lsa[knob.lsa]
+
+    def to_mad(self, lsa_name, lsa_value):
+        """Return the MAD string for a given LSA name and LSA value"""
+        return self.lsa[lsa_name].to_mad(lsa_value)
+
+
+class LHCOpticsDef:
+    """LHC optics definition
+
+    It is defined by an optics file and a set of settings
+    """
+
+    def __init__(
+        self,
+        name,
+        basedir,
+        parent=None,
+    ):
+        self.name = name
+        self.basedir = basedir
+        self.parent = parent
+        self.yaml = self.basedir / "readme.yaml"
+        self.refresh()
+
+    def __repr__(self):
+        return f"<OpticsDef {self.name}: {self.optics!r}>"
+
+    def read_data(self):
+        if self.yaml.exists():
+            return read_yaml(self.yaml)
+        else:
+            print(f"Optics definition data file {self.yaml} does not exist")
+            return {}
+
+    def refresh(self, data=None):
+        if data is None:
+            self.data = self.read_data()
+        else:
+            self.data.update(data)
+        self.name = self.data.get("name", None)
+        self.label = self.data.get("label", None)
+        self.optics = self.data.get("optics", None)
+        self.settings = self.data.get("settings", {})
+        self.particles = self.data.get("particles", ("proton", "proton"))
+        self.charges = self.data.get("charges", (1, 1))
+        self.masses = self.data.get("masses", (0.938272046, 0.938272046))
+
+    def save_data(self):
+        data = self.to_dict()
+        for k, v in data.items():
+            if k in set("particles charges masses") and v is None:
+                del data[k]
+        write_yaml(data, self.yaml)
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "optics": self.optics,
+            "settings": self.settings,
+            "particles": self.particles,
+            "charges": self.charges,
+            "masses": self.masses,
+        }
+
+
+class LHCOpticsSet:
+    """LHC optics set"""
+
+    def __init__(self, name, basedir, parent=None):
+        self.name = name
+        self.basedir = basedir
+        if not basedir.exists():
+            print(f"Optics set directory {basedir} does not exist")
+        self.parent = parent
+        self.yaml = self.basedir / "readme.yaml"
+        self.refresh()
+
+    def __dir__(self):
+        return super().__dir__() + list(self.optics.keys())
+
+    def __getattr__(self, name):
+        if name in self.optics:
+            return self.optics[name]
+        else:
+            raise AttributeError(f"No optics named {name}")
+
+    def __repr__(self):
+        return f"<OpticsSet {self.name!r} {len(self.optics)} optics>"
+
+    def add_optics(
+        self,
+        name,
+        label=None,
+        optics=None,
+        settings=None,
+        particles=None,
+        charges=None,
+        masses=None,
+    ):
+        """Add a new optics to the set"""
+        if name in self.optics:
+            raise ValueError(f"Optics {name} already exists")
+        (self.basedir / name).mkdir(parents=True, exist_ok=True)
+        optics_def = LHCOpticsDef(
+            name=name,
+            basedir=self.basedir / name,
+            parent=self,
+        )
+        optics_def.refresh(
+            data=dict(
+                name=name,
+                label=label,
+                optics=optics,
+                settings=settings,
+                particles=particles,
+                charges=charges,
+                masses=masses,
+            )
+        )
+        optics_def.save_data()
+        self.optics[name] = optics_def
+        self.save_data()
+        return optics
+
+    def read_data(self):
+        if self.yaml.exists():
+            return read_yaml(self.yaml)
+        else:
+            print(f"Optics set data file {self.yaml} does not exist")
+            return {}
+
+    def refresh(self, data=None):
+        if data is None:
+            data = self.read_data()
+        self.data = data
+        self.label = self.data.get("label", None)
+        self.optics = {}
+        for opt in self.data.get("optics", []):
+            self.optics[opt] = LHCOpticsDef(
+                name=opt,
+                basedir=self.basedir / opt,
+                parent=self,
+            )
+
+    def save_data(self):
+        data = self.to_dict()
+        from ruamel.yaml import CommentedSeq
+
+        data["optics"] = CommentedSeq(data["optics"])
+        data["optics"].fa.set_block_style()
+        write_yaml(data, self.yaml)
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "optics": list(self.optics),
+        }
 
 
 class LHCProcess:
@@ -780,12 +702,12 @@ class LHCProcess:
         return f"<Process {self.name}:{self.beam_process!r} {len(self.optics)} optics>"
 
     @property
-    def ts(self):
-        return list(self.optics.keys())
-
-    @property
     def duration(self):
         return max(self.optics.keys())
+
+    @property
+    def ts(self):
+        return list(self.optics.keys())
 
     def _lsa_settings_to_dict(self, lsa_settings):
         """Convert LSA settings to a dictionary"""
@@ -840,15 +762,28 @@ class LHCProcess:
                         os.remove(ff)
                 os.rmdir(ll)
 
-    def gen_repo_data(self):
-        """Generate the data for the process using resident data"""
-        self.save_data()
-        self.gen_optics_dir()
-
     def gen_data_from_lsa(self):
         """Generate the data from LSA"""
         self.set_optics_from_lsa()
         self.set_settings_from_lsa()
+
+    def gen_eos_data(self, eos_repo_path=None):
+        """
+        Generate EOS data for the given time step
+
+        - eos_repo_path: is the root of the repository in EOS
+        """
+        xsuite_model = self.parent.parent.get_xsuite_model()
+
+        out = []
+        for idx, _ in enumerate(self.optics):
+            out.extend(
+                self.gen_optics_eos_data(
+                    idx, eos_repo_path=eos_repo_path, xsuite_model=xsuite_model
+                )
+            )
+
+        return out
 
     def gen_html_homepage(self, plot="yaml_plotly"):
         """Generate the HTML homepage for the process"""
@@ -1032,29 +967,6 @@ class LHCProcess:
         html += "</html>\n"
         return html
 
-    def gen_html_setting_inplace_svg_plot(self, name):
-        """Generate the HTML plot for a given setting"""
-        if name not in self.settings:
-            raise ValueError(f"Setting {name} not found in optics settings")
-        tdata, vdata = self.settings[name]
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from io import StringIO
-
-        fig, ax = plt.subplots()
-        ax.plot(tdata, vdata, marker="o")
-        ax.set_xlabel("Time [s]")
-        ax.set_ylabel(name)
-        ax.grid(True)
-        svg_buffer = StringIO()
-        fig.savefig(svg_buffer, format="svg")
-        plt.close(fig)
-        svg_buffer.seek(0)
-        svg_data = svg_buffer.getvalue()
-        return svg_data
-
     def gen_html_pages(self, eos_repo_path=None, plot="yaml_plotly"):
         """Generate the HTML pages for the process"""
         files = []
@@ -1080,23 +992,28 @@ class LHCProcess:
             files.append(fn)
         return files
 
-    def gen_eos_data(self, eos_repo_path=None):
-        """
-        Generate EOS data for the given time step
+    def gen_html_setting_inplace_svg_plot(self, name):
+        """Generate the HTML plot for a given setting"""
+        if name not in self.settings:
+            raise ValueError(f"Setting {name} not found in optics settings")
+        tdata, vdata = self.settings[name]
+        import matplotlib
 
-        - eos_repo_path: is the root of the repository in EOS
-        """
-        xsuite_model = self.parent.parent.get_xsuite_model()
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from io import StringIO
 
-        out = []
-        for idx, _ in enumerate(self.optics):
-            out.extend(
-                self.gen_optics_eos_data(
-                    idx, eos_repo_path=eos_repo_path, xsuite_model=xsuite_model
-                )
-            )
-
-        return out
+        fig, ax = plt.subplots()
+        ax.plot(tdata, vdata, marker="o")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel(name)
+        ax.grid(True)
+        svg_buffer = StringIO()
+        fig.savefig(svg_buffer, format="svg")
+        plt.close(fig)
+        svg_buffer.seek(0)
+        svg_data = svg_buffer.getvalue()
+        return svg_data
 
     def gen_madx_model(self, data, output=None):
         """Generate MADX files for the optics"""
@@ -1130,6 +1047,41 @@ call, file="acc-models-lhc/{settings_path}";
                 f.write(madx)
             print(f"Writing {output}")
             return madx
+
+    def gen_optics_dir(self, lsa_settings=None):
+        """Generate optics directory structure"""
+        self.clear_dir()
+        for ts, name in self.optics.items():
+            optics_dir = self.basedir / str(ts)
+            optics_dir.mkdir(parents=True, exist_ok=True)
+            yaml = optics_dir / "readme.yaml"
+            charges = self.parent.charges
+            data = {
+                "name": name,
+                "settings": {},
+                "ts": ts,
+                "particles": self.parent.particles,
+                "charges": charges,
+                "masses": self.parent.masses,
+            }
+            for knobname, (tdata, vdata) in self.settings.items():
+                value = float(np.interp(ts, tdata, vdata))
+                data["settings"][knobname] = value
+
+            print(f"Writing {yaml}")
+            write_yaml(data, yaml)
+            data["energies"] = (
+                data["settings"]["nrj"] * charges[0],
+                data["settings"]["nrj"] * charges[1],
+            )
+            data["optics_path"] = f"{name}"
+            reldir = optics_dir.relative_to(self.parent.parent.basedir)
+            data["settings_path"] = reldir / "settings.madx"
+            self.gen_madx_model(data, output=optics_dir / "model.madx")
+            self.gen_madx_settings(data, output=optics_dir / "settings.madx")
+            (optics_dir / "acc-models-lhc").symlink_to(
+                "../../../../..", target_is_directory=True
+            )
 
     def gen_optics_eos_data(
         self, idx=None, ts=None, eos_repo_path=None, xsuite_model=None
@@ -1189,40 +1141,10 @@ call, file="acc-models-lhc/{settings_path}";
         ]
         return out
 
-    def gen_optics_dir(self, lsa_settings=None):
-        """Generate optics directory structure"""
-        self.clear_dir()
-        for ts, name in self.optics.items():
-            optics_dir = self.basedir / str(ts)
-            optics_dir.mkdir(parents=True, exist_ok=True)
-            yaml = optics_dir / "readme.yaml"
-            charges = self.parent.charges
-            data = {
-                "name": name,
-                "settings": {},
-                "ts": ts,
-                "particles": self.parent.particles,
-                "charges": charges,
-                "masses": self.parent.masses,
-            }
-            for knobname, (tdata, vdata) in self.settings.items():
-                value = float(np.interp(ts, tdata, vdata))
-                data["settings"][knobname] = value
-
-            print(f"Writing {yaml}")
-            write_yaml(data, yaml)
-            data["energies"] = (
-                data["settings"]["nrj"] * charges[0],
-                data["settings"]["nrj"] * charges[1],
-            )
-            data["optics_path"] = f"{name}"
-            reldir = optics_dir.relative_to(self.parent.parent.basedir)
-            data["settings_path"] = reldir / "settings.madx"
-            self.gen_madx_model(data, output=optics_dir / "model.madx")
-            self.gen_madx_settings(data, output=optics_dir / "settings.madx")
-            (optics_dir / "acc-models-lhc").symlink_to(
-                "../../../../..", target_is_directory=True
-            )
+    def gen_repo_data(self):
+        """Generate the data for the process using resident data"""
+        self.save_data()
+        self.gen_optics_dir()
 
     def gen_xsuite_src(self, idx=None, ts=None):
         """Generate the XSuite source file for the given time step"""
@@ -1256,6 +1178,25 @@ call, file="acc-models-lhc/{settings_path}";
         else:
             eos_repo_path = Path(eos_repo_path)
         return eos_repo_path / time_step_relative_path
+
+    def get_last_settings_from_lsa(self, params=None, part="target", verbose=False):
+        """Get the last setting for the given parameters"""
+        if params is None:
+            params = set(self.parent.parent.knobs.lsa) - self.knob_blacklist
+
+        out = {}
+        for param in params:
+            try:
+                if verbose:
+                    print(f"getting {param}")
+                trims = get_lsa().getLastTrim(
+                    param, beamprocess=self.beam_process, part=part
+                )
+                out[param] = trims
+            except Exception as ex:
+                if verbose:
+                    print("Empty response for '%s': %s" % (param, ex))
+        return out
 
     def get_lhcoptics(self, idx=None, ts=None, xsuite=True, set_params=True):
         """Get the LHC optics for the given time step"""
@@ -1332,25 +1273,6 @@ call, file="acc-models-lhc/{settings_path}";
 
         return Table(tw1), Table(tw2)
 
-    def get_last_settings_from_lsa(self, params=None, part="target", verbose=False):
-        """Get the last setting for the given parameters"""
-        if params is None:
-            params = set(self.parent.parent.knobs.lsa) - self.knob_blacklist
-
-        out = {}
-        for param in params:
-            try:
-                if verbose:
-                    print(f"getting {param}")
-                trims = get_lsa().getLastTrim(
-                    param, beamprocess=self.beam_process, part=part
-                )
-                out[param] = trims
-            except Exception as ex:
-                if verbose:
-                    print("Empty response for '%s': %s" % (param, ex))
-        return out
-
     def get_optics_data(self, idx=None, ts=None):
         if ts is None:
             ts = self.ts[idx]
@@ -1409,11 +1331,6 @@ call, file="acc-models-lhc/{settings_path}";
                     print("Empty response for '%s': %s" % (param, ex))
         return out
 
-    def get_web_url(self):
-        """Get the web URL for the process"""
-        cycle_url = self.parent.get_web_url()
-        return f"{cycle_url}/{self.name}"
-
     def get_web_optics_path_url(self, idx=None, ts=None):
         """Get the web URL for the optics path"""
         if ts is None:
@@ -1421,6 +1338,11 @@ call, file="acc-models-lhc/{settings_path}";
         process_url = self.get_web_url()
         optics_url = f"{process_url}/{ts}/optics.madx"
         return optics_url
+
+    def get_web_url(self):
+        """Get the web URL for the process"""
+        cycle_url = self.parent.get_web_url()
+        return f"{cycle_url}/{self.name}"
 
     def read_data(self):
         """Read the data from the YAML file"""
@@ -1440,15 +1362,6 @@ call, file="acc-models-lhc/{settings_path}";
         self.optics = self.data.get("optics", {})
         self.settings = self.data.get("settings", {})
         self.description = self.data.get("description", "")
-
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "label": self.label,
-            "beam_process": self.beam_process,
-            "optics": self.optics,
-            "settings": self.settings,
-        }
 
     def save_data(self):
         data = self.to_dict()
@@ -1490,236 +1403,342 @@ call, file="acc-models-lhc/{settings_path}";
                 vdata = knob.mad_value(vdata)
                 self.settings[knob.mad] = tdata.tolist(), vdata.tolist()
 
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "label": self.label,
+            "beam_process": self.beam_process,
+            "optics": self.optics,
+            "settings": self.settings,
+        }
 
-class LHCOpticsSet:
-    """LHC optics set"""
 
-    def __init__(self, name, basedir, parent=None):
-        self.name = name
-        self.basedir = basedir
-        if not basedir.exists():
-            print(f"Optics set directory {basedir} does not exist")
+class LHCRepo:
+    """LHC optics for a specific branch or tag"""
+
+    def __init__(self, basedir, name=None, parent=None):
+        self.basedir = Path(basedir)
+        self.yaml = self.basedir / "scenarios" / "readme.yaml"
         self.parent = parent
-        self.yaml = self.basedir / "readme.yaml"
         self.refresh()
+        self.name = str(self.data.get("name", name))
 
-    def __getattr__(self, name):
-        if name in self.optics:
-            return self.optics[name]
-        else:
-            raise AttributeError(f"No optics named {name}")
+    @classmethod
+    def from_basedir(cls, basedir):
+        yaml = read_yaml(Path(basedir) / "scenarios" / "readme.yaml")
+        name = yaml.get("name", basedir.name)
+        return cls(name=basedir.name, basedir=basedir)
 
     def __dir__(self):
-        return super().__dir__() + list(self.optics.keys())
+        return super().__dir__() + list(self.cycles.keys()) + list(self.sets.keys())
+
+    def __getattr__(self, name):
+        if name in self.cycles:
+            return self.cycles[name]
+        elif name in self.sets:
+            return self.sets[name]
+        else:
+            raise AttributeError(f"No cycle or set named {name}")
 
     def __repr__(self):
-        return f"<OpticsSet {self.name!r} {len(self.optics)} optics>"
+        return f"<LHC {self.name} '{self.basedir}', {len(self.cycles)} cycles, {len(self.sets)} sets>"
+
+    def add_cycle(self, name, label=None, particles=None, charges=None, masses=None):
+        """Add a new cycle to the repository"""
+        if name in self.cycles:
+            raise ValueError(f"Cycle {name} already exists")
+        (self.basedir / "scenarios" / "cycle" / name).mkdir(parents=True, exist_ok=True)
+        cycle = LHCCycle(
+            name=name,
+            basedir=self.basedir / "scenarios" / "cycle" / name,
+            parent=self,
+        )
+        cycle.label = label
+        if particles is None:
+            particles = ["proton", "proton"]
+        if charges is None:
+            charges = [1, 1]
+        if masses is None and particles == ["proton", "proton"]:
+            masses = [P_MASS, P_MASS]
+        cycle.particles = particles
+        cycle.charges = charges
+        cycle.masses = masses
+        cycle.save_data()
+        self.cycles[name] = cycle
+        self.save_data()
+        return cycle
+
+    def add_set(self, name, label=None):
+        """Add a new optics set to the repository"""
+        if name in self.cycles:
+            raise ValueError(f"Optics set {name} already exists")
+        (self.basedir / "scenarios" / "set" / name).mkdir(parents=True, exist_ok=True)
+        optics_set = LHCOpticsSet(
+            name=name,
+            basedir=self.basedir / "scenarios" / "set" / name,
+            parent=self,
+        )
+        optics_set.label = label
+        optics_set.save_data()
+        self.sets[name] = optics_set
+        self.save_data()
+        return optics_set
+
+    def check_optics_def(self):
+        for cycle in self.cycles.values():
+            cycle.check_optics_def()
+
+    def check_xml_optics_defs(self, xml_file=None):
+        res = True
+        for name in self.find_xml_optics(xml_file=xml_file):
+            path = self.basedir / "operation" / "optics" / f"{name}.madx"
+            if not path.exists():
+                print(f"Optics {name} not found in {path}")
+                res = False
+            else:
+                with open(path) as f:
+                    data = f.read()
+                    try:
+                        madx_defs = self.get_xml_optics_madx(name)
+                    except ValueError as e:
+                        print(e)
+                        res = False
+                        continue
+                    if not data.endswith(madx_defs):
+                        print(data)
+                        print(madx_defs)
+                        print(f"Optics {name} in {path} does not match XML definition")
+                        res = False
+        return res
+
+    def find_xml_optics(self, regexp=".*", xml_file=None):
+        lst = [
+            oo.attrib["name"]
+            for oo in self.get_xml_optics_elements(xml_file=xml_file)
+            if re.match(regexp, oo.attrib["name"])
+        ]
+        return lst
+
+    def gen_eos_data(self, eos_repo_path=None):
+        out = []
+        for cycle in self.cycles.values():
+            for process in cycle.beam_processes.values():
+                out.extend(process.gen_eos_data(eos_repo_path=eos_repo_path))
+        return out
+
+    def gen_html_homepage(self):
+        """Generate the HTML homepage for the repository"""
+        html = "<!DOCTYPE html>\n"
+        html += "<html lang='en'>\n"
+        html += "<head>\n"
+        html += "<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        html += "<link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
+        html += "<meta charset='UTF-8'>\n"
+        html += f"<title>{self.label}</title>\n"
+        html += "</head>\n"
+        html += f"<body>\n"
+        linklhc = "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
+        html += f"<h1>{linklhc} / {self.label}</h1>\n"
+        html += f"<p>{self.description}</p>\n"
+        html += "<h2>Cycles</h2>\n"
+        html += "<ul>\n"
+        for cycle in self.cycles.values():
+            cycle_path = f"scenarios/cycle/{cycle.name}"
+            link = f"<a href='{cycle_path}'>{cycle.label}</a>"
+            html += f"<li>{link}</li>\n"
+        html += "</ul>\n"
+        html += "</body>\n</html>\n"
+        return html
+
+    def gen_html_pages(self, eos_repo_path=None):
+        """Generate the HTML pages for the repository"""
+        files = []
+        if eos_repo_path is None:
+            eos_repo_path = self.get_eos_path()
+        else:
+            eos_repo_path = Path(eos_repo_path)
+        homepage = self.gen_html_homepage()
+        homepage_path = eos_repo_path / "index.html"
+        print(f"Writing {homepage_path}")
+        with open(homepage_path, "w") as f:
+            f.write(homepage)
+        files.append(homepage_path)
+        for cycle in self.cycles.values():
+            process_files = cycle.gen_html_pages(eos_repo_path=eos_repo_path)
+            files.extend(process_files)
+        return files
+
+    def gen_repo_data(self):
+        for cycle in self.cycles.values():
+            cycle.gen_repo_data()
+        self.save_data()
+
+    def gen_xml_optics_madx(self, name, xml_file=None):
+        path = self.basedir / "operation" / "optics" / f"{name}.madx"
+        if path.exists():
+            raise ValueError(f"File {path} already exists")
+        print(f"Writing {path}")
+        madx_defs = self.get_xml_optics_madx(name, xml_file=xml_file)
+        with open(path, "w") as f:
+            f.write(madx_defs)
+
+    def get_afs_path(self):
+        return Path("/afs/cern.ch/eng/acc-models/lhc/") / self.name
+
+    def get_cycles(self):
+        cycles = {}
+        for cycle_name in self.data.get("cycles", []):
+            cycles[cycle_name] = LHCCycle(
+                name=cycle_name,
+                basedir=self.basedir / "scenarios" / "cycle" / cycle_name,
+                parent=self,
+            )
+        return cycles
+
+    def get_eos_path(self):
+        return Path("/eos/project-a/acc-models/public/lhc/") / self.name
+
+    def get_knob_structure(self):
+        knob_path = self.basedir / "xsuite" / "knobs.yaml"
+        if knob_path.exists():
+            return read_knob_structure(knob_path)
+
+    def get_lsa_knobs(self):
+        fn = self.basedir / "operation" / "knobs.txt"
+        if fn.exists():
+            knobs = LHCKnobDefs.from_file(fn)
+        else:
+            knobs = LHCKnobDefs([])
+        knobs.add_knob("nrj", "LHCBEAM/MOMENTUM", 1.0, 1)
+        knobs.add_knob("vrf400", "RFBEAM1/TOTAL_VOLTAGE", 1.0, 1)
+        return knobs
+
+    def get_optics_list(self):
+        out = []
+        for cycle in self.cycles.values():
+            for process in cycle.beam_processes.values():
+                for ts in process.ts:
+                    out.append((cycle.name, process.name, ts))
+        return out
+
+    def get_processes(self):
+        out = []
+        for cycle in self.cycles.values():
+            out.extend(cycle.beam_processes.values())
+        return out
+
+    def get_run_data(self):
+        return LHCRun(self.name)
+
+    def get_sets(self):
+        sets = {}
+        for set_name in self.data.get("sets", []):
+            sets[set_name] = LHCOpticsSet(
+                name=set_name,
+                basedir=self.basedir / "scenarios" / "set" / set_name,
+                parent=self,
+            )
+        return sets
+
+    def get_web_lhc_json_url(self):
+        return f"{self.get_web_url()}/xsuite/lhc.json"
+
+    def get_web_url(self):
+        """Get the web URL for the repository"""
+        url = "https://acc-models.web.cern.ch/acc-models/lhc"
+        return f"{url}/{self.name}"
+
+    def get_xml_optics_elements(self, xml_file=None):
+        if xml_file is None:
+            xml_file = self.basedir / "operation" / "lhc.jmd.xml"
+        if not Path(xml_file).exists():
+            raise ValueError(f"File {xml_file} does not exist")
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+        return root.find("optics").findall("optic")
+
+    def get_xml_optics_madx(self, name, xml_file=None):
+        for oo in self.get_xml_optics_elements(xml_file=xml_file):
+            if oo.attrib["name"] == name:
+                break
+        else:
+            raise ValueError(f"Optics {name} not found in XML file")
+        out = []
+        for cc in oo.find("init-files").findall("call-file"):
+            path = self.basedir / cc.attrib["path"]
+            if not path.exists():
+                raise ValueError(f"File {path} used in {name} does not exist")
+            out.append(f'call, file="acc-models-lhc/{cc.attrib["path"]}";')
+        out.append("")
+        return "\n".join(out)
+
+    def get_xsuite_env(self):
+        import xtrack as xt
+
+        return xt.Environment.from_json(self.get_xsuite_json())
+
+    def get_xsuite_json(self, basedir=None):
+        if basedir is None:
+            basedir = self.basedir
+        else:
+            basedir = Path(basedir)
+        return basedir / "xsuite" / "lhc.json"
+
+    def get_xsuite_model(self):
+        return LHCXsuiteModel.from_json(self.get_xsuite_json())
+
+    def git_add(self, *args):
+        """Add the changes to the repository"""
+        print(git_add(self.basedir, *args))
+
+    def git_commit(self, message, *args):
+        """Commit the changes to the repository"""
+        print(git_commit(self.basedir, message, *args))
+
+    def git_push(self, *args):
+        print(git_push(self.basedir, *args))
+
+    def git_status(self):
+        """Get the git status of the repository"""
+        print(git_status(self.basedir))
 
     def read_data(self):
         if self.yaml.exists():
             return read_yaml(self.yaml)
         else:
-            print(f"Optics set data file {self.yaml} does not exist")
+            print(f"Repo data file {self.yaml} does not exist")
             return {}
 
     def refresh(self, data=None):
         if data is None:
             data = self.read_data()
         self.data = data
+        self.knobs = self.get_lsa_knobs()
+        self.cycles = self.get_cycles()
+        self.sets = self.get_sets()
+        self.start = self.data.get("start", None)
+        self.end = self.data.get("end", None)
         self.label = self.data.get("label", None)
-        self.optics = {}
-        for opt in self.data.get("optics", []):
-            self.optics[opt] = LHCOpticsDef(
-                name=opt,
-                basedir=self.basedir / opt,
-                parent=self,
-            )
+        self.description = self.data.get("description", "")
+
+    def save_data(self, level=0):
+        write_yaml(self.to_dict(), self.yaml)
+        if level > 0:
+            for cycle in self.cycles.values():
+                cycle.save_data(level=level - 1)
+            for optics_set in self.sets.values():
+                optics_set.save_data(level=level - 1)
 
     def to_dict(self):
         return {
             "name": self.name,
             "label": self.label,
-            "optics": list(self.optics),
+            "description": self.description,
+            "start": self.start,
+            "end": self.end,
+            "cycles": list(self.cycles),
+            "sets": list(self.sets),
         }
-
-    def save_data(self):
-        data = self.to_dict()
-        from ruamel.yaml import CommentedSeq
-
-        data["optics"] = CommentedSeq(data["optics"])
-        data["optics"].fa.set_block_style()
-        write_yaml(data, self.yaml)
-
-    def add_optics(
-        self,
-        name,
-        label=None,
-        optics=None,
-        settings=None,
-        particles=None,
-        charges=None,
-        masses=None,
-    ):
-        """Add a new optics to the set"""
-        if name in self.optics:
-            raise ValueError(f"Optics {name} already exists")
-        (self.basedir / name).mkdir(parents=True, exist_ok=True)
-        optics_def = LHCOpticsDef(
-            name=name,
-            basedir=self.basedir / name,
-            parent=self,
-        )
-        optics_def.refresh(
-            data=dict(
-                name=name,
-                label=label,
-                optics=optics,
-                settings=settings,
-                particles=particles,
-                charges=charges,
-                masses=masses,
-            )
-        )
-        optics_def.save_data()
-        self.optics[name] = optics_def
-        self.save_data()
-        return optics
-
-
-class LHCOpticsDef:
-    """LHC optics definition
-
-    It is defined by an optics file and a set of settings
-    """
-
-    def __init__(
-        self,
-        name,
-        basedir,
-        parent=None,
-    ):
-        self.name = name
-        self.basedir = basedir
-        self.parent = parent
-        self.yaml = self.basedir / "readme.yaml"
-        self.refresh()
-
-    def __repr__(self):
-        return f"<OpticsDef {self.name}: {self.optics!r}>"
-
-    def read_data(self):
-        if self.yaml.exists():
-            return read_yaml(self.yaml)
-        else:
-            print(f"Optics definition data file {self.yaml} does not exist")
-            return {}
-
-    def refresh(self, data=None):
-        if data is None:
-            self.data = self.read_data()
-        else:
-            self.data.update(data)
-        self.name = self.data.get("name", None)
-        self.label = self.data.get("label", None)
-        self.optics = self.data.get("optics", None)
-        self.settings = self.data.get("settings", {})
-        self.particles = self.data.get("particles", ("proton", "proton"))
-        self.charges = self.data.get("charges", (1, 1))
-        self.masses = self.data.get("masses", (0.938272046, 0.938272046))
-
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "label": self.label,
-            "optics": self.optics,
-            "settings": self.settings,
-            "particles": self.particles,
-            "charges": self.charges,
-            "masses": self.masses,
-        }
-
-    def save_data(self):
-        data = self.to_dict()
-        for k, v in data.items():
-            if k in set("particles charges masses") and v is None:
-                del data[k]
-        write_yaml(data, self.yaml)
-
-
-class LHCKnobDefs:
-    @classmethod
-    def from_file(cls, fn):
-        lst = []
-        for ln in open(fn):
-            if ln.startswith("#"):
-                continue
-            if ln.strip() == "":
-                continue
-            lst.append(LHCKnobDef(*ln.strip().split(", ")))
-        return cls(lst)
-
-    def __init__(self, knob_list):
-        self.mad = {}
-        self.lsa = {}
-        for knob in knob_list:
-            self.mad[knob.mad] = knob
-            self.lsa[knob.lsa] = knob
-
-    def mad_value(self, lsa_name, lsa_value):
-        """Return the MAD value for a given LSA name and LSA value"""
-        return self.lsa[lsa_name].mad_value(lsa_value)
-
-    def lsa_value(self, mad_name, mad_value):
-        """Return the LSA value for a given MAD name and value"""
-        return self.mad[mad_name].lsa_value(mad_value)
-
-    def to_mad(self, lsa_name, lsa_value):
-        """Return the MAD string for a given LSA name and LSA value"""
-        return self.lsa[lsa_name].to_mad(lsa_value)
-
-    def add(self, knob):
-        self.mad[knob.mad] = knob
-        self.lsa[knob.lsa] = knob
-
-    def remove(self, lsa=None, mad=None):
-        if lsa is not None:
-            knob = self.lsa[lsa]
-        elif mad is not None:
-            knob = self.lsa[lsa]
-        del self.mad[knob.mad]
-        del self.lsa[knob.lsa]
-
-    def add_knob(self, mad, lsa, scaling, test):
-        self.add(LHCKnobDef(mad, lsa, scaling, test))
-
-    def get_settings(self):
-        return list(self.lsa.keys())
-
-    def __repr__(self):
-        return f"<LHCKnobDefs {len(self.lsa)} knobs>"
-
-
-class LHCKnobDef:
-    def __init__(self, mad, lsa, scaling, test):
-        self.mad = str(mad).lower()
-        self.lsa = lsa  # string or None
-        self.scaling = float(scaling)
-        self.test = float(test)
-
-    def interpolate(self, ts, tdata, vdata):
-        return np.interp(ts, tdata, vdata)
-
-    def mad_value(self, lsa_value):
-        return lsa_value * self.scaling
-
-    def lsa_value(self, mad_value):
-        return mad_value / self.scaling
-
-    def to_mad(self, lsa_value):
-        return f"{self.mad}={self.mad_value(lsa_value)};"
-
-    def __repr__(self):
-        return f"<Knob {self.lsa}:{self.mad}>"
 
 
 class LHCRun:
@@ -1729,13 +1748,8 @@ class LHCRun:
         self.t2 = f"{year}-12-31 23:59:59"
         self.set_fills()
 
-    def set_fills(self):
-        self.fills = {}
-        fills = get_lsa().findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
-        for filln, bp_list in fills.items():
-            # beam_processes=[(ts,bp.split('@')[0]) for ts,bp in bp_list]
-            beam_processes = [(ts, bp) for ts, bp in bp_list]
-            self.fills[filln] = LHCFill(filln, beam_processes)
+    def __repr__(self):
+        return f"LHCRun({self.year})"
 
     def find_beam_processes(self, regexp="", full=True):
         reg = re.compile(regexp)
@@ -1748,36 +1762,20 @@ class LHCRun:
                         out.setdefault(bp, []).append(filln)
         return out
 
-    def hist_beam_processes(self, regexp="", full=True):
-        lst = self.find_beam_processes(regexp, full=full)
-        return list(sorted((len(v), k) for k, v in lst.items()))
-
     def get_used_beamprocess(self):
         out = set()
         for fill in self.fills.values():
             out.update(fill.get_used_beamprocess())
         return out
 
-    def __repr__(self):
-        return f"LHCRun({self.year})"
+    def hist_beam_processes(self, regexp="", full=True):
+        lst = self.find_beam_processes(regexp, full=full)
+        return list(sorted((len(v), k) for k, v in lst.items()))
 
-
-class LHCFill:
-    def __init__(self, filln, beam_processes):
-        self.filln = filln
-        self.beam_processes = beam_processes
-        self.start = min([ts for ts, bp in beam_processes])
-        self.end = max([ts for ts, bp in beam_processes])
-
-    def __repr__(self):
-        start = unixtime_to_string(self.start)
-        end = unixtime_to_string(self.end)
-        return f"<LHCFill {self.filln} {len(self.beam_processes)} processes from {start} to {end}>"
-
-    def main_processes(self):
-        """Return the main beam processes without @"""
-        out = []
-        for ts, bp in self.beam_processes:
-            if "@" not in bp and bp not in out:
-                out.append(bp)
-        return out
+    def set_fills(self):
+        self.fills = {}
+        fills = get_lsa().findBeamProcessHistory(self.t1, self.t2, accelerator="lhc")
+        for filln, bp_list in fills.items():
+            # beam_processes=[(ts,bp.split('@')[0]) for ts,bp in bp_list]
+            beam_processes = [(ts, bp) for ts, bp in bp_list]
+            self.fills[filln] = LHCFill(filln, beam_processes)
