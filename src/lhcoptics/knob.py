@@ -51,6 +51,33 @@ class Knob:
         self.parent = parent
         self.variant = variant
 
+
+    @staticmethod
+    def knobs_to_expr(knobs, strengths=None):
+        """
+        Print knobs as madx expressions.
+
+        knobs: list of knobs
+        strengths: dictionary of strengths to be used as base values
+        """
+        if strengths is None:
+            strengths = {}
+        weights = {}
+        for knob in knobs:
+            for st, val in knob.weights.items():
+                weights.setdefault(st, []).append(f"{val:+.15g} * {knob.name}")
+        for st in weights:
+            basevalue = strengths.get(st)
+            if basevalue is not None:
+                weights[st].insert(0, f"{basevalue:+.15g}")
+        out = []
+        for knob in knobs:
+            out.append(f"{knob.name} = {knob.value:.15g};")
+        for st in weights:
+            rhs = "\n  ".join(weights[st])
+            out.append(f"{st} :=\n  {rhs};")
+        return out
+
     @classmethod
     def from_dict(cls, data):
         if "class" in data:

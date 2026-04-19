@@ -449,6 +449,9 @@ use, sequence=lhcb2;
             variant = "lhc"
         return variant
 
+    def is_full(self):
+        return "lhcb1" in self.madx.sequence and "lhcb2" in self.madx.sequence
+
     def mad_find_and_set0_knobs(madx, strengths, variant=None):
         """
         Find knobs that are used to set the strengths and set knob value to 0

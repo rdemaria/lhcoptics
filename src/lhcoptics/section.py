@@ -351,7 +351,7 @@ class LHCSection:
             out.append("")
         if knobs and len(self.knobs) > 0:
             out.append(f"! Knobs of {self.name.upper()}")
-            for expr in LHCMadxModel.knobs_to_expr(self.knobs.values(), self.strengths):
+            for expr in Knob.knobs_to_expr(self.knobs.values(), self.strengths):
                 out.append(expr)
             out.append("")
         return deliver_list_str(out, output)

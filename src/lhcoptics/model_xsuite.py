@@ -457,7 +457,6 @@ class LHCXsuiteModel:
 
     @classmethod
     def from_cpymad(cls, madx, sliced=False, madxfile=None):
-
         if not madx.sequence.lhcb1.has_beam:
             madx.use(sequence="lhcb1")
             madx.use(sequence="lhcb2")
@@ -680,10 +679,11 @@ class LHCXsuiteModel:
     def p0c(self):
         return self.env.b1.particle_ref.p0c[0]
 
-    @p0c.setter
-    def p0c(self, value):
-        self.env.b1.particle_ref.p0c = value
-        self.env.b2.particle_ref.p0c = value
+    #Now done in xsuite with new json files, but leaving here for reference in case we need to do it manually again
+    #@p0c.setter
+    #def p0c(self, value):
+    #    self.env.b1.particle_ref.p0c = value
+    #    self.nv.b2.particle_ref.p0c = value
 
     def _match_d12r(self, ipn):
         lhc = self.env
@@ -915,7 +915,6 @@ class LHCXsuiteModel:
         )
         if line.element_names[0] != "ip1":
             line.cycle("ip1", inplace=True)
-        return cmin.real, cmin.imag
 
     def get_knob(self, knob):
         value = self._var_values[knob.name]
@@ -1141,7 +1140,7 @@ class LHCXsuiteModel:
             return False
         return True
 
-    def knob_delete_all(self):
+    def knobs_delete_all(self):
         for variable in self._var_values:
             self[variable] = self[variable]
 
@@ -1679,6 +1678,11 @@ class LHCXsuiteModel:
                 if key in self and self[key] != value:
                     print(f"Update {key} from {self[key]:15.6g} to {value:15.6g}")
             self[key] = value
+
+    def update_from_madx_optics(self, filename, knobs=None, verbose=False):
+        self.env.vars.load(filename)
+        if knobs is not None:
+            self.create_knobs(knobs)
 
 
 class SinglePassDispersion(xdeps.Action):

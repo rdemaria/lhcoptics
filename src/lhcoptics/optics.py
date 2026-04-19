@@ -57,6 +57,14 @@ def set_ip_labels(ax, tw):
     ax.set_xlabel(None)
 
 
+def is_madx_optics(src):
+    if isinstance(src, str) and src.endswith(".madx"):
+        return True
+    if isinstance(src, Path) and src.suffix == ".madx":
+        return True
+    return False
+
+
 class LHCOptics:
     """
     Optics containts global knobs, global parameters and sections
@@ -254,12 +262,37 @@ class LHCOptics:
         return self
 
     @classmethod
-    def from_model(
-        cls,
-        model,
-        name=None,
-        variant=None,
-    ):
+    def from_model(cls, model, name=None, variant=None, attach_model="auto"):
+        """
+        Build an optics instance from an initialized model.
+
+        The method infers the optics variant when not provided, creates the
+        default global knobs with their values temporarily set to zero, and
+        populates all IR and arc sections from the same model state.
+
+        Parameters
+        ----------
+        model :
+            Source model providing knob creation, variable access, and section
+            extraction.
+        name : str, optional
+            Name assigned to the created optics object.
+        variant : str, optional
+            Optics variant. If omitted, it is obtained from
+            ``model.get_variant()``.
+        attach_model : bool or str, optional
+            Controls whether the source model is attached to the returned
+            optics. With ``"auto"``, the model is attached only when
+            ``model.is_full()`` is true; cpymad-backed models are converted to
+            an ``LHCXsuiteModel`` before attachment. Any truthy value other
+            than ``"auto"`` attaches ``model`` as-is.
+
+        Returns
+        -------
+        LHCOptics
+            A new optics object populated with sections, global parameters, and
+            generated knobs extracted from ``model``.
+        """
         if variant is None:
             variant = model.get_variant()
 
@@ -272,6 +305,13 @@ class LHCOptics:
         opt = cls(
             name=name, irs=irs, arcs=arcs, params=params, knobs=knobs, variant=variant
         )
+        if attach_model == "auto":
+            if model.is_full():
+                if hasattr(model, "madx"):
+                    model = LHCXsuiteModel.from_cpymad(model.madx)
+                opt.set_xsuite_model(model, verbose=False)
+        elif attach_model:
+            opt.model = model
         return opt
 
     @classmethod
@@ -1814,15 +1854,46 @@ class LHCOptics:
         if len(knobs) > 0:
             strengths = self.find_strengths()
             out.append("! Knobs")
-            for expr in LHCMadxModel.knobs_to_expr(knobs, strengths):
+            for expr in Knob.knobs_to_expr(knobs, strengths):
                 out.append(expr)
             out.append("")
 
         out.append("! Constant definitions\n")
         if self.variant.startswith("hl"):
-            out.append(LHCMadxModel.extra_defs_hllhc)
-        else:
-            out.append(LHCMadxModel.extra_defs)
+            out.append(
+                """
+! Triplet helper
+kqx.l1             := kqx2a.l1           ;
+ktqx1.l1           := kqx1.l1-kqx2a.l1   ;
+ktqx3.l1           := kqx3.l1-kqx2a.l1   ;
+kqx.r1             := kqx2a.r1           ;
+ktqx1.r1           := kqx1.r1-kqx2a.r1   ;
+ktqx3.r1           := kqx3.r1-kqx2a.r1   ;
+
+kqx.l5             := kqx2a.l5           ;
+ktqx1.l5           := kqx1.l5-kqx2a.l5   ;
+ktqx3.l5           := kqx3.l5-kqx2a.l5   ;
+kqx.r5             := kqx2a.r5           ;
+ktqx1.r5           := kqx1.r5-kqx2a.r5   ;
+ktqx3.r5           := kqx3.r5-kqx2a.r5   ;
+"""
+            )
+        out.append(
+            """
+! Solenoids and spectrometers
+abas               := 12.00/6.0*clight/p0c*on_sol_atlas ; !2 T
+abls               := 6.05/12.1*clight/p0c*on_sol_alice ; !0.5 T
+abcs               := 52.00/13.0*clight/p0c*on_sol_cms ; !4 T
+abxwt.l2           := -0.0000772587268993839836*7e12/p0c*on_alice ;
+abwmd.l2           := +0.0001472587268993839840*7e12/p0c*on_alice ;
+abaw.r2            := -0.0001335474860334838000*7e12/p0c*on_alice ;
+abxwt.r2           := +0.0000635474860334838004*7e12/p0c*on_alice ;
+abxws.l8           := -0.000045681598453109894*7e12/p0c*on_lhcb ;
+abxwh.l8           := +0.000180681598453109894*7e12/p0c*on_lhcb ;
+ablw.r8            := -0.000180681598453109894*7e12/p0c*on_lhcb ;
+abxws.r8           := +0.000045681598453109894*7e12/p0c*on_lhcb ;
+"""
+        )
         return deliver_list_str(out, output)
 
     def to_table(self, *rows):
@@ -1947,50 +2018,53 @@ class LHCOptics:
         """
         if self.model is None:
             raise ValueError("Model not set")
-        if src is None:
+        if is_madx_optics(src):
+            self.model.update_from_madx_optics(src, knobs=self.knobs, verbose=verbose)
+        elif src is None:
             src = self
-        if full:
-            for ss in self.irs + self.arcs:
-                if hasattr(src, ss.name):
-                    src_ss = getattr(src, ss.name)
-                    lbl = f"{src}.{ss.name}"
-                elif ss.name in src:
-                    src_ss = src[ss.name]
-                    lbl = f"{src}[{ss.name!r}]"
+            if full:
+                for ss in self.irs + self.arcs:
+                    if hasattr(src, ss.name):
+                        src_ss = getattr(src, ss.name)
+                        lbl = f"{src}.{ss.name}"
+                    elif ss.name in src:
+                        src_ss = src[ss.name]
+                        lbl = f"{src}[{ss.name!r}]"
+                    if verbose:
+                        print(f"Update strengths and knobs in {ss.name!r} from {lbl}")
+                    ss.update_model(
+                        src=src_ss,
+                        verbose=verbose,
+                        knobs=knobs,
+                        set_knob_values=set_knob_values,
+                    )
+            # knobs must be updated after the strengths
+            if knobs == "create":
                 if verbose:
-                    print(f"Update strengths and knobs in {ss.name!r} from {lbl}")
-                ss.update_model(
-                    src=src_ss,
+                    print(f"Update knobs from {src}")
+                self.model.create_knobs(
+                    src.knobs,
                     verbose=verbose,
-                    knobs=knobs,
-                    set_knob_values=set_knob_values,
+                    set_value=set_knob_values,
                 )
-        # knobs must be updated after the strengths
-        if knobs == "create":
-            if verbose:
-                print(f"Update knobs from {src}")
-            self.model.create_knobs(
-                src.knobs,
-                verbose=verbose,
-                set_value=set_knob_values,
-            )
-        elif knobs == "update":
-            if verbose:
-                print(f"Update knobs from {src}")
-            self.model.update_knobs(
-                src.knobs,
-                verbose=verbose,
-                set_value=set_knob_values,
-            )
-        elif knobs == None or knobs == False:
-            pass
-        else:
-            raise ValueError(
-                f"knobs must be 'create', 'update', None or False not {knobs!r}"
-            )
+            elif knobs == "update":
+                if verbose:
+                    print(f"Update knobs from {src}")
+                self.model.update_knobs(
+                    src.knobs,
+                    verbose=verbose,
+                    set_value=set_knob_values,
+                )
+            elif knobs == None or knobs == False:
+                pass
+            else:
+                raise ValueError(
+                    f"knobs must be 'create', 'update', None or False not {knobs!r}"
+                )
 
-        if "p0c" in self.params:
-            self.model.p0c = self.params["p0c"]
+        # optics now have p0c
+        # if "p0c" in self.params:
+        #    self.model.p0c = self.params["p0c"]
         if set_init:
             self.set_init()
         return self

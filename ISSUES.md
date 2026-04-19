@@ -1,7 +1,12 @@
 # Issues
 
 Fixes:
-- add knobs: on_sol_atlas , on_sol_alice, on_sol_cms, on_alice, on_lhcb in to_madx
+- lhc cpymad optics -> LHCOptics -to_madx> madx optics -> cpymad_optics -> LHCOptics -> check
+- madx optics, json_thick -> LHCOptics -> match -> check
+- madx optics, json_thin -> LHCOptics -> match -> check
+- seq -> json thick
+- json thick -> json -> thick
+
 - add i_mo, on_mo knobs
 - symplify opt creation from simple madx files (e.g.no knob structure)
 
