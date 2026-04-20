@@ -740,12 +740,12 @@ class LHCIR(LHCSection):
                 k_l = f"mu{xy}{self.ipname}b{beam}_l"
                 k_r = f"mu{xy}{self.ipname}b{beam}_r"
                 k = f"mu{xy}{self.ipname}b{beam}"
-                if verbose and self.params[k] != self.params[k_l] + self.params[k_r]:
+                if verbose and not np.isclose(self.params[k], self.params[k_l] + self.params[k_r], atol=1e-12):
                     print(
                         f"Adjust {k_r} from {self.params[k_r]} to {self.params[k] - self.params[k_l]} to be consistent with {k}"
                     )
                 if not dryrun:
-                    self.params[k_r] = self.params[k] - self.params[k_l]
+                    self.params[k_r] = round(self.params[k] - self.params[k_l], 4)
 
     def set_bumps_off(self):
         for k, knob in self.knobs.items():

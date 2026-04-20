@@ -39,6 +39,7 @@ from .utils import (
     print_diff_dict_objs,
     read_knob_structure,
     find_comparable_values,
+    round_to_close_rational,
 )
 
 _opl = ["_op", "_sq", ""]
@@ -101,11 +102,37 @@ class LHCOptics:
         if variant == "hl":
             out += [f"on_dx{irn}{hv}{ls}" for irn in "15" for hv in "hv" for ls in "ls"]
             out += [f"on_dsep{irn}{hv}" for irn in "15" for hv in "hv"]
-            out += [f"on_mo", "on_imo.b1", "on_imo.b2", "dqxdjy.b1", "dqxdjy.b2"]
-        else:
-            out += ["on_ssep1_h", "on_xx1_v", "on_ssep5_v", "on_xx5_h"]
+            out += [
+                f"on_mo.b1",
+                "on_mo.b2",
+                "on_imo.b1",
+                "on_imo.b2",
+                "dqxdjy.b1",
+                "dqxdjy.b2",
+            ]
+        elif variant == "lhc2025":
+            out += [
+                "on_ssep1_h",
+                "on_ssep5_v",
+                "on_xx1_h",
+                "on_xx1_v",
+                "on_xx2v",
+                "on_xx5_h",
+                "on_xx5_v",
+                "on_xx8h",
+                "on_xx8v",
+                "on_qpbump.b1",
+                "on_qpbump.b2",
+                "on_afp",
+            ]
             out += [f"{kk}.b{b}" for kk in ["phase_change", "dp_trim"] for b in "12"]
-            out += ["on_mo", "dqxdjy.b1", "dqxdjy.b1"]
+            out += ["on_mo.b1", "on_mo.b2", "dqxdjy.b1", "dqxdjy.b2"]
+        else:
+            out+= ["on_ssep1_h","on_xx1_v","on_ssep5_v", "on_xx5_h", "on_xx1_h","on_xx5_v"]
+            out += [f"{kk}.b{b}" for kk in ["phase_change", "dp_trim"] for b in "12"]
+            out += ["on_mo.b1", "on_mo.b2", "dqxdjy.b1", "dqxdjy.b2"]
+
+
         return out
 
     @classmethod
@@ -269,7 +296,7 @@ class LHCOptics:
             *filenames, extra=extra, stdout=stdout, basedir=basedir
         )
         return cls.from_model(
-            model, name=",".join(map(str,filenames)), attach_model=attach_model
+            model, name=",".join(map(str, filenames)), attach_model=attach_model
         )
 
     @classmethod
@@ -320,7 +347,18 @@ class LHCOptics:
             if model.is_full():
                 if hasattr(model, "madx"):
                     model = LHCXsuiteModel.from_cpymad(model.madx)
-                opt.set_xsuite_model(model, verbose=False)
+                opt.model = model
+                # workaround for run 3 optics that do not have
+                # betxip1b1 etc in the model
+                opt.update_model(set_init=False)
+                opt.set_knobs_off()
+                if  'betxip1b1' not in opt.params:
+                    opt.ir1.set_params()
+                    opt.ir5.set_params()
+                    opt.set_init()
+                    opt.set_params()
+                else:
+                    opt.set_init()
         elif attach_model:
             opt.model = model
         return opt
@@ -587,6 +625,25 @@ class LHCOptics:
     def check(self, verbose=False):
         """Compute twiss and print orbit at IPs, tunes and chromaticity"""
         self.twissip()
+
+    def check_data(self):
+        """Check that all params strengths and knobs are present"""
+        for k in self._global_param_names:
+            if k not in self.params:
+                print(f"Parameter {k} is missing")
+        for k in self._gen_knob_names(self.variant):
+            if k not in self.knobs:
+                print(f"Knob {k} is missing")
+        for ss in self.irs + self.arcs:
+            for param in ss.gen_param_names():
+                if param not in ss.params:
+                    print(f"Parameter {param} in section {ss.name} is missing")
+            for strength in ss.gen_strength_names():
+                if strength not in ss.strengths:
+                    print(f"Strength {strength} in section {ss.name} is missing")
+            for knobname in ss.gen_knob_names():
+                if knobname not in ss.knobs:
+                    print(f"Knob {knobname} in section {ss.name} is missing")
 
     def check_knobs(self, fail=False, verbose=True):
         report = []
@@ -1679,29 +1736,26 @@ class LHCOptics:
                 if not dryrun:
                     self.params[f"q{xy}b{beam}"] = qx if xy == "x" else qy
                     self.params[f"qp{xy}b{beam}"] = qp
-        ## round ATS factors is not straightforward because they are computed from the
-        ## ratio of the beta functions at the IPs, so we need to compute them from the
-        ## twiss and check that the values from beam 1 and beam 2 are consistent
-        ## also the value cannot be rounded as 1/3 is common
-        # for xy in "xy":
-        #     for irn in [1, 5]:
-        #         rname = f"r{xy}_ip{irn}"
-        #         tw1 = self.twiss(1, strengths=False, chrom=False)
-        #         tw2 = self.twiss(2, strengths=False, chrom=False)
-        #         rr_ipb1 = self.irs[irn - 1][f"bet{xy}ip{irn}b1"] / np.round(
-        #             tw1[f"bet{xy}", f"ip{irn}"], 8
-        #         )
-        #         rr_ibb2 = self.irs[irn - 1][f"bet{xy}ip{irn}b2"] / np.round(
-        #             tw2[f"bet{xy}", f"ip{irn}"], 8
-        #         )
-        #         if abs(rr_ipb1 - rr_ibb2) > 0.00001:
-        #             raise ValueError(
-        #                 f"Cannot round r{xy}_ip{irn} to 1.0 because beam 1 and beam 2 values differ by more than 0.00001: {rr_ipb1} vs {rr_ibb2}"
-        #             )
-        #         if verbose:
-        #             print(f"Round {rname} from {self.params[rname]} to {rr_ipb1}")
-        #         if not dryrun:
-        #             self.params[rname] = rr_ipb1
+        for xy in "xy":
+            for irn in [1, 5]:
+                rname = f"r{xy}_ip{irn}"
+                tw1 = self.twiss(1, strengths=False, chrom=False)
+                tw2 = self.twiss(2, strengths=False, chrom=False)
+                rr_ipb1 = round_to_close_rational(
+                    self.irs[irn - 1][f"bet{xy}ip{irn}b1"] / tw1[f"bet{xy}", f"ip{irn}"]
+                )
+                rr_ibb2 = round_to_close_rational(
+                    self.irs[irn - 1][f"bet{xy}ip{irn}b2"] / tw2[f"bet{xy}", f"ip{irn}"]
+                )
+
+                if abs(rr_ipb1 - rr_ibb2) > 0.00001:
+                    raise ValueError(
+                        f"Cannot round r{xy}_ip{irn} to 1.0 because beam 1 and beam 2 values differ by more than 0.00001: {rr_ipb1} vs {rr_ibb2}"
+                    )
+                if verbose and self.params[rname] != rr_ipb1:
+                    print(f"Round {rname} from {self.params[rname]} to {rr_ipb1}")
+                if not dryrun:
+                    self.params[rname] = rr_ipb1
 
     def set_ats_phase(self):
         """
@@ -1801,11 +1855,11 @@ class LHCOptics:
                 ss.set_params(mode=mode, verbose=verbose)
         return self
 
-    def set_xsuite_model(self, model, verbose=False):
+    def set_xsuite_model(self, model, set_init=True, verbose=False):
         if isinstance(model, str) or isinstance(model, Path):
             model = LHCXsuiteModel.from_json(model)
         self.model = model
-        self.update_model(verbose=verbose)
+        self.update_model(verbose=verbose, set_init=set_init)
         return self
 
     def test_coupling_knobs(self):
@@ -2077,6 +2131,7 @@ abxws.r8           := +0.000045681598453109894*7e12/p0c*on_lhcb ;
         # if "p0c" in self.params:
         #    self.model.p0c = self.params["p0c"]
         if set_init:
+            self.set_knobs_off()
             self.set_init()
         return self
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 from collections import namedtuple
 import subprocess
+from fractions import Fraction
 
 import requests
 import json
@@ -442,3 +443,12 @@ def match_compare_log(mtc, entry1=0, entry2=-1):
         diff = value1 - value2
         name = f"{target.tag} {target.tar}"
         print(f"{name:<35} {value1:18.9g} {value2:18.9g} {diff:18.9g}")
+
+
+def round_to_close_rational(x):
+    """
+    Round a number to a close rational number with small denominator.
+    """
+
+    frac = Fraction(x).limit_denominator(max_denominator=1000000)
+    return float(frac)

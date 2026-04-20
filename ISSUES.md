@@ -1,7 +1,7 @@
 # Issues
 
 Fixes:
-- lhc cpymad optics -> LHCOptics -to_madx> madx optics -> cpymad_optics -> LHCOptics -> check
+- lhc cpymad optics -> LHCOptics -to_madx> madx optics -> _optics -> LHCOptics -> check
 - madx optics, json_thick -> LHCOptics -> match -> check
 - madx optics, json_thin -> LHCOptics -> match -> check
 - seq -> json thick
