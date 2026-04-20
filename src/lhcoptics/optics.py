@@ -262,6 +262,17 @@ class LHCOptics:
         return self
 
     @classmethod
+    def from_madx_scripts(
+        cls, *filenames, extra=False, stdout=False, attach_model="auto", basedir=None
+    ):
+        model = LHCMadxModel.from_madx_scripts(
+            *filenames, extra=extra, stdout=stdout, basedir=basedir
+        )
+        return cls.from_model(
+            model, name=",".join(map(str,filenames)), attach_model=attach_model
+        )
+
+    @classmethod
     def from_model(cls, model, name=None, variant=None, attach_model="auto"):
         """
         Build an optics instance from an initialized model.

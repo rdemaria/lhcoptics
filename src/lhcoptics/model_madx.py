@@ -377,10 +377,12 @@ use, sequence=lhcb2;
         self.b2 = MADSequence(self.madx, "lhcb2")
 
     @classmethod
-    def from_madx_scripts(cls, *madxfiles, extra=True, stdout=False):
+    def from_madx_scripts(cls, *madxfiles, extra=True, stdout=False, basedir=None):
         from cpymad.madx import Madx
 
         madx = Madx(stdout=stdout)
+        if basedir is not None:
+            madx.chdir(str(basedir))
         madx.options(echo=False, warn=False, info=False)
         for madxfile in madxfiles:
             madx.call(str(madxfile))

@@ -1237,6 +1237,41 @@ call, file="acc-models-lhc/{settings_path}";
             else:
                 raise FileNotFoundError(f"Optics file {eos_optics} does not exist")
         return opt
+    
+    def get_madx_model_basedir(self, idx=None, ts=None):
+        """Get the MADX model directory for the given time step
+        If idx is provided, it will use the corresponding time step from self.ts.
+
+        """
+        assert idx is not None or ts is not None, "Either idx or ts must be provided"
+        if idx is not None:
+            ts = self.ts[idx]
+        if ts in self.optics:
+            optics_dir = self.basedir / str(ts)
+            if optics_dir.exists():
+                return optics_dir
+            else:
+                raise FileNotFoundError(f"Optics directory {optics_dir} does not exist")
+        else:
+            raise ValueError(f"Optics {ts} not found in {self.name}")
+
+    def get_madx_model_file(self, idx=None, ts=None):
+        """Get the MADX model file for the given time step
+        If idx is provided, it will use the corresponding time step from self.ts.
+
+        """
+        assert idx is not None or ts is not None, "Either idx or ts must be provided"
+        if idx is not None:
+            ts = self.ts[idx]
+        if ts in self.optics:
+            optics_dir = self.basedir / str(ts)
+            madxfile = optics_dir / "model.madx"
+            if madxfile.exists():
+                return madxfile
+            else:
+                raise FileNotFoundError(f"MADX file {madxfile} does not exist")
+        else:
+            raise ValueError(f"Optics {ts} not found in {self.name}")
 
     def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
         """Get the MADX model for the given time step
