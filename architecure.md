@@ -78,9 +78,14 @@ The classes have various plotting methods all starting with `.plot` and `.plot_<
 Matching
 ------------------------------------
 
+Matching is driven by some parameters in the LHCOptics and sections instances. Most parameters are related to observables and thereore calculated from twiss. Since matching is approxiamted even observables that are matched for are not strictly the same as the parameters. We have
+-`get_params_from twiss`: that computes parameters from Twiss output
+-`get_params_from_variables`: that extract parameters from variables in the model.
+
+In matching the parameters used as input are copied in the model, while the parameters resulting in the output are copied from twiss. `update_params` by default uses parameters from variables.
+
 `LHCOptics`, `LHCIR1`,...,`LHCA12`, ... and specialize `Knob` instance have matching functions that uses the parameters, limits from circuits and other option to match strength variables in the model and update parameter variables. The variables  stays in the model, until `.update` is explictly called. 
 - `.match(solve=True|False, fail=True|False)`: return Xsuite Optimized instance, if `solve` also match, if `fail` raise an exception if case the targets are not matched.
-
 
 
 

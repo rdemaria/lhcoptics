@@ -1,14 +1,11 @@
 # Issues
 
 Fixes:
-- lhc cpymad optics -> LHCOptics -to_madx> madx optics -> _optics -> LHCOptics -> check
-- madx optics, json_thick -> LHCOptics -> match -> check
+- verify new to_madx in hl
+- verify loading run 3
 - madx optics, json_thin -> LHCOptics -> match -> check
-- seq -> json thick
-- json thick -> json -> thick
 
 - add i_mo, on_mo knobs
-- symplify opt creation from simple madx files (e.g.no knob structure)
 
 - lhc.vars.load() does not create the knob structure with name expected by opt.update()
   a workaround is needed. LHCOptics.from_xsuite does the correct thing, but it is not atomic
@@ -36,6 +33,7 @@ Fixes:
 - Make sure to use model.create_knob (that deletes and recreate the knob) before matching in all knobs
 
 Features:
+- add improved bend models in Run 3 jsons 
 - add matching for MBs (in particular for flat)
 - add per-arc dispersion knobs
 - introduce multi i/k power converter for triplets

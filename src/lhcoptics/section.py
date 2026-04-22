@@ -411,7 +411,8 @@ class LHCSection:
         return self
 
     def update_model(
-        self, src=None, verbose=False, set_knob_values=False, knobs="create"
+        self, src=None, verbose=False, set_knob_values=False, knobs="create",
+        params=True, strengths=True
     ):
         """Update the model with the local strengths, knobs
         If a src is provided, it will be used to update the local values, else self will be used.
@@ -422,13 +423,22 @@ class LHCSection:
             raise ValueError("Model not set")
         if src is None:
             src = self
-        if hasattr(src, "strengths"):
-            strength = src.strengths
-        elif "strengths" in src:
-            strength = src["strengths"]
-        else:
-            strength = src
-        self.model.update_vars(strength, verbose=verbose)
+        if strengths:
+            if hasattr(src, "strengths"):
+                strength = src.strengths
+            elif "strengths" in src:
+                strength = src["strengths"]
+            else:
+                strength = src
+            self.model.update_vars(strength, verbose=verbose)
+        if params:
+            if hasattr(src, "params"):
+                params = src.params
+            elif "params" in src:
+                params = src["params"]
+            else:
+                params = src
+            self.model.update_vars(params, verbose=verbose)
         if hasattr(src, "knobs"):
             knob_dict = src.knobs
         elif "knobs" in src:

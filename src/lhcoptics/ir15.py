@@ -30,13 +30,18 @@ class LHCIR15(LHCIR):
             out.extend(gen_acb_alt_names("c", range(5, 10), 0, "lr", self.irn))
             out.extend(gen_acb_alt_names("", range(10, 14), 0, "lr", self.irn))
         else:
-            out.extend(gen_acb_alt_names("y", [4], 1, "lr", self.irn))
+            out.extend(gen_acb_alt_names("y", [4], 0, "lr", self.irn))
             out.extend(gen_acb_alt_names("c", range(5, 11), 0, "lr", self.irn))
             out.extend(gen_acb_alt_names("", range(11, 14), 0, "lr", self.irn))
         return out
 
     def gen_bend_names(self):
-        return gen_d12_names(self.irn)
+        if self.variant.startswith("hl"):
+            return gen_d12_names(self.irn, self.variant)
+        else:
+            out=[f"ad1.lr{self.irn}",f"ad2.l{self.irn}", f"ad2.r{self.irn}"]
+            out.extend([f"kd1.lr{self.irn}",f"kd2.l{self.irn}", f"kd2.r{self.irn}"])
+            return out
 
     def gen_crab_names(self):
         return gen_crab_names(self.irn)
@@ -51,15 +56,13 @@ class LHCIR15(LHCIR):
             out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
             out.append(f"on_crab{self.irn}")
         else:
-            out.extend(
-                f"on_{kk}{self.irn}_{hv}" for kk in ["x", "sep"] for hv in "hv"
-            )
+            out.extend(f"on_{kk}{self.irn}_{hv}" for kk in ["x", "sep"] for hv in "hv")
             out.extend(f"on_o{hv}{self.irn}" for hv in "hv")
             out.extend(f"on_{xy}ip{self.irn}b{beam}" for xy in "xy" for beam in "12")
-        #TODO need to support energy dependent knobs
-        #if self.name == "ir1":
+        # TODO need to support energy dependent knobs
+        # if self.name == "ir1":
         #    out.append(f"on_sol_atlas")
-        #elif self.name == "ir5":
+        # elif self.name == "ir5":
         #    out.append(f"on_sol_cms")
         return out
 
@@ -79,10 +82,10 @@ class LHCIR15(LHCIR):
         out.extend(self.gen_quad_names())
         out.extend(self.gen_bend_names())
         out.extend(self.gen_acb_names())
-        out.extend(self.gen_crab_names())
+        if self.variant.startswith("hl"):
+            out.extend(self.gen_crab_names())
         out.extend(self.gen_experiment_names())
         return out
-
 
     def has_ats_phase(self):
         return self.params[f"betxip{self.irn}b1"] <= 2.5

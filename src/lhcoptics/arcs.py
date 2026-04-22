@@ -169,8 +169,8 @@ class LHCArc(LHCSection):
         missing = mod - gen
         passed = not extra and not missing
         if verbose and not passed:
-            print(f"Extra ACB names in model: {extra}")
-            print(f"Missing ACB names in model: {missing}")
+            print(f"Extra ACB names in {self.name}: {extra}")
+            print(f"Missing ACB names in {self.name}: {missing}")
         return passed
 
     def get_init(self, beam):
@@ -238,7 +238,9 @@ class LHCArc(LHCSection):
             init = sequence.twiss(strengths=False).get_twiss_init(start)
             return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
 
-    def get_params_from_twiss(self, tw1, tw2):
+    def get_params_from_twiss(self, tw1=None, tw2=None):
+        if tw1 is None or tw2 is None:
+            tw1, tw2 = self.twiss(strengths=False)
         params = {
             f"mux{self.name}b1": tw1.mux[-1],
             f"mux{self.name}b2": tw2.mux[-1],
@@ -254,18 +256,6 @@ class LHCArc(LHCSection):
             - tw2["muy", self.start_cellb2],
         }
         return params
-
-    def get_params(self, mode="from_twiss", verbose=False):
-        """Get params from model"""
-        if verbose:
-            print(f"Getting parameters for Arc {self.name} using mode '{mode}'")
-        if mode.startswith("from_twiss"):
-            tw1, tw2 = self.twiss(strengths=False)
-            return self.get_params_from_twiss(tw1, tw2)
-        elif mode == "from_variables":
-            return self.get_params_from_variables()
-        else:
-            raise ValueError("mode must start with 'from_twiss' or be 'from_variables'")
 
     def get_params_from_variables(self, model=None, verbose=False):
         """Get params from model variables"""
@@ -366,16 +356,16 @@ class LHCArc(LHCSection):
                 print(f"Matching phase of Arc {self.name}")
             try:
                 mtc.solve(n_steps=10)
-                params = self.get_params()
+                params = self.get_params_from_twiss()
                 cc = f"cell{self.name[1:]}"
                 for beam in [1, 2]:
                     for xy in "xy":
                         nn = f"mu{xy}{cc}b{beam}"
                         if verbose:
                             print(
-                                f"Update {nn}: from {self.params[nn]:.6f} to {params[nn]:.6f} diff {params[nn] - self.params[nn]:.2f}"
+                                f"Update {nn}: from {lhc[nn]:.6f} to {params[nn]:.6f} diff {params[nn] - lhc[nn]:.2f}"
                             )
-                        self.params[nn] = params[nn]
+                        lhc[nn] = params[nn]
                 if verbose:
                     match_compare_log(mtc)
             except Exception as e:
@@ -411,7 +401,7 @@ class LHCArc(LHCSection):
             irb.match().solve()
 
     def get_phase(self):
-        params = self.get_params()
+        params = self.get_params_from_twiss()
         return {k: params[k] for k in self.phase_names}
 
     def round_params(self, verbose=False, dryrun=False):

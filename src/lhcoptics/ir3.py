@@ -68,25 +68,32 @@ class LHCIR3(LHCIR):
     }
     name = "ir3"
 
-
     def gen_acb_names(self):
         out = []
-        out.extend(gen_acb_alt_names("w", [4,5], 0, "lr", self.irn))
+        out.extend(gen_acb_alt_names("w", [4, 5], 0, "lr", self.irn))
         out.extend(gen_acb_alt_names("c", range(6, 11), 0, "lr", self.irn))
         out.extend(gen_acb_alt_names("", range(11, 14), 0, "lr", self.irn))
         return out
 
     def gen_bend_names(self):
-        out=[f"{tt}.{nn}6{lr}3" for tt in ['abw','adiff.bw','shift.bw'] for nn in "abcdef" for lr in "lr"]
-        out.extend(["kd34.l3","e_kd3.l3","e_kd3.r3", "e_kd4.l3","e_kd4.r3"])
+        if self.variant.startswith("hl"):
+            out = [
+                f"{tt}.{nn}6{lr}3"
+                for tt in ["abw", "adiff.bw", "shift.bw"]
+                for nn in "abcd"
+                for lr in "lr"
+            ]
+            out.extend(["kd34.lr3", "e_kd3.l3", "e_kd3.r3", "e_kd4.l3", "e_kd4.r3"])
+        else:
+            out = ["ad34.lr3", "kd34.lr3"]
         return out
 
     def gen_quad_names(self):
         quads = []
-        quads.extend(["kq4.lr3","kqt4.l3","kqt4.r3"])
-        quads.extend(["kq5.lr3","kqt5.l3","kqt5.r3"])
+        quads.extend(["kq4.lr3", "kqt4.l3", "kqt4.r3"])
+        quads.extend(["kq5.lr3", "kqt5.l3", "kqt5.r3"])
         quads.extend(gen_qq([6], self.irn))
-        quads.extend(gen_qtl(range(7,12), self.irn))
+        quads.extend(gen_qtl(range(7, 12), self.irn))
         quads.extend(gen_qt([12, 13], self.irn))
         return quads
 

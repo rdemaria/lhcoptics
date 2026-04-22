@@ -431,6 +431,37 @@ class LHCXsuiteModel:
         {"name": r"mqt\..*", "num_kicks": 2},
         {"name": r"mqs.*", "num_kicks": 2},
     ]
+    @staticmethod
+    def _configure_sequence(lhc, variant):
+        if variant.startswith("hl"):
+            print("Configuring sequence in Xsuite...")
+            for nn in list(lhc.elements.keys()):
+                if hasattr(lhc.elements[nn], "k0_from_h"):
+                    lhc.elements[nn].k0_from_h = False
+
+            lhc.vars.update(rbend_data)
+            config_rbend_ir15(lhc)
+            config_rbend_ir28(lhc)
+            config_rbend_ir3(lhc)
+            config_rbend_ir4(lhc)
+            config_rbend_ir7(lhc)
+        if "p0c" not in lhc:
+            lhc["p0c"] = 450e9
+        lhc.new_particle("particle_ref_b1", p0c="p0c")
+        lhc.new_particle("particle_ref_b2", p0c="p0c")
+        lhc.b1.set_particle_ref("particle_ref_b1")
+        lhc.b2.set_particle_ref("particle_ref_b2")
+
+        for ll in lhc.lines.values():
+            ll.twiss_default["method"] = "4d"
+            ll.twiss_default["co_search_at"] = "ip7"
+            ll.twiss_default["strengths"] = True
+            #ll.twiss_default["compute_chromatic_properties"] = False
+            if "b2" in ll.name:
+                ll.twiss_default["reverse"] = True
+
+        lhc["lagrf400.b1"] = 0.5
+        lhc["vrf400"] = 6.5
 
     def __init__(
         self,
@@ -456,7 +487,7 @@ class LHCXsuiteModel:
         self._aperture = None
 
     @classmethod
-    def from_cpymad(cls, madx, sliced=False, madxfile=None):
+    def from_cpymad(cls, madx, madxfile=None):
         if not madx.sequence.lhcb1.has_beam:
             madx.use(sequence="lhcb1")
             madx.use(sequence="lhcb2")
@@ -466,32 +497,13 @@ class LHCXsuiteModel:
         )
         lines["b1"] = lines.pop("lhcb1")
         lines["b2"] = lines.pop("lhcb2")
-        lines["b1"].particle_ref = xt.Particles(mass0=xt.PROTON_MASS_EV, p0c=450e9)
-        lines["b2"].particle_ref = xt.Particles(mass0=xt.PROTON_MASS_EV, p0c=450e9)
 
         lhc = xt.Environment(lines=lines)
+        model=cls(env=lhc, madxfile=madxfile)
         for line in lhc.lines.values():
-            line.twiss_default["method"] = "4d"
-            line.twiss_default["co_search_at"] = "ip7"
-            line.twiss_default["strengths"] = True
-            line.twiss_default["compute_chromatic_properties"] = False
-            if "b2" in line.name:
-                line.twiss_default["reverse"] = True
             line.metadata = lines[line.name].metadata
-
-        if sliced:
-            for line_name, line in list(lines.items()):
-                sliced_line = line.copy()
-                sliced_line.slice_thick_elements(
-                    slicing_strategies=[
-                        xt.Strategy(slicing=None),
-                        xt.Strategy(slicing=xt.Uniform(8, mode="thick"), name="mb.*"),
-                        xt.Strategy(slicing=xt.Uniform(8, mode="thick"), name="mq.*"),
-                    ]
-                )
-                lhc.lines[f"{line_name}s"] = sliced_line
-
-        return cls(env=lhc, madxfile=madxfile)
+        cls._configure_sequence(lhc, model.get_variant())
+        return model
 
     @classmethod
     def from_json(cls, jsonfile):
@@ -523,45 +535,22 @@ class LHCXsuiteModel:
         lhc = xt.load(
             string=seq_text, format="madx", reverse_lines=["b2"], _rbend_correct_k0=True
         )
-        print("Configuring sequence in Xsuite...")
-        for nn in list(lhc.elements.keys()):
-            if hasattr(lhc.elements[nn], "k0_from_h"):
-                lhc.elements[nn].k0_from_h = False
-
-        lhc.vars.update(rbend_data)
-        config_rbend_ir15(lhc)
-        config_rbend_ir28(lhc)
-        config_rbend_ir3(lhc)
-        config_rbend_ir4(lhc)
-        config_rbend_ir7(lhc)
-        lhc["p0c"] = 450e9
-        lhc.new_particle("particle_ref_b1", p0c="p0c")
-        lhc.new_particle("particle_ref_b2", p0c="p0c")
-        lhc.b1.set_particle_ref("particle_ref_b1")
-        lhc.b2.set_particle_ref("particle_ref_b2")
-
-        for ll in lhc.lines.values():
-            ll.twiss_default["method"] = "4d"
-            ll.twiss_default["co_search_at"] = "ip7"
-            ll.twiss_default["strengths"] = True
-            if "b2" in ll.name:
-                ll.twiss_default["reverse"] = True
-
-        lhc["lagrf400.b1"] = 0.5
-        lhc["vrf400"] = 6.5
-        return cls(env=lhc)
-
-    @classmethod
-    def from_madxfile(cls, madxfile, sliced=False):
-        """Create an `LHCXsuiteModel` from a MAD-X input file."""
-
-        madmodel = LHCMadxModel.from_madx_scripts(madxfile)
-        model = cls.from_cpymad(madmodel.madx, sliced=sliced, madxfile=madxfile)
-        model.madxfile = madxfile
+        model = cls(env=lhc)
+        cls._configure_sequence(lhc,model.get_variant())
         return model
 
     @classmethod
-    def make_json_from_sequence(cls, sequencefile, jsonfile, knobfile):
+    def from_madx_scripts(cls, *madxfiles, extra=True, stdout=False, basedir=None):
+        """Create an `LHCXsuiteModel` from a MAD-X input file."""
+
+        madmodel = LHCMadxModel.from_madx_scripts(
+            *madxfiles, basedir=basedir, extra=extra, stdout=stdout
+        )
+        model = cls.from_cpymad(madmodel.madx, madxfile=", ".join(map(str, madxfiles)))
+        return model
+
+    @classmethod
+    def make_json_from_sequence(cls, sequencefile, jsonfile):
         print("Loading sequence into Xsuite...")
         model = cls.from_madx_sequence(sequencefile)
         lhc = model.env
@@ -679,9 +668,9 @@ class LHCXsuiteModel:
     def p0c(self):
         return self.env.b1.particle_ref.p0c[0]
 
-    #Now done in xsuite with new json files, but leaving here for reference in case we need to do it manually again
-    #@p0c.setter
-    #def p0c(self, value):
+    # Now done in xsuite with new json files, but leaving here for reference in case we need to do it manually again
+    # @p0c.setter
+    # def p0c(self, value):
     #    self.env.b1.particle_ref.p0c = value
     #    self.nv.b2.particle_ref.p0c = value
 
@@ -812,13 +801,17 @@ class LHCXsuiteModel:
         """
         self.delete_knob(knob.name, verbose=verbose, dry_run=False)
         knobname = knob.name
+        self[knobname] = 0.0
         for wtarget, value in knob.weights.items():
             wname = f"{wtarget}_from_{knobname}"
             if verbose:
                 print(f"Setting weight {wname} = {value:15.6g}")
                 print(f"Creating expression {wtarget} += {wname} * {knobname}")
             self[wname] = value
-            self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
+            if wtarget in self:
+                self.ref[wtarget] += self.ref[wname] * self.ref[knobname]
+            else:
+                self.ref[wtarget] = self.ref[wname] * self.ref[knobname]
         if set_value:
             if verbose:
                 print(f" Setting knob {knobname} = {knob.value:15.6g}")
@@ -1116,7 +1109,11 @@ class LHCXsuiteModel:
         return self.env.vars[key]._info(limit=None)
 
     def is_full(self):
-        return self.b1 is not None and self.b2 is not None
+        return (
+            len(self.env.lines) >= 2
+            and "b1" in self.env.lines
+            and "b2" in self.env.lines
+        )
 
     def keys(self):
         return self._var_values.keys()

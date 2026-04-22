@@ -48,15 +48,15 @@ class LHCIR2(LHCIR):
         out.extend(gen_acbx_names(self.irn))
         out.extend(gen_acb_full_names("y", "s4", self.irn))
         out.extend(gen_acb_alt_names("y", [4], 1, "lr", self.irn))
-        out.extend(f"acbc{hv}s5.l2b{beam}" for hv in "hv" for beam in "12")
-        out.extend(f"acby{hv}s5.r2b{beam}" for hv in "hv" for beam in "12")
+        out.extend(f"acby{hv}s5.l2b{beam}" for hv in "hv" for beam in "12")
+        out.extend(f"acbc{hv}s5.r2b{beam}" for hv in "hv" for beam in "12")
         out.extend(["acbyh5.l2b1", "acbyv5.l2b2", "acbcv5.r2b1", "acbch5.r2b2"])
         out.extend(gen_acb_alt_names("c", range(6, 11), 1, "lr", self.irn))
         out.extend(gen_acb_alt_names("", range(11, 14), 1, "lr", self.irn))
         return out
 
     def gen_bend_names(self):
-        return gen_d12_names(self.irn)
+        return gen_d12_names(self.irn,self.variant)
 
     def gen_experiment_names(self):
         return ["abls","abxwt.l2","abwmd.l2","abaw.r2","abxwt.r2"]

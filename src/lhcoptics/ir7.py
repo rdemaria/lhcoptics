@@ -81,16 +81,24 @@ class LHCIR7(LHCIR):
         return out
 
     def gen_bend_names(self):
-        out = [f"{tt}.{nn}7{lr}" for tt in ["abw", "adiff.bw", "shift.bw"] for nn in "abcd" for lr in "lr"]
-        out.extend(["kd34.l7", "e_kd3.l7", "e_kd3.r7", "e_kd4.l7", "e_kd4.r7"])
+        if self.variant.startswith("hl"):
+            out = [
+                f"{tt}.{nn}6{lr}7"
+                for tt in ["abw", "adiff.bw", "shift.bw"]
+                for nn in "abcd"
+                for lr in "lr"
+            ]
+            out.extend(["kd34.lr7", "e_kd3.l7", "e_kd3.r7", "e_kd4.l7", "e_kd4.r7"])
+        else:
+            out = ["ad34.lr7", "kd34.lr7"]
         return out
 
     def gen_quad_names(self):
         quads = []
-        quads.extend(["kq4.lr7","kqt4.l7","kqt4.r7"])
+        quads.extend(["kq4.lr7", "kqt4.l7", "kqt4.r7"])
         quads.extend(["kq5.lr7"])
         quads.extend(gen_qq([6], self.irn))
-        quads.extend(gen_qtl(range(7,12), self.irn))
+        quads.extend(gen_qtl(range(7, 12), self.irn))
         quads.extend(gen_qt([12, 13], self.irn))
         return quads
 

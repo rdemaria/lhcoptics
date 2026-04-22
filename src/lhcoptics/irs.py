@@ -18,10 +18,12 @@ def gen_acbx_names(irn):
     return [f"acbx{hv}{nn}.{lr}{irn}" for nn in "123" for hv in "hv" for lr in "lr"]
 
 
-def gen_d12_names(irn):
+def gen_d12_names(irn, variant):
     out = [f"ad{nn}.{lr}{irn}" for nn in "12" for lr in "lr"]
-    out.extend(f"sep_mid_d1.{lr}{irn}" for lr in "lr")
-    out.extend(f"shift_d2.{lr}{irn}" for lr in "lr")
+    #TODO temporary until we support new bends in non-HL models
+    if variant.startswith("hl"): 
+        out.extend(f"sep_mid_d1.{lr}{irn}" for lr in "lr")
+        out.extend(f"shift_d2.{lr}{irn}" for lr in "lr")
     out.extend(f"kd{nn}.{lr}{irn}" for nn in "12" for lr in "lr")
     return out
 
@@ -197,8 +199,8 @@ class LHCIR(LHCSection):
         missing = mod - gen
         passed = not extra and not missing
         if verbose and not passed:
-            print(f"Extra ACB names in model: {extra}")
-            print(f"Missing ACB names in model: {missing}")
+            print(f"Extra ACB names in {self.name}: {extra}")
+            print(f"Missing ACB names in {self.name}: {missing}")
         return passed
 
     def check_quad_strengths(
@@ -250,7 +252,21 @@ class LHCIR(LHCSection):
             else:
                 raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
 
-    def get_params_from_twiss(self, tw1, tw2):
+    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init"):
+        if tw1 is None:
+            if mode == "init":
+                tw1 = self.twiss_from_init(1, strengths=False)
+            elif mode == "full":
+                 tw1 = self.twiss_full(1, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        if tw2 is None:
+            if mode == "init":
+                tw2 = self.twiss_from_init(2, strengths=False)
+            elif mode == "full":
+                tw2 = self.twiss_full(2, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
         ipname = self.ipname
         params = {}
         if self.init_left is None:
@@ -300,25 +316,6 @@ class LHCIR(LHCSection):
                     if ppname in model:
                         params[ppname] = model[ppname]
         return params
-
-    def get_params(self, mode="from_twiss_init", verbose=False):
-        if verbose:
-            print(f"Getting parameters for {self} using mode '{mode}'")
-        if mode == "from_twiss_init":
-            tw1 = self.twiss_from_init(1, strengths=False)
-            tw2 = self.twiss_from_init(2, strengths=False)
-            params = self.get_params_from_twiss(tw1, tw2)
-        elif mode == "from_twiss_full":
-            tw1 = self.twiss_full(1, strengths=False)
-            tw2 = self.twiss_full(2, strengths=False)
-            params = self.get_params_from_twiss(tw1, tw2)
-        elif mode == "from_variables":
-            params = self.get_params_from_variables()
-        else:
-            raise ValueError(
-                f"mode must be 'from_twiss_init', 'from_twiss_full' or 'from_variables' instead of {mode!r}"
-            )
-        return {k: np.round(v, 8) for k, v in params.items()}
 
     def get_phase(self):
         phases = {}
@@ -658,8 +655,8 @@ class LHCIR(LHCSection):
         if solve:
             try:
                 match.solve(n_steps=15)
-                if self.name not in ["ir5", "ir1"]:
-                    self.update_params_lrphase(verbose=verbose)
+                if lrphase is False:
+                    lhc.vars.update(self.get_params_lrphase())
                 if verbose:
                     match_compare_log(match)
             except Exception as e:
@@ -849,8 +846,9 @@ class LHCIR(LHCSection):
         init = sequence.twiss(strengths=strengths).get_twiss_init(start)
         return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
 
-    def update_params_lrphase(self, verbose=True):
-        params = self.get_params(mode="from_twiss_init")
+    def get_params_lrphase(self, verbose=True):
+        params = self.get_params_from_twiss(mode="init")
+        out = {}
         for beam in "12":
             for param in "mux muy".split():
                 k = f"{param}{self.ipname}b{beam}"
@@ -859,5 +857,6 @@ class LHCIR(LHCSection):
                 if verbose:
                     print(f"Set {kl} from {self.params[kl]} to {params[kl]}")
                     print(f"Set {kr} from {self.params[kr]} to {params[kr]}")
-                self.params[kl] = params[kl]
-                self.params[kr] = params[kr]
+                out[kl] = params[kl]
+                out[kr] = params[kr]
+        return out

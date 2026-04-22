@@ -55,7 +55,7 @@ class LHCIR8(LHCIR):
         return out
 
     def gen_bend_names(self):
-        return gen_d12_names(self.irn)
+        return gen_d12_names(self.irn, self.variant)
 
     def gen_experiment_names(self):
         return ["abxws.l8","abxwh.l8","ablw.r8","abxws.r8"]

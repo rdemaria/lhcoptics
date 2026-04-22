@@ -160,15 +160,15 @@ def format_method(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     return f"{node.name}({first_arg}{suffix})"
 
 
-def print_scope(body: list[ast.stmt], *, indent: int = 0) -> None:
-    """Print declarations for the given scope."""
+def iter_scope_lines(body: list[ast.stmt], *, indent: int = 0) -> Iterable[str]:
+    """Yield formatted declarations for the given scope."""
     declarations = collect_declarations(body, in_class=indent > 0)
     prefix = " " * indent
 
     for declaration in declarations:
-        print(f"{prefix}{format_declaration(declaration)}")
+        yield f"{prefix}{format_declaration(declaration)}"
         if declaration.kind == "class" and isinstance(declaration.node, ast.ClassDef):
-            print_scope(declaration.node.body, indent=indent + 4)
+            yield from iter_scope_lines(declaration.node.body, indent=indent + 4)
 
 
 def parse_args() -> argparse.Namespace:
@@ -176,16 +176,28 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Print names declared in a Python module."
     )
-    parser.add_argument("module", type=Path, help="Path to the Python module to inspect.")
+    parser.add_argument(
+        "modules",
+        nargs="+",
+        type=Path,
+        help="Path(s) to the Python module(s) to inspect.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     """Run the command-line entry point."""
     args = parse_args()
-    source = args.module.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(args.module))
-    print_scope(tree.body)
+    multiple_modules = len(args.modules) > 1
+
+    for module in args.modules:
+        source = module.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(module))
+        for line in iter_scope_lines(tree.body):
+            if multiple_modules:
+                print(f"{module}:{line}")
+            else:
+                print(line)
     return 0
 
 

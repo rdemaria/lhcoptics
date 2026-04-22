@@ -74,6 +74,56 @@ class LHCOptics:
 
     _arc_names = ["a12", "a23", "a34", "a45", "a56", "a67", "a78", "a81"]
     _arcs = [LHCA12, LHCA23, LHCA34, LHCA45, LHCA56, LHCA67, LHCA78, LHCA81]
+    _extra_madx_hl_defs = """
+! Triplet helper
+kqx.l1             := kqx2a.l1           ;
+ktqx1.l1           := kqx1.l1-kqx2a.l1   ;
+ktqx3.l1           := kqx3.l1-kqx2a.l1   ;
+kqx.r1             := kqx2a.r1           ;
+ktqx1.r1           := kqx1.r1-kqx2a.r1   ;
+ktqx3.r1           := kqx3.r1-kqx2a.r1   ;
+
+kqx.l5             := kqx2a.l5           ;
+ktqx1.l5           := kqx1.l5-kqx2a.l5   ;
+ktqx3.l5           := kqx3.l5-kqx2a.l5   ;
+kqx.r5             := kqx2a.r5           ;
+ktqx1.r5           := kqx1.r5-kqx2a.r5   ;
+ktqx3.r5           := kqx3.r5-kqx2a.r5   ;
+
+! Solenoids and spectrometers
+abas               := 12.00/6.0*clight/p0c*on_sol_atlas ; !2 T
+abls               := 6.05/12.1*clight/p0c*on_sol_alice ; !0.5 T
+abcs               := 52.00/13.0*clight/p0c*on_sol_cms ; !4 T
+abxwt.l2           := -0.0000772587268993839836*7e12/p0c*on_alice ;
+abwmd.l2           := +0.0001472587268993839840*7e12/p0c*on_alice ;
+abaw.r2            := -0.0001335474860334838000*7e12/p0c*on_alice ;
+abxwt.r2           := +0.0000635474860334838004*7e12/p0c*on_alice ;
+abxws.l8           := -0.000045681598453109894*7e12/p0c*on_lhcb ;
+abxwh.l8           := +0.000180681598453109894*7e12/p0c*on_lhcb ;
+ablw.r8            := -0.000180681598453109894*7e12/p0c*on_lhcb ;
+abxws.r8           := +0.000045681598453109894*7e12/p0c*on_lhcb ;
+
+! Main dipole strength corrections
+e_kb               = 6.9e-13;
+a.mb               = twopi/8/(23*6+2*2*4);
+l.mb               = 14.3;
+ab.a12             := a.mb;
+ab.a23             := a.mb;
+ab.a34             := a.mb;
+ab.a45             := a.mb;
+ab.a56             := a.mb;
+ab.a67             := a.mb;
+ab.a78             := a.mb;
+ab.a81             := a.mb;
+kb.a12             := ab.a12/l.mb*(1+e_kb);
+kb.a23             := ab.a23/l.mb*(1+e_kb);
+kb.a34             := ab.a34/l.mb*(1+e_kb);
+kb.a45             := ab.a45/l.mb*(1+e_kb);
+kb.a56             := ab.a56/l.mb*(1+e_kb);
+kb.a67             := ab.a67/l.mb*(1+e_kb);
+kb.a78             := ab.a78/l.mb*(1+e_kb);
+kb.a81             := ab.a81/l.mb*(1+e_kb);
+"""
     _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
 
     _global_param_names = [
@@ -128,10 +178,16 @@ class LHCOptics:
             out += [f"{kk}.b{b}" for kk in ["phase_change", "dp_trim"] for b in "12"]
             out += ["on_mo.b1", "on_mo.b2", "dqxdjy.b1", "dqxdjy.b2"]
         else:
-            out+= ["on_ssep1_h","on_xx1_v","on_ssep5_v", "on_xx5_h", "on_xx1_h","on_xx5_v"]
+            out += [
+                "on_ssep1_h",
+                "on_xx1_v",
+                "on_ssep5_v",
+                "on_xx5_h",
+                "on_xx1_h",
+                "on_xx5_v",
+            ]
             out += [f"{kk}.b{b}" for kk in ["phase_change", "dp_trim"] for b in "12"]
             out += ["on_mo.b1", "on_mo.b2", "dqxdjy.b1", "dqxdjy.b2"]
-
 
         return out
 
@@ -153,7 +209,7 @@ class LHCOptics:
         verbose=False,
         name=None,
     ):
-        variant = data.get("variant", "2025")
+        variant = data.get("variant", "lhc2025")
         irs = [IR.from_dict(d, variant=variant) for IR, d in zip(cls._irs, data["irs"])]
         arcs = [
             Arc.from_dict(d, variant=variant) for Arc, d in zip(cls._arcs, data["arcs"])
@@ -216,91 +272,89 @@ class LHCOptics:
     def from_cpymad(
         cls,
         madx,
-        knob_structure,
         name=None,
-        sliced=False,
-        make_model=None,
-        xsuite_model=None,
+        attach_model="auto",
         circuits=None,
-        verbose=False,
         variant=None,
+        verbose=False,
     ):
         """
         Create an LHCOptics object from a MADX model.
 
-        Steps:
-            1. Create a MADX model from the provided `madx` object.
-            2. Read the knob structure from the `knob_structure` parameter.
-            3. Create knobs using the MADX model and the knob structure.
-               This sets also the knob values to zero in the model
-            4. Populate the sections using from_model
-                1. collect stregnth names
-                2. make and set knob values to zero
-                3. get strengths values
-                4. put knobs back
-                5. get params from variables if they exist
-            5. Restores the knob values
-            6. If ask create an xsuite or madx model, or uses one
-            7. Set the model
-            8. Set the ciruits if needed
         """
         madmodel = LHCMadxModel(madx)
-        if "mqxfa.a1r1" in madmodel.madx.elements:
-            variant = "hl"
-        else:
-            variant = "2025"
-        knobs = madmodel.make_and_set0_knobs(
-            knob_structure.get("global", []), variant=variant
+        return cls.from_model(
+            madmodel,
+            name=name,
+            attach_model=attach_model,
+            circuits=circuits,
+            verbose=verbose,
+            variant=variant,
         )
-        irs = [
-            ir.from_model(
-                madmodel, knob_names=knob_structure.get(ir.name), variant=variant
-            )
-            for ir in cls._irs
-        ]
-        arcs = [
-            LHCArc.from_model(
-                madmodel,
-                arc,
-                knob_names=knob_structure.get(arc),
-                variant=variant,
-            )
-            for arc in cls._arc_names
-        ]
-        for k, knob in knobs.items():
-            madmodel[k] = knob.value
-        self = cls(name, irs, arcs, knobs=knobs, variant=variant)
-        if make_model == "xsuite":
-            xsuite_model = LHCXsuiteModel.from_cpymad(
-                madx, sliced=sliced, knob_structure=knob_structure
-            )
-        elif make_model == "madx":
-            self.model = madmodel
-        elif make_model is None:
-            pass
-        else:
-            raise ValueError(
-                f"Unknown make_model {make_model}, use 'xsuite' or 'madx' or None"
-            )
-        if xsuite_model is not None:
-            self.set_xsuite_model(xsuite_model, verbose=verbose)
-        if circuits is not None:
-            self.set_circuits(circuits)
-        return self
 
     @classmethod
     def from_madx_scripts(
-        cls, *filenames, extra=False, stdout=False, attach_model="auto", basedir=None
+        cls,
+        *filenames,
+        extra=False,
+        stdout=False,
+        attach_model="auto",
+        basedir=None,
+        circuits=None,
+        verbose=False,
     ):
         model = LHCMadxModel.from_madx_scripts(
             *filenames, extra=extra, stdout=stdout, basedir=basedir
         )
         return cls.from_model(
-            model, name=",".join(map(str, filenames)), attach_model=attach_model
+            model,
+            name=",".join(map(str, filenames)),
+            attach_model=attach_model,
+            circuits=circuits,
+            verbose=verbose,
         )
 
     @classmethod
-    def from_model(cls, model, name=None, variant=None, attach_model="auto"):
+    def from_madx_optics(
+        cls, filename, model=None, name=None, circuits=None, verbose=False
+    ):
+
+        if not is_madx_optics(filename):
+            raise ValueError(
+                f"Input {filename} does not appear to be a MADX optics file"
+            )
+
+        opt_model = LHCXsuiteModel.from_madx_optics(filename)
+        if model is None:
+            assert circuits is None, "Circuits cannot be set when no full model"
+            opt = cls.from_model(
+                opt_model,
+                name=name,
+                attach_model=True,
+                verbose=verbose,
+            )
+        else:
+            opt = cls.from_model(
+                opt_model,
+                name=name,
+                attach_model=False,
+                verbose=verbose,
+            )
+            opt.set_xsuite_model(model, verbose=verbose)
+            if circuits is not None:
+                opt.set_circuits(circuits)
+        return opt
+
+    @classmethod
+    def from_model(
+        cls,
+        model,
+        name=None,
+        variant=None,
+        attach_model="auto",
+        circuits=None,
+        verbose=False,
+    ):
         """
         Build an optics instance from an initialized model.
 
@@ -334,11 +388,20 @@ class LHCOptics:
         if variant is None:
             variant = model.get_variant()
 
+        if verbose:
+            print(f"Creating optics {name} with variant={variant}")
+
+        if verbose:
+            print(f"Zero and extract global knobs")
         knobs = model.make_and_set0_knobs(
             knob_names=cls._gen_knob_names(variant), variant=variant
         )
+        if verbose:
+            print(f"Generating sections")
         irs = [IR.from_model(model, variant=variant) for IR in cls._irs]
         arcs = [Arc.from_model(model, variant=variant) for Arc in cls._arcs]
+        if verbose:
+            print(f"Extracting global parameters")
         params = {k: model[k] for k in cls._global_param_names if k in model}
         opt = cls(
             name=name, irs=irs, arcs=arcs, params=params, knobs=knobs, variant=variant
@@ -346,21 +409,19 @@ class LHCOptics:
         if attach_model == "auto":
             if model.is_full():
                 if hasattr(model, "madx"):
+                    if verbose:
+                        print(f"Converting MADX model to Xsuite model")
                     model = LHCXsuiteModel.from_cpymad(model.madx)
-                opt.model = model
-                # workaround for run 3 optics that do not have
-                # betxip1b1 etc in the model
-                opt.update_model(set_init=False)
-                opt.set_knobs_off()
-                if  'betxip1b1' not in opt.params:
-                    opt.ir1.set_params()
-                    opt.ir5.set_params()
-                    opt.set_init()
-                    opt.set_params()
-                else:
-                    opt.set_init()
+                if verbose:
+                    print(f"Attaching Xsuite model")
+                opt.set_xsuite_model(model, verbose=verbose)
         elif attach_model:
-            opt.model = model
+            if model.is_full() and hasattr(model, "env"):
+                opt.set_xsuite_model(model, verbose=verbose)
+            else:
+                opt.model = model
+        if circuits is not None:
+            opt.set_circuits(circuits)
         return opt
 
     @classmethod
@@ -369,9 +430,7 @@ class LHCOptics:
         xsuite_model,
         name=None,
         circuits=None,
-        knob_structure=None,
         variant=None,
-        params_mode="from_variables",
         verbose=False,
     ):
         """
@@ -407,39 +466,17 @@ class LHCOptics:
         else:
             raise ValueError("Variant must be provided if xsuite_model is not provided")
 
-        if knob_structure is None:
-            knob_structure = read_knob_structure(
-                xsuite_model.env.metadata["knob_structure"]
-            )
-        elif isinstance(knob_structure, str) or isinstance(knob_structure, Path):
-            knob_structure = read_knob_structure(knob_structure)
-        else:
-            print("No knob_structure provided")
-        knobs = xsuite_model.make_and_set0_knobs(
-            knob_structure.get("global", []), variant=variant
+        return cls.from_model(
+            xsuite_model,
+            name=name,
+            variant=variant,
+            attach_model=True,
+            circuits=circuits,
+            verbose=verbose,
         )
-        irs = [
-            ir.from_model(
-                xsuite_model, knob_names=knob_structure.get(ir.name), variant=variant
-            )
-            for ir in cls._irs
-        ]
-        arcs = [
-            LHCArc.from_model(
-                xsuite_model, arc, knob_names=knob_structure.get(arc), variant=variant
-            )
-            for arc in cls._arc_names
-        ]
-        self = cls(name, irs, arcs, knobs=knobs, variant=variant)
-        self.model = (
-            xsuite_model  #  TODO replace with set_xsuite_model to make more checks
-        )
-        if circuits is not None:
-            self.set_circuits(circuits)
-        self.create_knobs(verbose=verbose)
-        self.set_params(mode=params_mode, full=True)
-        for k, knob in knobs.items():
-            xsuite_model[k] = knob.value
+
+        # for k, knob in knobs.items():
+        #    xsuite_model[k] = knob.value
         return self
 
     @classmethod
@@ -625,6 +662,10 @@ class LHCOptics:
     def check(self, verbose=False):
         """Compute twiss and print orbit at IPs, tunes and chromaticity"""
         self.twissip()
+
+    def check_acb_names(self):
+        for ss in self.irs + self.arcs:
+            ss.check_acb_names()
 
     def check_data(self):
         """Check that all params strengths and knobs are present"""
@@ -943,13 +984,17 @@ class LHCOptics:
             out[ss.name] = list(ss.knobs.keys())
         return out
 
-    def get_params(self, mode="from_twiss", full=False, verbose=False):
+    def get_params_from_twiss(self, full=False, verbose=False, mode="init"):
         """
         Get the parameters from the optics and its sections.
+
+        Using `init` mode, the parameters are obtained from the twiss at the initial point of each section, which is more consistent with the way the sections are defined and matched. 
+        
+        Using `full` mode, the parameters are obtained from the twiss at all points of the sections, which can be more accurate but also more sensitive to numerical issues and differences in the twiss computation.
         """
         if verbose:
             print(f"Getting parameters from mode {mode} with full={full}")
-        if mode == "from_twiss":
+        if mode == "full":
             tw1 = self.model.b1.twiss(
                 compute_chromatic_properties=True, strengths=False
             )
@@ -957,7 +1002,7 @@ class LHCOptics:
                 compute_chromatic_properties=True, strengths=False
             )
             return self.get_params_from_twiss(tw1, tw2, full=full)
-        elif mode == "from_twiss_init":
+        elif mode == "init":
             tw1 = tw1 = self.model.b1.twiss(
                 compute_chromatic_properties=True, strengths=False
             )
@@ -966,15 +1011,13 @@ class LHCOptics:
             )
             ret = self.get_params_from_twiss(tw1, tw2, full=False)
             for ss in self.irs + self.arcs:
-                retss = ss.get_params(mode="from_twiss_init")
+                retss = ss.get_params(mode="init")
                 ret.update(retss)
             return ret
-        elif mode == "from_variables":
-            return self.get_params_from_variables(full=full)
         else:
-            raise ValueError("mode must be 'from_twiss' or 'from_variables'")
+            raise ValueError(f"Unknown mode {mode} for get_params_from_twiss")
 
-    def get_params_from_twiss(self, tw1, tw2, full=False):
+    def _get_params_from_twiss(self, tw1=None, tw2=None, full=False, mode="init"):
         """
         Get the parameters from the twiss object.
         """
@@ -997,8 +1040,8 @@ class LHCOptics:
                 params.update(pp)
             temp.update(params)
         else:
-            temp.update(self.ir1.get_params())
-            temp.update(self.ir5.get_params())
+            temp.update(self.ir1.get_params_from_twiss(mode="init"))
+            temp.update(self.ir5.get_params_from_twiss(mode="init"))
         for irn in [1, 5]:
             for xy in "xy":
                 rname = f"r{xy}_ip{irn}"
@@ -1815,7 +1858,9 @@ class LHCOptics:
         return self
 
     def set_init(self):
-        for ir in self.irs:
+        self.ir1.set_init()
+        self.ir5.set_init()
+        for ir in self.ir2, self.ir3, self.ir4, self.ir6, self.ir7, self.ir8:
             ir.set_init()
 
     def set_knobs_off(self):
@@ -1855,11 +1900,24 @@ class LHCOptics:
                 ss.set_params(mode=mode, verbose=verbose)
         return self
 
-    def set_xsuite_model(self, model, set_init=True, verbose=False):
+    def set_xsuite_model(self, model, verbose=False):
         if isinstance(model, str) or isinstance(model, Path):
             model = LHCXsuiteModel.from_json(model)
+        if self.variant.startswith("hl"):
+            print("Load extra MADX definitions for HL-LHC")
+            model.env.vars.load(string=self._extra_madx_hl_defs,format="madx")
         self.model = model
-        self.update_model(verbose=verbose, set_init=set_init)
+        self.create_knobs(verbose=verbose)
+        self.update_model(set_init=False)
+        self.set_knobs_off()
+        # If the model already has the parameters, we can just set the init and update the model. Otherwise, we need to set the parameters from the IRs and arcs first.
+        if "betxip1b1" not in self.ir1.params:
+            self.ir1.set_params()
+            self.ir5.set_params()
+            self.set_init()
+            self.set_params()
+        else:
+            self.set_init()
         return self
 
     def test_coupling_knobs(self):
@@ -1923,42 +1981,8 @@ class LHCOptics:
                 out.append(expr)
             out.append("")
 
-        out.append("! Constant definitions\n")
         if self.variant.startswith("hl"):
-            out.append(
-                """
-! Triplet helper
-kqx.l1             := kqx2a.l1           ;
-ktqx1.l1           := kqx1.l1-kqx2a.l1   ;
-ktqx3.l1           := kqx3.l1-kqx2a.l1   ;
-kqx.r1             := kqx2a.r1           ;
-ktqx1.r1           := kqx1.r1-kqx2a.r1   ;
-ktqx3.r1           := kqx3.r1-kqx2a.r1   ;
-
-kqx.l5             := kqx2a.l5           ;
-ktqx1.l5           := kqx1.l5-kqx2a.l5   ;
-ktqx3.l5           := kqx3.l5-kqx2a.l5   ;
-kqx.r5             := kqx2a.r5           ;
-ktqx1.r5           := kqx1.r5-kqx2a.r5   ;
-ktqx3.r5           := kqx3.r5-kqx2a.r5   ;
-"""
-            )
-        out.append(
-            """
-! Solenoids and spectrometers
-abas               := 12.00/6.0*clight/p0c*on_sol_atlas ; !2 T
-abls               := 6.05/12.1*clight/p0c*on_sol_alice ; !0.5 T
-abcs               := 52.00/13.0*clight/p0c*on_sol_cms ; !4 T
-abxwt.l2           := -0.0000772587268993839836*7e12/p0c*on_alice ;
-abwmd.l2           := +0.0001472587268993839840*7e12/p0c*on_alice ;
-abaw.r2            := -0.0001335474860334838000*7e12/p0c*on_alice ;
-abxwt.r2           := +0.0000635474860334838004*7e12/p0c*on_alice ;
-abxws.l8           := -0.000045681598453109894*7e12/p0c*on_lhcb ;
-abxwh.l8           := +0.000180681598453109894*7e12/p0c*on_lhcb ;
-ablw.r8            := -0.000180681598453109894*7e12/p0c*on_lhcb ;
-abxws.r8           := +0.000045681598453109894*7e12/p0c*on_lhcb ;
-"""
-        )
+            out.append(self._extra_madx_hl_defs)
         return deliver_list_str(out, output)
 
     def to_table(self, *rows):
@@ -2076,6 +2100,8 @@ abxws.r8           := +0.000045681598453109894*7e12/p0c*on_lhcb ;
         set_init=True,
         knobs="create",
         set_knob_values=False,
+        strengths=True,
+        params=True,
     ):
         """
         Update model from an optics or a dict.
@@ -2087,6 +2113,14 @@ abxws.r8           := +0.000045681598453109894*7e12/p0c*on_lhcb ;
             self.model.update_from_madx_optics(src, knobs=self.knobs, verbose=verbose)
         elif src is None:
             src = self
+            if params:
+                if hasattr(src, "params"):
+                    src_params = src.params
+                elif 'params' in src:
+                    src_params = src['params']
+                else:
+                    src_params = src
+                self.model.update_vars(src_params, verbose=verbose)
             if full:
                 for ss in self.irs + self.arcs:
                     if hasattr(src, ss.name):
@@ -2102,6 +2136,8 @@ abxws.r8           := +0.000045681598453109894*7e12/p0c*on_lhcb ;
                         verbose=verbose,
                         knobs=knobs,
                         set_knob_values=set_knob_values,
+                        strengths=strengths,
+                        params=params,
                     )
             # knobs must be updated after the strengths
             if knobs == "create":

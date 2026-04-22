@@ -1620,6 +1620,13 @@ class LHCRepo:
     def get_afs_path(self):
         return Path("/afs/cern.ch/eng/acc-models/lhc/") / self.name
 
+    def get_circuits_json(self, basedir=None):
+        if basedir is None:
+            basedir = self.basedir
+        else:
+            basedir = Path(basedir)
+        return basedir / "xsuite" / "lhccircuits.json"
+
     def get_cycles(self):
         cycles = {}
         for cycle_name in self.data.get("cycles", []):
@@ -1712,15 +1719,18 @@ class LHCRepo:
 
         return xt.Environment.from_json(self.get_xsuite_json())
 
-    def get_xsuite_json(self, basedir=None):
+    def get_xsuite_json(self, thin=False, basedir=None):
         if basedir is None:
             basedir = self.basedir
         else:
             basedir = Path(basedir)
-        return basedir / "xsuite" / "lhc.json"
+        if thin:
+            return basedir / "xsuite" / "lhc_thin.json"
+        else:
+            return basedir / "xsuite" / "lhc.json"
 
-    def get_xsuite_model(self):
-        return LHCXsuiteModel.from_json(self.get_xsuite_json())
+    def get_xsuite_model(self, thin=False):
+        return LHCXsuiteModel.from_json(self.get_xsuite_json(thin=thin))
 
     def git_add(self, *args):
         """Add the changes to the repository"""
