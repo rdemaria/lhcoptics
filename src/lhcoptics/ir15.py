@@ -89,3 +89,30 @@ class LHCIR15(LHCIR):
 
     def has_ats_phase(self):
         return self.params[f"betxip{self.irn}b1"] <= 2.5
+
+
+class LHCIR1(LHCIR15):
+    """IR1-specific optics model."""
+
+    name = "ir1"
+
+    @property
+    def quads(self):
+        if self.variant == "2025":
+            return {
+                k: v
+                for k, v in self.strengths.items()
+                if re.match("kt?q[^s]", k) and not k.startswith("kq4")
+            }
+        else:
+            return LHCIR15.quads.__get__(self)
+
+    def gen_experiment_names(self):
+        return ["abas"]
+
+
+class LHCIR5(LHCIR15):
+    name = "ir5"
+
+    def gen_experiment_names(self):
+        return ["abcs"]

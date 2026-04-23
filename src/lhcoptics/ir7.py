@@ -109,8 +109,24 @@ class LHCIR7(LHCIR):
         out.extend(self.gen_acb_names())
         return out
 
-    def get_params_from_twiss(self, tw1, tw2):
-        params = LHCIR.get_params_from_twiss(self, tw1, tw2)
+    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init", verbose=False):
+        if tw1 is None:
+            if mode == "init":
+                tw1 = self.twiss_from_init(1, strengths=False)
+            elif mode == "full":
+                tw1 = self.twiss_full(1, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        if tw2 is None:
+            if mode == "init":
+                tw2 = self.twiss_from_init(2, strengths=False)
+            elif mode == "full":
+                tw2 = self.twiss_full(2, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        params = super().get_params_from_twiss(
+            tw1=tw1, tw2=tw2, mode=mode, verbose=verbose
+        )
         for col_name in self.collimators:
             if "b1" in col_name:
                 params[f"betx_{col_name}"] = tw1["betx", col_name]
@@ -233,7 +249,7 @@ class LHCIR7(LHCIR):
         if solve:
             try:
                 opt.solve()
-                self.update_params_lrphase(verbose=verbose)
+                lhc.vars.update(self.get_params_lrphase())
                 if verbose:
                     match_compare_log(opt)
             except Exception as e:

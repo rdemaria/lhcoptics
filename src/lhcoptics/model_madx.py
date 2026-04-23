@@ -439,6 +439,9 @@ use, sequence=lhcb2;
                 get_ap_limit(kk, tab, verbose=verbose)
         return out
 
+    def get_p0c(self):
+        return self.madx.sequence.lhcb1.beam.pc
+
     def get_variant(self):
         vv = self.madx.globals
         if "acbrdh4.l1b1" in vv:
@@ -605,11 +608,11 @@ use, sequence=lhcb2;
                 )
             print()
 
-    def twiss(self, sequence=None, **kwargs):
-        if sequence is None:
-            return (self.b1.twiss(**kwargs), self.b2.twiss(**kwargs))
+    def twiss(self, beam=None, chrom=True, **kwargs):
+        if beam is None:
+            return (self.b1.twiss(chrom=chrom, **kwargs), self.b2.twiss(chrom=chrom, **kwargs))
         else:
-            return getattr(self, f"b{sequence}").twiss(**kwargs)
+            return getattr(self, f"b{beam}").twiss(chrom=chrom, **kwargs)
 
     def update(self, src, knobs_check=True):
         if hasattr(src, "strengths"):
@@ -686,6 +689,7 @@ class MADSequence:
         s=0,
         at=None,
         full=True,
+        chrom=True,
     ):
         """
         Parameters:
@@ -693,6 +697,7 @@ class MADSequence:
         - at: location to which initial conditions are to be set
         - init, betx, .... : initial conditions if all are None, then they are taken from the periodic solution at `at`
         - start, end: start and end of the twiss output
+        - chrom: if True, compute chromatic properties
         """
         if set([betx, bety, alfx, alfy, dx, dpx, dy, dpy, init]) == {
             None
@@ -712,7 +717,8 @@ class MADSequence:
                 alfy=alfy,
                 sequence=self.sequence,
             )
-        return xd.Table(tw)
+        tab=xd.Table(tw)
+        return tab
 
     def twiss_line(self, betx=1, bety=1, alfx=0, alfy=0):
         tw = self.madx.twiss(

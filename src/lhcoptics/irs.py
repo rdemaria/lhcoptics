@@ -252,12 +252,14 @@ class LHCIR(LHCSection):
             else:
                 raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
 
-    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init"):
+    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init", verbose=False):
+        if verbose:
+            print(f"Getting parameters for {self} from twiss (mode={mode})")
         if tw1 is None:
             if mode == "init":
                 tw1 = self.twiss_from_init(1, strengths=False)
             elif mode == "full":
-                 tw1 = self.twiss_full(1, strengths=False)
+                tw1 = self.twiss_full(1, strengths=False)
             else:
                 raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
         if tw2 is None:
@@ -377,18 +379,19 @@ class LHCIR(LHCSection):
                         )
                     )
 
-        if lrphase and right:
-            for tt in ["mux", "muy"]:
-                for ll in lines:
-                    targets.append(
-                        xt.Target(
-                            tt,
-                            self.params[f"{tt}{self.ipname}{ll}_r"],
-                            line=ll,
-                            at=self.ipname,
-                            tag=f"{tt}{self.ipname}{ll}_r",
-                        )
-                    )
+        #if lrphase and right:
+        #    raise NotImplementedError("Right-only with LR phase targets not implemented yet")
+        #    for tt in ["mux", "muy"]:
+        #        for ll, end in zip(lines, ends):
+        #            targets.append(
+        #                xt.Target(
+        #                    tt,
+        #                    self.params[f"{tt}{self.ipname}{ll}_r"],
+        #                    line=ll,
+        #                    at=end,
+        #                    tag=f"{tt}{self.ipname}{ll}_r",
+        #                )
+        #            )
 
         if right:
             for ll, init, end in zip(lines, inits_r, ends):
@@ -605,6 +608,8 @@ class LHCIR(LHCSection):
 
         if lrphase is False:
             match.disable(target="mu.*_l")
+        else:
+            match.disable(target="mu.*_r")
 
         if sym_triplets:
             for kl, kr in zip(self.kqxl, self.kqxr):

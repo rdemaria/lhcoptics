@@ -1,0 +1,172 @@
+classDiagram
+
+%% Core optics hierarchy
+class LHCOptics["optics.LHCOptics"]
+class LHCSection["section.LHCSection"]
+class LHCIR["irs.LHCIR"]
+class LHCIR15["ir15.LHCIR15"]
+class LHCIR1["ir15.LHCIR1"]
+class LHCIR2["ir2.LHCIR2"]
+class LHCIR3["ir3.LHCIR3"]
+class LHCIR4["ir4.LHCIR4"]
+class LHCIR5["ir15.LHCIR5"]
+class LHCIR6["ir6.LHCIR6"]
+class LHCIR7["ir7.LHCIR7"]
+class LHCIR8["ir8.LHCIR8"]
+class LHCArc["arcs.LHCArc"]
+class LHCA12["arcs.LHCA12"]
+class LHCA23["arcs.LHCA23"]
+class LHCA34["arcs.LHCA34"]
+class LHCA45["arcs.LHCA45"]
+class LHCA56["arcs.LHCA56"]
+class LHCA67["arcs.LHCA67"]
+class LHCA78["arcs.LHCA78"]
+class LHCA81["arcs.LHCA81"]
+class ActionArcPhaseAdvance["arcs.ActionArcPhaseAdvance"]
+
+%% Models
+class LHCMadxModel["model_madx.LHCMadxModel"]
+class MADSequence["model_madx.MADSequence"]
+class RMatrix["model_madx.RMatrix"]
+class TwissInit["model_madx.TwissInit"]
+class LHCXsuiteModel["model_xsuite.LHCXsuiteModel"]
+class SinglePassDispersion["model_xsuite.SinglePassDispersion"]
+
+%% Knobs
+class Knob["knob.Knob"]
+class IPKnob["knob.IPKnob"]
+class TuneKnob["knob.TuneKnob"]
+class ChromaKnob["knob.ChromaKnob"]
+class CouplingKnob["knob.CouplingKnob"]
+class DispKnob["knob.DispKnob"]
+class CrabKnob["knob.CrabKnob"]
+class ActionCmin["knob.ActionCmin"]
+
+%% Circuits
+class LHCCircuit["circuits.LHCCircuit"]
+class LHCCalibration["circuits.LHCCalibration"]
+class LHCCircuits["circuits.LHCCircuits"]
+class LHCCircuit2in1["circuits.LHCCircuit2in1"]
+
+%% Tables
+class Col["opttable.Col"]
+class ColKnob["opttable.ColKnob"]
+class LHCSectionTable["opttable.LHCSectionTable"]
+class LHCIRTable["opttable.LHCIRTable"]
+class LHCArcTable["opttable.LHCArcTable"]
+class LHCOpticsTable["opttable.LHCOpticsTable"]
+class BeamProcessTable["opttable.BeamProcess"]
+class PolyProcess["opttable.PolyProcess"]
+
+%% Repository model
+class LHCDev["repo.LHCDev"]
+class LHCCycle["repo.LHCCycle"]
+class RepoLHCFill["repo.LHCFill"]
+class LHCKnobDef["repo.LHCKnobDef"]
+class LHCKnobDefs["repo.LHCKnobDefs"]
+class LHCOpticsDef["repo.LHCOpticsDef"]
+class LHCOpticsSet["repo.LHCOpticsSet"]
+class LHCProcess["repo.LHCProcess"]
+class LHCRepo["repo.LHCRepo"]
+class RepoLHCRun["repo.LHCRun"]
+
+%% LSA / NXCals helpers
+class NXCals["nxcals_util.NXCals"]
+class LsaLHCRun["lsa_util.LHCRun"]
+class LsaLHCFill["lsa_util.LHCFill"]
+class LHCBeamProcess["lsa_util.LHCBeamProcess"]
+
+%% Signal helpers
+class Piecewise["rdmsignal.Piecewise"]
+class Polynomial["rdmsignal.Polynomial"]
+class Spline["rdmsignal.Spline"]
+
+%% External bases used by helper actions
+class xt_Action["xt.Action"]
+class xdeps_Action["xdeps.Action"]
+
+%% Inheritance
+LHCSection <|-- LHCIR
+LHCSection <|-- LHCArc
+LHCIR <|-- LHCIR15
+LHCIR15 <|-- LHCIR1
+LHCIR15 <|-- LHCIR5
+LHCIR <|-- LHCIR2
+LHCIR <|-- LHCIR3
+LHCIR <|-- LHCIR4
+LHCIR <|-- LHCIR6
+LHCIR <|-- LHCIR7
+LHCIR <|-- LHCIR8
+LHCArc <|-- LHCA12
+LHCArc <|-- LHCA23
+LHCArc <|-- LHCA34
+LHCArc <|-- LHCA45
+LHCArc <|-- LHCA56
+LHCArc <|-- LHCA67
+LHCArc <|-- LHCA78
+LHCArc <|-- LHCA81
+Knob <|-- IPKnob
+Knob <|-- TuneKnob
+Knob <|-- ChromaKnob
+Knob <|-- CouplingKnob
+Knob <|-- DispKnob
+Knob <|-- CrabKnob
+LHCSectionTable <|-- LHCIRTable
+LHCSectionTable <|-- LHCArcTable
+LHCSectionTable <|-- LHCOpticsTable
+xt_Action <|-- ActionArcPhaseAdvance
+xt_Action <|-- ActionCmin
+xdeps_Action <|-- SinglePassDispersion
+
+%% Ownership and dependencies in the optics model
+LHCOptics *-- "8" LHCIR : irs
+LHCOptics *-- "8" LHCArc : arcs
+LHCOptics o-- "0..*" Knob : knobs
+LHCOptics --> LHCCircuits : circuits
+LHCOptics --> LHCXsuiteModel : active model
+LHCOptics ..> LHCMadxModel : builds from
+LHCSection o-- "0..*" Knob : knobs
+LHCSection --> LHCOptics : parent
+LHCSection ..> LHCMadxModel : from_cpymad
+LHCSection ..> LHCXsuiteModel : from_xsuite
+LHCIR --> LHCArc : arc_left / arc_right
+ActionArcPhaseAdvance --> LHCArc : arc
+
+%% Model helpers
+LHCXsuiteModel ..> LHCMadxModel : imports / converts
+LHCXsuiteModel ..> Knob : creates and updates
+LHCMadxModel ..> Knob : creates and updates
+
+%% Circuit subsystem
+LHCCircuits *-- "0..*" LHCCircuit : pcname / madname
+LHCCircuits *-- "0..*" LHCCalibration : calibrations
+LHCCircuits *-- "0..*" LHCCircuit2in1 : pcname2in1
+LHCCircuit --> LHCCalibration : _calib
+LHCCircuit2in1 --> LHCCircuit : pc1
+LHCCircuit2in1 --> LHCCircuit : pc2
+
+%% Tables
+LHCSectionTable o-- Col : params / strengths
+LHCIRTable *-- "0..*" LHCIR : rows
+LHCArcTable *-- "0..*" LHCArc : rows
+LHCOpticsTable *-- "0..*" LHCOptics : rows
+LHCOpticsTable *-- "8" LHCIRTable : ir tables
+LHCOpticsTable *-- "8" LHCArcTable : arc tables
+
+%% Repository hierarchy
+LHCDev *-- "0..*" LHCRepo : branch / tag repos
+LHCRepo *-- "0..*" LHCCycle : cycles
+LHCRepo *-- "0..*" LHCOpticsSet : sets
+LHCRepo o-- LHCKnobDefs : knob map
+LHCRepo ..> LHCXsuiteModel : loads model
+LHCRepo ..> RepoLHCRun : get_run_data
+LHCCycle *-- "0..*" LHCProcess : beam_processes
+LHCOpticsSet *-- "0..*" LHCOpticsDef : optics
+LHCKnobDefs *-- "0..*" LHCKnobDef : entries
+LHCProcess ..> LHCOptics : builds optics snapshots
+LHCProcess ..> LHCXsuiteModel : loads xsuite model
+RepoLHCRun *-- "0..*" RepoLHCFill : fills
+
+%% LSA / NXCals helper hierarchy
+LsaLHCRun *-- "0..*" LsaLHCFill : fills
+LHCBeamProcess ..> LsaLHCRun : trims / history

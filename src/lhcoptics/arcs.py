@@ -238,9 +238,24 @@ class LHCArc(LHCSection):
             init = sequence.twiss(strengths=False).get_twiss_init(start)
             return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
 
-    def get_params_from_twiss(self, tw1=None, tw2=None):
-        if tw1 is None or tw2 is None:
-            tw1, tw2 = self.twiss(strengths=False)
+    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init", verbose=False):
+        if verbose:
+            print(f"Getting parameters for Arc {self.name} from twiss (mode={mode})")
+        if tw1 is None:
+            if mode == "init":
+                tw1 = self.twiss_periodic(1, strengths=False)
+            elif mode == "full":
+                tw1 = self.twiss_full(1, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        if tw2 is None:
+            if mode == "init":
+                tw2 = self.twiss_periodic(2, strengths=False)
+            elif mode == "full":
+                tw2 = self.twiss_full(2, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+
         params = {
             f"mux{self.name}b1": tw1.mux[-1],
             f"mux{self.name}b2": tw2.mux[-1],
@@ -273,7 +288,10 @@ class LHCArc(LHCSection):
                     # fall back in case of old HL optics
                     elif self.parent.variant.startswith("hl"):
                         key2 = key.replace("a", "")
-                    params[key] = model[key2]
+                    else:
+                        key2 = key
+                    if key2 in model:
+                        params[key] = model[key2]
         return params
 
     @property

@@ -91,7 +91,7 @@ class LHCSection:
 
     Needs:
        twiss_<method>() to return a twiss table
-       get_params() method to return the parameters at the end of the section
+       get_params_from_variables() method to return the parameters from the model using variables
        get_params_from_twiss() method to return the parameters from a twiss table
 
     """
@@ -268,7 +268,7 @@ class LHCSection:
 
     def get_param_mismatches(self, tol=1e-6, params=None):
         if params is None:
-            params = self.get_params()
+            params = self.get_params_from_twiss()
         out = []
         for k, v in self.params.items():
             if k in params:
@@ -310,13 +310,20 @@ class LHCSection:
         for k, knob in self.knobs.items():
             self.parent.model[k] = knob.value
 
-    def set_params(self, mode="from_twiss_init", verbose=False):
+    def set_params(self, mode='from_variables', verbose=False):
         """
-        Copy all parameters from get_params() to self.params
+        Copy all parameters from get_params_from_variables() to self.params
         """
-        src = self.get_params(mode=mode, verbose=verbose)
+        if mode == 'from_variables':
+            src = self.get_params_from_variables(verbose=verbose)
+        elif mode == 'from_twiss_full':
+            src = self.get_params_from_twiss(verbose=verbose, mode='full')
+        elif mode == 'from_twiss_init' or mode == 'from_twiss':
+            src = self.get_params_from_twiss(verbose=verbose, mode='init')
+        else:
+            raise ValueError(f"Unknown mode {mode} use from_variables, from_twiss_full or from_twiss_init or from_twiss")
         if verbose:
-            print(f"Setting parameters from mode {mode} with full=True")
+            print(f"Setting parameters with {mode!r}")
         self.params.update(src)
         return self
 
@@ -472,10 +479,10 @@ class LHCSection:
         right=True,
     ):
         """
-        Update existing params from self.model or src.params or src
+        Update existing params from self.model using variables or src.params or src
         """
         if src is None:
-            src = self.get_params()
+            src = self.get_params_from_variables()
         elif hasattr(src, "params"):
             src = src.params
         if hasattr(self, "irn"):
@@ -511,7 +518,7 @@ class LHCSection:
         self, src=None, verbose=False, b1=True, b2=True, left=True, right=True
     ):
         """
-        Update existing stregnths from self. model or src.strengths or src
+        Update existing stregnths from self. model using variables or src.strengths or src
         """
         if src is None:
             src = self.model

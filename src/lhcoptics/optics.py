@@ -22,11 +22,11 @@ from .arcs import (
     LHCA81,
 )
 from .circuits import LHCCircuits
-from .ir1 import LHCIR1
+from .ir15 import LHCIR1
 from .ir2 import LHCIR2
 from .ir3 import LHCIR3
 from .ir4 import LHCIR4
-from .ir5 import LHCIR5
+from .ir15 import LHCIR5
 from .ir6 import LHCIR6
 from .ir7 import LHCIR7
 from .ir8 import LHCIR8
@@ -43,6 +43,27 @@ from .utils import (
 )
 
 _opl = ["_op", "_sq", ""]
+
+
+def get_ats_factors(presqueeze, squeezed):
+    out = {}
+    for irn in [1, 5]:
+        for xy in "xy":
+            rname = f"r{xy}_ip{irn}"
+            rnameb1 = f"r{xy}ip{irn}b1"
+            rnameb2 = f"r{xy}ip{irn}b2"
+            out[rnameb1] = (
+                squeezed[f"bet{xy}ip{irn}b1"] / presqueeze[f"bet{xy}ip{irn}b1"]
+            )
+            out[rnameb2] = (
+                squeezed[f"bet{xy}ip{irn}b2"] / presqueeze[f"bet{xy}ip{irn}b2"]
+            )
+            out[rname] = (out[rnameb1] + out[rnameb2]) / 2
+            if abs(out[rnameb1] - out[rnameb2]) > 0.00001:
+                print(
+                    f"Warning: r{xy}_ip{irn} from beam 1 and beam 2 differ by more than 0.00001: {out[rnameb1]} vs {out[rnameb2]}"
+                )
+    return out
 
 
 def set_ip_labels(ax, tw):
@@ -372,12 +393,11 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         variant : str, optional
             Optics variant. If omitted, it is obtained from
             ``model.get_variant()``.
-        attach_model : bool or str, optional
+        attach_model : bool or "auto", optional
             Controls whether the source model is attached to the returned
             optics. With ``"auto"``, the model is attached only when
             ``model.is_full()`` is true; cpymad-backed models are converted to
-            an ``LHCXsuiteModel`` before attachment. Any truthy value other
-            than ``"auto"`` attaches ``model`` as-is.
+            an ``LHCXsuiteModel`` before attachment. With True attaches ``model`` as-is.
 
         Returns
         -------
@@ -984,38 +1004,65 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             out[ss.name] = list(ss.knobs.keys())
         return out
 
-    def get_params_from_twiss(self, full=False, verbose=False, mode="init"):
+    def get_params_from_twiss(
+        self, tw1=None, tw2=None, full=False, verbose=False, mode="init"
+    ):
         """
         Get the parameters from the optics and its sections.
 
-        Using `init` mode, the parameters are obtained from the twiss at the initial point of each section, which is more consistent with the way the sections are defined and matched. 
-        
+        Using `init` mode, the parameters are obtained from the twiss at the initial point of each section, which is more consistent with the way the sections are defined and matched.
+
         Using `full` mode, the parameters are obtained from the twiss at all points of the sections, which can be more accurate but also more sensitive to numerical issues and differences in the twiss computation.
         """
+        if tw1 is None:
+            if verbose:
+                print(f"Computing twiss for beam 1 to get parameters")
+            tw1 = self.model.twiss(beam=1, chrom=True)
+        if tw2 is None:
+            if verbose:
+                print(f"Computing twiss for beam 2 to get parameters")
+            tw2 = self.model.twiss(beam=2, chrom=True)
         if verbose:
-            print(f"Getting parameters from mode {mode} with full={full}")
-        if mode == "full":
-            tw1 = self.model.b1.twiss(
-                compute_chromatic_properties=True, strengths=False
-            )
-            tw2 = self.model.b2.twiss(
-                compute_chromatic_properties=True, strengths=False
-            )
-            return self.get_params_from_twiss(tw1, tw2, full=full)
-        elif mode == "init":
-            tw1 = tw1 = self.model.b1.twiss(
-                compute_chromatic_properties=True, strengths=False
-            )
-            tw2 = self.model.b2.twiss(
-                compute_chromatic_properties=True, strengths=False
-            )
-            ret = self.get_params_from_twiss(tw1, tw2, full=False)
-            for ss in self.irs + self.arcs:
-                retss = ss.get_params(mode="init")
-                ret.update(retss)
-            return ret
-        else:
-            raise ValueError(f"Unknown mode {mode} for get_params_from_twiss")
+            print(f"Getting parameters (full={full}) with mode {mode}")
+        p0c = self.model.get_p0c()
+        params = {
+            "p0c": p0c,
+            "qxb1": tw1.qx,
+            "qyb1": tw1.qy,
+            "qxb2": tw2.qx,
+            "qyb2": tw2.qy,
+            "qpxb1": tw1.dqx,
+            "qpyb1": tw1.dqy,
+            "qpxb2": tw2.dqx,
+            "qpyb2": tw2.dqy,
+        }
+        presqueeze = {}
+        presqueeze.update(self.ir1.get_params_from_twiss(mode="init", verbose=verbose))
+        presqueeze.update(self.ir5.get_params_from_twiss(mode="init", verbose=verbose))
+        if full:
+            if mode == "full":
+                for ss in self.irs + self.arcs:
+                    pp = ss.get_params_from_twiss(tw1, tw2, verbose=verbose)
+                    params.update(pp)
+                params.update(get_ats_factors(presqueeze, params))
+                for xy in "xy":
+                    for irn in "15":
+                        for beam in "12":
+                            name = f"bet{xy}ip{irn}b{beam}"
+                            params[name] = presqueeze[name]
+            elif mode == "init":
+                for ss in self.irs + self.arcs:
+                    pp = ss.get_params_from_twiss(mode="init", verbose=verbose)
+                    params.update(pp)
+                squeezed = {}
+                for xy in "xy":
+                    for irn in "15":
+                        squeezed[f"bet{xy}ip{irn}b1"] = tw1[f"bet{xy}", f"ip{irn}"]
+                        squeezed[f"bet{xy}ip{irn}b2"] = tw2[f"bet{xy}", f"ip{irn}"]
+                params.update(get_ats_factors(presqueeze, squeezed))
+            else:
+                raise ValueError(f"Unknown mode {mode} for get_params_from_twiss")
+        return params
 
     def _get_params_from_twiss(self, tw1=None, tw2=None, full=False, mode="init"):
         """
@@ -1033,12 +1080,18 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             "qpxb2": tw2.dqx,
             "qpyb2": tw2.dqy,
         }
+        presqueeze = {}
+        presqueeze.update(self.ir1.get_params_from_twiss(mode="init"))
+        presqueeze.update(self.ir5.get_params_from_twiss(mode="init"))
         temp = {}
         if full:
             for ss in self.irs + self.arcs:
                 pp = ss.get_params_from_twiss(tw1, tw2)
                 params.update(pp)
             temp.update(params)
+            ats_factors = get_ats_factors(presqueeze, temp)
+            temp.update(presqueeze)
+            temp.update(ats_factors)
         else:
             temp.update(self.ir1.get_params_from_twiss(mode="init"))
             temp.update(self.ir5.get_params_from_twiss(mode="init"))
@@ -1058,6 +1111,8 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         """
         Get the parameters from the model variables.
         """
+        if verbose:
+            print(f"Getting parameters from variables in the model (full={full})")
         params = {}
         if "p0c" in self.model:
             params["p0c"] = self.model["p0c"]
@@ -1065,29 +1120,12 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             params["p0c"] = self.model["nrj"] * 1e9
         else:
             params["p0c"] = self.model.get_p0c()
-        var_names = (
-            "qxb1",
-            "qyb1",
-            "qxb2",
-            "qyb2",
-            "qpxb1",
-            "qpyb1",
-            "qpxb2",
-            "qpyb2",
-        )
-        for irn in [1, 5]:
-            for plane in "xy":
-                params[f"r{plane}_ip{irn}"] = self.model.get(f"r{plane}_ip{irn}", 1)
-
-        for var_name in var_names:
-            if var_name in self.model:
-                params[var_name] = self.model[var_name]
+        for k in self._global_param_names:
+            if k in self.model:
+                params[k] = self.model[k]
         if full:
-            if verbose:
-                print("Getting parameters from variables:")
             for ss in self.irs + self.arcs:
                 pp = ss.get_params_from_variables(verbose=verbose)
-                print(len(pp))
                 params.update(pp)
         return params
 
@@ -1882,13 +1920,21 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         self.update_model()
         return self
 
-    def set_params(self, full=True, mode="from_twiss_init", verbose=False):
+    def set_params(self, full=True, verbose=False, mode="from_variables"):
         """
-        Copy all parameters from get_params() into params
+        Copy all parameters from get_params_from_variables() into params
         """
         if verbose:
-            print(f"Setting parameters from mode {mode} with full={full}")
-        params = self.get_params(mode=mode, verbose=verbose)
+            print(f"Setting parameters (full={full})")
+        if mode == "from_variables":
+            params = self.get_params_from_variables(full=full, verbose=verbose)
+        elif mode== "from_twiss_full":
+            params = self.get_params_from_twiss(full=True, verbose=verbose, mode=mode)
+        elif mode == "from_twiss_init" or mode == "from_twiss":
+            params = self.get_params_from_twiss(full=False, verbose=verbose, mode=mode)
+        else:
+            raise ValueError(f"Unknown mode {mode} use from_variables, from_twiss_full or from_twiss_init or from_twiss")
+
         for k in self._global_param_names:
             if k in params:
                 v = params[k]
@@ -1897,7 +1943,7 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 self.params[k] = v
         if full:
             for ss in self.irs + self.arcs:
-                ss.set_params(mode=mode, verbose=verbose)
+                ss.set_params(verbose=verbose, mode=mode)
         return self
 
     def set_xsuite_model(self, model, verbose=False):
@@ -1905,15 +1951,16 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             model = LHCXsuiteModel.from_json(model)
         if self.variant.startswith("hl"):
             print("Load extra MADX definitions for HL-LHC")
-            model.env.vars.load(string=self._extra_madx_hl_defs,format="madx")
+            model.env.vars.load(string=self._extra_madx_hl_defs, format="madx")
         self.model = model
         self.create_knobs(verbose=verbose)
         self.update_model(set_init=False)
         self.set_knobs_off()
         # If the model already has the parameters, we can just set the init and update the model. Otherwise, we need to set the parameters from the IRs and arcs first.
         if "betxip1b1" not in self.ir1.params:
-            self.ir1.set_params()
-            self.ir5.set_params()
+            print("Missing IP1/IP5 beta parameters in model, calculating from twiss")
+            self.ir1.set_params('from_twiss')
+            self.ir5.set_params('from_twiss')
             self.set_init()
             self.set_params()
         else:
@@ -2116,8 +2163,8 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             if params:
                 if hasattr(src, "params"):
                     src_params = src.params
-                elif 'params' in src:
-                    src_params = src['params']
+                elif "params" in src:
+                    src_params = src["params"]
                 else:
                     src_params = src
                 self.model.update_vars(src_params, verbose=verbose)
@@ -2178,7 +2225,7 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         # if verbose:
         #    print(f"Update params in {self}")
         if src is None:
-            src = self.get_params()
+            src = self.get_params_from_variables()
         elif hasattr(src, "params"):
             src = src.params
         if add:

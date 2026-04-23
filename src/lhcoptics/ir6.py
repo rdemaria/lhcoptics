@@ -131,10 +131,27 @@ class LHCIR6(LHCIR):
         )
         return tw["mux", ds], tw["muy", ds]
 
-    def get_params_from_twiss(self, tw1, tw2):
-        params = LHCIR.get_params_from_twiss(self, tw1, tw2)
 
-        muxmkdb1 = tw1["mux", "mkd.h5l6.b1"]
+    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init", verbose=False):
+        if tw1 is None:
+            if mode == "init":
+                tw1 = self.twiss_from_init(1, strengths=False)
+            elif mode == "full":
+                tw1 = self.twiss_full(1, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        if tw2 is None:
+            if mode == "init":
+                tw2 = self.twiss_from_init(2, strengths=False)
+            elif mode == "full":
+                tw2 = self.twiss_full(2, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        params = super().get_params_from_twiss(
+            tw1=tw1, tw2=tw2, mode=mode, verbose=verbose
+        )
+
+        muxmkdb1 = tw1.rows[r"mkd.h5l6.b1(..0)?"].mux[0]
         params["dmuxkickb1_tcsg"] = tw1["mux", "tcsp.a4r6.b1"] - muxmkdb1
         dmuxb1 = (
             np.array([tw1["mux", f"tcdqa.{abc}4r6.b1"] for abc in "abc"]) - muxmkdb1
@@ -152,18 +169,22 @@ class LHCIR6(LHCIR):
         params["betytcdsb1"] = tw1["bety", "tcdsa.4l6.b1"]
         params["betxtcsgb1"] = tw1["betx", "tcsp.a4r6.b1"]
         params["betytcsgb1"] = tw1["bety", "tcsp.a4r6.b1"]
-        params["betxmkdb1"] = tw1["betx", "mkd.h5l6.b1"]
-        params["betymkdb1"] = tw1["bety", "mkd.h5l6.b1"]
+        betxmkdb1 = tw1.rows[r"mkd.h5l6.b1(..0)?"].betx[0]
+        betymkdb1 = tw1.rows[r"mkd.h5l6.b1(..0)?"].bety[0]
+        params["betxmkdb1"] = betxmkdb1
+        params["betymkdb1"] = betymkdb1
         params["bxdumpb1"] = beta_dump(params["betxip6b1"], params["alfxip6b1"])
         params["bydumpb1"] = beta_dump(params["betyip6b1"], params["alfyip6b1"])
 
-        params["dmuxkickb1_bds"] = tw1["mux", "mkd.o5l6.b1"]
-        params["dmuxkickb1_bdsa"] = tw1["mux", "mkd.a5l6.b1"]
-        params["dmuxkickb1_eds"] = tw1["mux", "e.ds.r6.b1"] - tw1["mux", "mkd.o5l6.b1"]
+        muxmkdob1 = tw1.rows[r"mkd.o5l6.b1(..0)?"].mux[0]
+        muxmkdab1 = tw1.rows[r"mkd.a5l6.b1(..0)?"].mux[0]
+        params["dmuxkickb1_bds"] = muxmkdob1
+        params["dmuxkickb1_bdsa"] = muxmkdab1
+        params["dmuxkickb1_eds"] = tw1["mux", "e.ds.r6.b1"] - muxmkdob1
         params["tcdqmingapb1"] = tcdq_mingap(params["betxtcdqb1"], params["dxtcdqb1"])
         params["tcdqgapb1"] = tcdq_gap(params["betxtcdqb1"])
 
-        muxmkdb2 = tw2["mux", "mkd.h5r6.b2"]
+        muxmkdb2 = tw2.rows[r"mkd.h5r6.b2(..0)?"].mux[0]
         params["dmuxkickb2_tcsg"] = tw2["mux", "tcsp.a4l6.b2"] - muxmkdb2
         dmuxb2 = muxmkdb2 - np.array(
             [tw2["mux", f"tcdqa.{abc}4l6.b2"] for abc in "abc"]
@@ -181,14 +202,18 @@ class LHCIR6(LHCIR):
         params["betytcdsb2"] = tw2["bety", "tcdsa.4r6.b2"]
         params["betxtcsgb2"] = tw2["betx", "tcsp.a4l6.b2"]
         params["betytcsgb2"] = tw2["bety", "tcsp.a4l6.b2"]
-        params["betxmkdb2"] = tw2["betx", "mkd.h5r6.b2"]
-        params["betymkdb2"] = tw2["bety", "mkd.h5r6.b2"]
+        betxmkdb2 = tw2.rows[r"mkd.h5r6.b2(..0)?"].betx[0]
+        betymkdb2 = tw2.rows[r"mkd.h5r6.b2(..0)?"].bety[0]
+        params["betxmkdb2"] = betxmkdb2
+        params["betymkdb2"] = betymkdb2
         params["bxdumpb2"] = beta_dump(params["betxip6b2"], params["alfxip6b2"])
         params["bydumpb2"] = beta_dump(params["betyip6b2"], params["alfyip6b2"])
 
-        params["dmuxkickb2_bds"] = tw2["mux", "mkd.o5r6.b2"]
-        params["dmuxkickb2_bdsa"] = tw2["mux", "mkd.a5r6.b2"]
-        params["dmuxkickb2_eds"] = tw2["mux", "e.ds.r6.b2"] - tw2["mux", "mkd.o5r6.b2"]
+        muxmkdob2 = tw2.rows[r"mkd.o5r6.b2(..0)?"].mux[0]
+        muxmkdab2 = tw2.rows[r"mkd.a5r6.b2(..0)?"].mux[0]
+        params["dmuxkickb2_bds"] = muxmkdob2
+        params["dmuxkickb2_bdsa"] = muxmkdab2
+        params["dmuxkickb2_eds"] = tw2["mux", "e.ds.r6.b2"] - muxmkdob2
         params["tcdqmingapb2"] = tcdq_mingap(params["betxtcdqb2"], params["dxtcdqb2"])
         params["tcdqgapb2"] = tcdq_gap(params["betxtcdqb2"])
         return params

@@ -10,11 +10,11 @@ from .arcs import LHCArc
 from .circuits import LHCCircuits, LHCCalibration, LHCCircuit, LHCCircuit2in1
 from .lsa_util import get_lsa
 from .nxcals_util import get_spark, get_nxcals, NXCals
-from .ir1 import LHCIR1
+from .ir15 import LHCIR1
 from .ir2 import LHCIR2
 from .ir3 import LHCIR3
 from .ir4 import LHCIR4
-from .ir5 import LHCIR5
+from .ir15 import LHCIR5
 from .ir6 import LHCIR6
 from .ir7 import LHCIR7
 from .ir8 import LHCIR8

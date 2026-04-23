@@ -432,9 +432,12 @@ class LHCXsuiteModel:
         {"name": r"mqs.*", "num_kicks": 2},
     ]
     @staticmethod
-    def _configure_sequence(lhc, variant):
+    def _configure_sequence(lhc, variant, verbose=False):
+        if verbose:
+            print(f"Configuring sequence in Xsuite for variant = {variant}")
         if variant.startswith("hl"):
-            print("Configuring sequence in Xsuite...")
+            if verbose:
+                print("Setting rbend models")
             for nn in list(lhc.elements.keys()):
                 if hasattr(lhc.elements[nn], "k0_from_h"):
                     lhc.elements[nn].k0_from_h = False
@@ -446,12 +449,18 @@ class LHCXsuiteModel:
             config_rbend_ir4(lhc)
             config_rbend_ir7(lhc)
         if "p0c" not in lhc:
+            if verbose:
+                print("Setting reference energy if not already set")
             lhc["p0c"] = 450e9
+        if verbose:
+            print("Setting reference particles for b1 and b2")
         lhc.new_particle("particle_ref_b1", p0c="p0c")
         lhc.new_particle("particle_ref_b2", p0c="p0c")
         lhc.b1.set_particle_ref("particle_ref_b1")
         lhc.b2.set_particle_ref("particle_ref_b2")
 
+        if verbose:
+            print("Setting twiss defaults for all lines")
         for ll in lhc.lines.values():
             ll.twiss_default["method"] = "4d"
             ll.twiss_default["co_search_at"] = "ip7"
@@ -460,7 +469,10 @@ class LHCXsuiteModel:
             if "b2" in ll.name:
                 ll.twiss_default["reverse"] = True
 
+        if verbose:
+            print("Setting RF voltages")
         lhc["lagrf400.b1"] = 0.5
+        lhc["lagrf400.b2"] = 0 # mind the change due to MAD-X bv convention
         lhc["vrf400"] = 6.5
 
     def __init__(
@@ -517,26 +529,31 @@ class LHCXsuiteModel:
         return cls(env=env, madxfile=madxfile)
 
     @classmethod
-    def from_madx_sequence(cls, filename):
+    def from_madx_sequence(cls, filename, verbose=False):
         """Create an `LHCXsuiteModel` from a MAD-X sequence file."""
+        if verbose:
+            print(f"Loading MAD-X sequence from {filename!r} into Xsuite...")
+            print("Lower case eveything and set at= to at:=")
         seq_text = open(filename).read().lower()
-        # Recover expressions in at arguments of the sequences
         assert " at=" in seq_text
         assert ",at=" not in seq_text
         assert "at =" not in seq_text
         seq_text = seq_text.replace(" at=", "at:=")
 
-        # Rename sequences
+        if verbose:
+            print("Renaming sequences from LHCB1 and LHCB2 to b1 and b2...")
         assert "LHCB1" not in seq_text
         assert "LHCB2" not in seq_text
         seq_text = seq_text.replace("lhcb1", "b1")
         seq_text = seq_text.replace("lhcb2", "b2")
 
+        if verbose:
+            print("Loading sequence into Xsuite using native loader and reverse_lines for b2...")
         lhc = xt.load(
             string=seq_text, format="madx", reverse_lines=["b2"], _rbend_correct_k0=True
         )
         model = cls(env=lhc)
-        cls._configure_sequence(lhc,model.get_variant())
+        cls._configure_sequence(lhc,model.get_variant(),verbose=verbose)
         return model
 
     @classmethod
@@ -550,27 +567,32 @@ class LHCXsuiteModel:
         return model
 
     @classmethod
-    def make_json_from_sequence(cls, sequencefile, jsonfile):
-        print("Loading sequence into Xsuite...")
-        model = cls.from_madx_sequence(sequencefile)
+    def make_json_from_sequence(cls, sequencefile, jsonfile, verbose=False):
+        if verbose:
+            print("Loading sequence into Xsuite...")
+        model = cls.from_madx_sequence(sequencefile, verbose=verbose)
         lhc = model.env
-        print(f"Saving JSON model to {jsonfile!r}...")
+        if verbose:
+            print(f"Saving JSON model to {jsonfile!r}...")
         lhc.to_json(jsonfile)
 
         jsonfile = Path(jsonfile)
         thin_jsonfile = jsonfile.with_name(jsonfile.stem + "_thin.json")
-        print(f"Creating and saving thin JSON model to {thin_jsonfile!r}...")
-        cls.make_thin_env(lhc).to_json(thin_jsonfile)
+        if verbose:
+            print(f"Creating and saving thin JSON model to {thin_jsonfile!s}...")
+        cls.make_thin_env(lhc, verbose=verbose).to_json(thin_jsonfile)
 
     @classmethod
-    def make_thin_env(cls, env):
+    def make_thin_env(cls, env, verbose=False):
         slicing_strategies = [xt.Strategy(None)]  # By default leave untouched
         for config in cls.slicing_recipe:
+            if verbose:
+                print(f"Slicing according to {config!r}...")
             if "element_type" in config:
-                cls = getattr(xt, config["element_type"])
+                ecls = getattr(xt, config["element_type"])
                 num_kicks = config["num_kicks"]
                 slicing_strategies.append(
-                    xt.Strategy(element_type=cls, slicing=xt.Teapot(num_kicks))
+                    xt.Strategy(element_type=ecls, slicing=xt.Teapot(num_kicks))
                 )
             elif "name" in config:
                 name = config["name"]

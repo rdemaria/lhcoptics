@@ -10,14 +10,6 @@ HL_DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data" / "hl
 LHC_DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data" / "lhc"
 
 
-def load_optics(data_dir, circuits):
-    return LHCOptics.from_xsuite(
-        xt.load(str(data_dir / "lhc.json")),
-        variant="hl",
-        knob_structure=str(data_dir / "knobs.yaml"),
-        circuits=circuits,
-    )
-
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -44,33 +36,25 @@ def pytest_collection_modifyitems(config, items):
         config.hook.pytest_deselected(items=deselected)
         items[:] = selected
 
-@pytest.fixture
-def fresh_optics_hl(hllhc_data_dir, circuits_hl):
-    return load_optics(hllhc_data_dir, circuits_hl)
-
+@pytest.fixture(scope="session")
+def circuits_hl():
+    return LHCCircuits.from_json(str(HL_DATA_DIR / "lhccircuits.json"))
 
 @pytest.fixture(scope="session")
-def hllhc_data_dir():
-    return HL_DATA_DIR
+def circuits_lhc():
+    return LHCCircuits.from_json(str(LHC_DATA_DIR / "lhccircuits.json"))
 
 @pytest.fixture(scope="session")
-def lhc_data_dir():
-    return LHC_DATA_DIR
+def xsuite_model_hl():
+    lhc=xt.load(str(HL_DATA_DIR / "lhc.json"))
+    lhc.vars.load(str(HL_DATA_DIR / "optics.madx"))
+    return LHCXsuiteModel(lhc)
 
 @pytest.fixture(scope="session")
-def circuits_hl(hllhc_data_dir):
-    return LHCCircuits.from_json(str(hllhc_data_dir / "lhccircuits.json"))
+def optics_hl(xsuite_model_hl, circuits_hl):
+    return LHCOptics.from_model(xsuite_model_hl, circuits=circuits_hl)
 
 @pytest.fixture(scope="session")
-def optics_hl(hllhc_data_dir, circuits_hl):
-    return load_optics(hllhc_data_dir, circuits_hl)
+def madx_optics_hl():
+    return HL_DATA_DIR/"optics.madx"
 
-
-@pytest.fixture(scope="session")
-def model_xsuite_hl():
-    return LHCXsuiteModel.from_json(HL_DATA_DIR / "lhc.json")
-
-
-@pytest.fixture(scope="session")
-def optics_lhc(lhc_data_dir):
-    return load_optics(lhc_data_dir, None)

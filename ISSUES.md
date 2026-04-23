@@ -1,8 +1,7 @@
 # Issues
 
 Fixes:
-- verify new to_madx in hl
-- verify loading run 3
+- verify loading run 3, add particles to json in acc-models Run 3
 - madx optics, json_thin -> LHCOptics -> match -> check
 
 - add i_mo, on_mo knobs
