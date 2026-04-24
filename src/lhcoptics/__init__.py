@@ -63,4 +63,4 @@ __all__ = [
     "unixtime_to_string",
     "xmltodict",
 ]
-__version__ = "0.0.6"
+__version__ = "0.0.7"
