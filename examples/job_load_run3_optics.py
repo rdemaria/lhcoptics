@@ -34,3 +34,11 @@ opt.set_xsuite_model(mx)
 opt.check_data()
 #opt.plot(yl='x y')
 
+#
+mxm=LHCXsuiteModel.from_cpymad(mm.madx)
+mxm2=LHCXsuiteModel(mxm.env.copy())
+
+opt=LHCOptics.from_model(mm,attach_model=False)
+opt.set_xsuite_model(mxm2)
+
+
