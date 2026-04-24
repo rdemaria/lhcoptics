@@ -2,13 +2,13 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 [major|minor|bug]" >&2
+  echo "Usage: $0 [major|minor|bug|patch|current]" >&2
   exit 1
 }
 
 BUMP=${1:-}
 case "$BUMP" in
-  major|minor|bug|patch) ;;
+  major|minor|bug|patch|current) ;;
   *) usage ;;
 esac
 [ "$BUMP" = "patch" ] && BUMP="bug"
@@ -53,17 +53,20 @@ match = re.search(
 if not match:
     raise SystemExit(f"Could not find __version__ in {init_py}")
 ver = match.group(1)
-major, minor, patch = map(int, ver.split("."))
-if bump == "major":
-    major += 1
-    minor = 0
-    patch = 0
-elif bump == "minor":
-    minor += 1
-    patch = 0
+if bump == "current":
+    new_ver = ver
 else:
-    patch += 1
-new_ver = f"{major}.{minor}.{patch}"
+    major, minor, patch = map(int, ver.split("."))
+    if bump == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump == "minor":
+        minor += 1
+        patch = 0
+    else:
+        patch += 1
+    new_ver = f"{major}.{minor}.{patch}"
 
 init_text = re.sub(
     r'(?m)^(__version__\s*=\s*["\'])[^"\']+(["\'])',
@@ -98,8 +101,10 @@ fi
 
 rm -rf dist/ *.egg-info
 
-git add pyproject.toml src/lhcoptics/__init__.py
-git commit -m "Release v$NEW_VER"
+if [ "$BUMP" != "current" ]; then
+  git add pyproject.toml src/lhcoptics/__init__.py
+  git commit -m "Release v$NEW_VER"
+fi
 
 echo "Building distribution..."
 python -m build
