@@ -905,6 +905,37 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             if sum(map(abs, knob.weights.values())) == 0
         }
 
+    def _get_section_src(self, src, section, index, verbose=False):
+        if src is None:
+            if verbose:
+                print(f"No source provided for {section.name}")
+            return None
+        if hasattr(src, section.name):
+            if verbose:
+                print(f"Using attribute {section.name!r} from {src} for {section.name}")
+            return getattr(src, section.name)
+        if isinstance(src, dict):
+            if section.name in src:
+                if verbose:
+                    print(f"Using dict key {section.name!r} for {section.name}")
+                return src[section.name]
+            if section in self.irs and "irs" in src:
+                if verbose:
+                    print(f"Using serialized irs[{index}] for {section.name}")
+                return src["irs"][index]
+            if section in self.arcs and "arcs" in src:
+                arc_index = index - len(self.irs)
+                if verbose:
+                    print(f"Using serialized arcs[{arc_index}] for {section.name}")
+                return src["arcs"][arc_index]
+            if any(key in src for key in ("params", "knobs", "irs", "arcs")):
+                if verbose:
+                    print(f"No section source found for {section.name} in structured dict")
+                return None
+        if verbose:
+            print(f"Using flat source {src} for {section.name}")
+        return src
+
     def get(self, k, default=None, full=True):
         """
         Get a parameter, strengths or knobs from the optics or its sections.
@@ -2012,23 +2043,11 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                         strengths=strengths,
                     )
             else:
-                for ss in self.irs + self.arcs:
-                    if hasattr(src, ss.name):
-                        src_ss = getattr(src, ss.name)
+                for index, ss in enumerate(self.irs + self.arcs):
+                    src_ss = self._get_section_src(src, ss, index, verbose=verbose)
+                    if src_ss is not None:
                         if verbose:
-                            print(f"Update {ss.name} from {src}.{ss.name}")
-                        ss.update(
-                            src=src_ss,
-                            verbose=verbose,
-                            add_params=add_params,
-                            knobs=knobs,
-                            params=params,
-                            strengths=strengths,
-                        )
-                    elif ss.name in src:
-                        src_ss = src[ss.name]
-                        if verbose:
-                            print(f"Update {ss.name} from {src}[{ss.name}]")
+                            print(f"Update {ss.name} from {src}")
                         ss.update(
                             src=src_ss,
                             verbose=verbose,
@@ -2049,17 +2068,21 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         """
         if src is None:
             src = self.model
-        if hasattr(src, "knobs"):
-            knobs_dict = src.knobs
-        elif hasattr(src, "get_knob"):
-            knobs_dict = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
-        elif src == "default":
+        if src == "default":
             if verbose:
                 print("Update knobs from default list")
             knobs_dict = {
                 k: self.model.get_knob_by_probing(k)
                 for k in self.gen_knob_names(full=False)
             }
+        elif hasattr(src, "knobs"):
+            knobs_dict = src.knobs
+        elif isinstance(src, dict) and "knobs" in src:
+            knobs_dict = src["knobs"]
+        elif hasattr(src, "get_knob"):
+            knobs_dict = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
+        else:
+            knobs_dict = src
         for k in self.knobs:
             if k in knobs_dict:
                 if verbose:
@@ -2067,15 +2090,10 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 self.knobs[k] = Knob.from_src(knobs_dict[k])
                 self.knobs[k].parent = self
         if full:
-            for ss in self.irs + self.arcs:
-                if hasattr(src, ss.name):
-                    src_ss = getattr(src, ss.name)
+            for index, ss in enumerate(self.irs + self.arcs):
+                src_ss = self._get_section_src(src, ss, index, verbose=verbose)
+                if src_ss is not None:
                     ss.update_knobs(src=src_ss, verbose=verbose)
-                elif ss.name in src:
-                    src_ss = src[ss.name]
-                    ss.update_knobs(src=src_ss, verbose=verbose)
-                else:
-                    ss.update_knobs(src=src, verbose=verbose)
         return self
 
     def update_model(
@@ -2097,26 +2115,24 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             raise ValueError("Model not set")
         if is_madx_optics(src):
             self.model.update_from_madx_optics(src, knobs=self.knobs, verbose=verbose)
-        elif src is None:
-            src = self
+        else:
+            if src is None:
+                src = self
             if params:
                 if hasattr(src, "params"):
                     src_params = src.params
-                elif "params" in src:
+                elif isinstance(src, dict) and "params" in src:
                     src_params = src["params"]
                 else:
                     src_params = src
                 self.model.update_vars(src_params, verbose=verbose)
             if full:
-                for ss in self.irs + self.arcs:
-                    if hasattr(src, ss.name):
-                        src_ss = getattr(src, ss.name)
-                        lbl = f"{src}.{ss.name}"
-                    elif ss.name in src:
-                        src_ss = src[ss.name]
-                        lbl = f"{src}[{ss.name!r}]"
+                for index, ss in enumerate(self.irs + self.arcs):
+                    src_ss = self._get_section_src(src, ss, index, verbose=verbose)
+                    if src_ss is None:
+                        continue
                     if verbose:
-                        print(f"Update strengths and knobs in {ss.name!r} from {lbl}")
+                        print(f"Update strengths and knobs in {ss.name!r}")
                     ss.update_model(
                         src=src_ss,
                         verbose=verbose,
@@ -2126,11 +2142,17 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                         params=params,
                     )
             # knobs must be updated after the strengths
+            if hasattr(src, "knobs"):
+                src_knobs = src.knobs
+            elif isinstance(src, dict) and "knobs" in src:
+                src_knobs = src["knobs"]
+            else:
+                src_knobs = {}
             if knobs == "create":
                 if verbose:
                     print(f"Update knobs from {src}")
                 self.model.create_knobs(
-                    src.knobs,
+                    src_knobs,
                     verbose=verbose,
                     set_value=set_knob_values,
                 )
@@ -2138,7 +2160,7 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 if verbose:
                     print(f"Update knobs from {src}")
                 self.model.update_knobs(
-                    src.knobs,
+                    src_knobs,
                     verbose=verbose,
                     set_value=set_knob_values,
                 )
@@ -2163,10 +2185,14 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         """
         # if verbose:
         #    print(f"Update params in {self}")
+        original_src = src
         if src is None:
             src = self.get_params_from_variables()
+            original_src = src
         elif hasattr(src, "params"):
             src = src.params
+        elif isinstance(src, dict) and "params" in src:
+            src = src["params"]
         if add:
             self.params.update(src)
         else:
@@ -2178,9 +2204,10 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                         )
                     self.params[k] = src[k]
         if full:
-            for ss in self.irs + self.arcs:
+            for index, ss in enumerate(self.irs + self.arcs):
                 # if verbose:
                 # print(f"Update params in {ss}")
-                ssrc = src.get(ss.name)
-                ss.update_params(ssrc, verbose=verbose, add=add)
+                ssrc = self._get_section_src(original_src, ss, index, verbose=verbose)
+                if ssrc is not None:
+                    ss.update_params(ssrc, verbose=verbose, add=add)
         return self

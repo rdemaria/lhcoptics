@@ -1647,13 +1647,16 @@ class LHCXsuiteModel:
         return init
 
     def twiss_open(self, start, end, init, beam, strengths=True, chrom=False):
-        return self.sequence[beam].twiss(
+        tw=self.sequence[beam].twiss(
             start=start,
             end=end,
             init=init,
             strengths=strengths,
             compute_chromatic_properties=chrom,
         )
+        tw.qx = (tw.mux[-1] - tw.mux[0])
+        tw.qy = (tw.muy[-1] - tw.muy[0])
+        return tw
 
     def update(self, src, knobs_check=True):
         if hasattr(src, "strengths"):

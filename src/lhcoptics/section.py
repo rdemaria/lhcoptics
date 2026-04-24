@@ -411,6 +411,8 @@ class LHCSection:
             src = {k: src.get_knob(knob) for k, knob in self.knobs.items()}
         elif hasattr(src, "knobs"):
             src = src.knobs
+        elif isinstance(src, dict) and "knobs" in src:
+            src = src["knobs"]
         for k in self.knobs:
             if k in src:
                 if verbose:
@@ -487,6 +489,8 @@ class LHCSection:
             src = self.get_params_from_variables()
         elif hasattr(src, "params"):
             src = src.params
+        elif isinstance(src, dict) and "params" in src:
+            src = src["params"]
         if hasattr(self, "irn"):
             filter = filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
         else:
@@ -526,6 +530,8 @@ class LHCSection:
             src = self.model
         elif hasattr(src, "strengths"):
             src = src.strengths
+        elif isinstance(src, dict) and "strengths" in src:
+            src = src["strengths"]
         if hasattr(self, "irn"):
             filter = filter_lrb12(self.irn, left=left, right=right, b1=b1, b2=b2)
         else:

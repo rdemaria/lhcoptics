@@ -145,6 +145,17 @@ class LHCIR(LHCSection):
         self.startb12 = (self.startb1, self.startb2)
         self.endb12 = (self.endb1, self.endb2)
 
+    def copy(self):
+        return self.__class__(
+            name=self.name,
+            strengths=self.strengths.copy(),
+            params=self.params.copy(),
+            knobs={k: knob.copy() for k, knob in self.knobs.items()},
+            parent=self.parent,
+            filename=self.filename,
+            variant=self.variant,
+        )
+
     def __getitem__(self, key):
         if re.match(r"kqx[123]\.[lr]", key):
             return self.get_kqx(int(key[3]), key[-2])
