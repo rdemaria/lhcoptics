@@ -7,3 +7,5 @@ dist
 *.json
 acc-models-lhc
 .ipynb_checkpoints
+.codex
+*.swp
