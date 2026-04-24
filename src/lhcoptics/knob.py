@@ -1,5 +1,4 @@
 import re
-from tabnanny import verbose
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -370,8 +369,8 @@ class IPKnob(Knob):
             expected = {(col, f"ip{ip}"): 0 for ip in range(1, 9) for col in cols}
             expected[self.xy, ipname] = self.specs[self.xy + self.beams[0]] * test_value
             for (col, ips), vv in expected.items():
-                xpx_threshold = threshold if col in ["x", "y"] else threshold / 100
-                if abs(tw[col, ips] - vv) > threshold:
+                limit = threshold if col in ["x", "y"] else threshold / 100
+                if abs(tw[col, ips] - vv) > limit:
                     msg.append(
                         f"Error: {col} at {ips} = {tw[col, ips]:23.15g} != {vv:23.15g}"
                     )
@@ -450,7 +449,7 @@ class IPKnob(Knob):
         names = self.get_weight_knob_names()
         names = [k for k in names if self.weights[k.split("_from_")[0]] != 0]
         names = [k for k in names if not k in self.const]
-        names = [k for k in names if k.startswith(f"acb")]
+        names = [k for k in names if k.startswith("acb")]
         varyb1 = [xt.Vary(wn, step=self.step) for wn in names if "b1" in wn]
         varyb2 = [xt.Vary(wn, step=self.step) for wn in names if "b2" in wn]
         varycmn = [
@@ -1251,7 +1250,7 @@ class DispKnob(Knob):
         print(f"  Correcting for {self.ipknobname!r}")
         print(f"  Match value: {self.match_value}")
         print(f"  Boundaries: {self.st_left}, {self.st_right}")
-        print(f"  Weights:")
+        print("  Weights:")
         for k, v in self.weights.items():
             if v != 0:
                 print(f"    {k}: {v}")

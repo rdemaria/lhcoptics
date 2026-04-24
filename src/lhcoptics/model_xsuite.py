@@ -258,9 +258,9 @@ def config_rbend_ir7(lhc):
     for side in ("r7", "l7"):
         for section in "abcd":
             if section in "ab":
-                k0 = lhc.ref[f"kd34.lr7"] + lhc.ref[f"e_kd3.{side}"]
+                k0 = lhc.ref["kd34.lr7"] + lhc.ref[f"e_kd3.{side}"]
             else:
-                k0 = -lhc.ref[f"kd34.lr7"] - lhc.ref[f"e_kd4.{side}"]
+                k0 = -lhc.ref["kd34.lr7"] - lhc.ref[f"e_kd4.{side}"]
             prefix = f"{section}6{side}"
             angle_ref = lhc.ref[f"abw.{prefix}"]
             angle_diff_ref = lhc.ref[f"adiff.bw.{prefix}"]
@@ -280,9 +280,9 @@ def config_rbend_ir3(lhc):
     for side in ("r3", "l3"):
         for section in "abcdef":
             if section in "abc":
-                k0 = -lhc.ref[f"kd34.lr3"] - lhc.ref[f"e_kd3.{side}"]
+                k0 = -lhc.ref["kd34.lr3"] - lhc.ref[f"e_kd3.{side}"]
             else:
-                k0 = lhc.ref[f"kd34.lr3"] + lhc.ref[f"e_kd4.{side}"]
+                k0 = lhc.ref["kd34.lr3"] + lhc.ref[f"e_kd4.{side}"]
             prefix = f"{section}6{side}"
             angle_ref = lhc.ref[f"abw.{prefix}"]
             angle_diff_ref = lhc.ref[f"adiff.bw.{prefix}"]
@@ -759,7 +759,7 @@ class LHCXsuiteModel:
         eds = "e.ds.l4.b1"
         print(f"match {ipl} left from {eds} to {ipl}")
         lhc.b1.match(
-            vary=xt.VaryList([f"kd3.l4", f"kd4.l4"], step=1e-12),
+            vary=xt.VaryList(["kd3.l4", "kd4.l4"], step=1e-12),
             targets=xt.TargetSet(at=ipl, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
@@ -773,7 +773,7 @@ class LHCXsuiteModel:
         sds = "s.ds.r4.b1"
         print(f"match {ipr} right from {ipr} to {sds}")
         lhc.b1.match(
-            vary=xt.VaryList([f"kd3.r4", f"kd4.r4"], step=1e-12),
+            vary=xt.VaryList(["kd3.r4", "kd4.r4"], step=1e-12),
             targets=xt.TargetSet(at=sds, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
@@ -939,6 +939,7 @@ class LHCXsuiteModel:
         )
         if line.element_names[0] != "ip1":
             line.cycle("ip1", inplace=True)
+        return cmin.real, cmin.imag
 
     def get_knob(self, knob):
         value = self._var_values[knob.name]
@@ -989,7 +990,6 @@ class LHCXsuiteModel:
             return Knob(name, value=0.0, weights={}, variant=variant).specialize()
         ref = self.env.ref[name]
         weight_names = [item._key for item in mgr.rdeps[ref]]
-        var_values = self._var_values
         weights = {}
         tasks = mgr.tasks
         for wname in weight_names:
@@ -1295,7 +1295,7 @@ class LHCXsuiteModel:
                 f"e_kd3.r{ipn}",
                 f"e_kd4.r{ipn}",
             ]
-        var_names += [f"kd3.l4", f"kd4.l4", f"kd3.r4", f"kd4.r4"]
+        var_names += ["kd3.l4", "kd4.l4", "kd3.r4", "kd4.r4"]
         return {var_name: float(lhc[var_name]) for var_name in var_names}
 
     def match_w(self, beam=None, target="triplet", k2max=0.42, verbose=True):

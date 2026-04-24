@@ -5,7 +5,6 @@ from .irs import (
     gen_acb_full_names,
     gen_acbx_names,
     gen_crab_names,
-    gen_param_names,
     gen_qq,
     gen_qt,
     gen_qtl,

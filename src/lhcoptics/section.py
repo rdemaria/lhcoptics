@@ -124,6 +124,7 @@ class LHCSection:
         self.parent = parent
         self.filename = filename
         self._model = None
+        self._circuits = None
 
     @classmethod
     def from_dict(cls, data, filename=None, variant=None):
@@ -182,10 +183,11 @@ class LHCSection:
 
     @property
     def circuits(self):
-        if hasattr(self, "circuits"):
-            return self.circuits
-        else:
-            return self.parent.circuits
+        if self._circuits is not None:
+            return self._circuits
+        if self.parent is None:
+            return None
+        return self.parent.circuits
 
     @property
     def model(self):
@@ -255,9 +257,9 @@ class LHCSection:
         return ()
 
     def get_current(self, kname, p0c=7e12):
-        if self.parent.circuit is None:
-            raise ValueError("Circuit not set")
-        return self.parent.circuit.get_current(kname, self[kname], p0c)
+        if self.circuits is None:
+            raise ValueError("Circuits not set")
+        return self.circuits.get_current(kname, self[kname], p0c)
 
     def get_match(self):
         mtc = self.match(verbose=False, solve=False)

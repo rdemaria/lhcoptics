@@ -2,9 +2,8 @@ import re
 
 import numpy as np
 import xtrack as xt
-import matplotlib.pyplot as plt
 
-from .section import LHCSection, lhcprev, lhcsucc, sort_n
+from .section import LHCSection, lhcprev, lhcsucc
 from .utils import match_compare_log
 
 

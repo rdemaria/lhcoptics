@@ -2,7 +2,6 @@ import numpy as np
 
 import xtrack as xt
 
-from .model_xsuite import LHCMadxModel
 from .section import LHCSection, gen_acb_alt_names
 from .utils import match_compare_log
 
@@ -31,7 +30,6 @@ class LHCArc(LHCSection):
             name = cls.name
         if variant is None:
             variant = model.get_variant()
-        i1, i2 = int(name[1]), int(name[2])
         arc = cls(name=name, strengths={}, params={}, knobs={}, variant=variant)
         knobs = model.make_and_set0_knobs(
             knob_names=arc.gen_knob_names(), variant=variant
@@ -488,10 +486,6 @@ class LHCArc(LHCSection):
             res["muy"] = res["muy"] - res["muy", start_arc]
 
             return res
-
-
-class LHCA12(LHCArc):
-    name = "a12"
 
 
 class LHCA12(LHCArc):

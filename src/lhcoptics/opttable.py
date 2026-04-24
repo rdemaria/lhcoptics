@@ -80,15 +80,18 @@ class LHCSectionTable:
         self.rows.append(row)
         return self
 
-    def append_from_madxfile(self, filename):
+    def append_from_madx_optics(self, filename):
         row0 = self.rows[0]
-        row = row0.__class__.from_madxfile(
+        row = row0.__class__.from_madx_optics(
             filename,
             name=row0.name,
             variant=row0.variant,
         )
         self.rows.append(row)
         return self
+
+    def append_from_madxfile(self, filename):
+        return self.append_from_madx_optics(filename)
 
     def extend(self, rows):
         self.rows.extend(rows)
@@ -447,6 +450,15 @@ class LHCArcTable(LHCSectionTable):
 
 
 class LHCOpticsTable(LHCSectionTable):
+    def append_from_madx_optics(self, filename):
+        row0 = self.rows[0]
+        row = row0.__class__.from_madx_optics(
+            filename,
+            name=row0.name,
+        )
+        self.rows.append(row)
+        return self
+
     def tab_from_lsa(self, beamprocess, parameters=None):
         if parameters is None:
             parameters = ["LHCBEAM/MOMENTUM"]

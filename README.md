@@ -11,40 +11,40 @@ pip install -e .
 
 Usage:
 ```
-from lhcoptics import LHC
-inj=LHC().y2025.pp.ramp[0].plot()
+from lhcoptics import LHCDev
+inj = LHCDev().y2025.pp.ramp[0].plot()
 ```
 
 ## Documentation
 
 The package consists of the following main components:
-- `LHC`: Manages the acc-models-lhc LHC optics repository, allowing access to different LHC optics configurations.
+- `LHCDev`: Manages local acc-models-lhc branches and tags, allowing access to different LHC optics configurations.
 - `LHCRepo`: Manages a branch or tag of the LHC optics repository.
 - `LHCCycle`: Manages a LHC cycle, including the LHC optics and the LHC beam.
 - `LHCProcess`: Manages a LHC beam process: a list of LHC optics and a settings parametrized by time.
 - `LHCOptics`: An optics configuration consisting of strengths, knobs and parameters.
 
-Example: plot the IR1 optics in the first step the ramp process of the 2055 proton-proton cycle
+Example: plot the IR1 optics in the first step the ramp process of the 2025 proton-proton cycle
 
 ```
-from lhcoptics import LHC
-LHC().y2025.pp.ramp[0].ir1.plot()
+from lhcoptics import LHCDev
+LHCDev().y2025.pp.ramp[0].ir1.plot()
 ```
 
 
 
-## LHC
-The `LHC` class is responsible for managing the LHC optics repository. It provides functionality to extract branches or tags from the repository and store local copies of the optics. The class also includes mechanisms to regularly check branches for updates.
+## LHCDev
+The `LHCDev` class is responsible for managing local copies of the LHC optics repository. It provides functionality to extract branches or tags from the repository and store local copies of the optics. The class also includes mechanisms to regularly check branches for updates.
 
 The class stores data locally, by default in Python user site, or using the environment variable `LHCOPTICS_BASEDIR`. The Git repository URL can also be customized by `LHCOPTICS_GIT_URL`.
 
 Usage:
 ```
-from lhcoptics import LHC
-# initialize LHC instance repository
+from lhcoptics import LHCDev
+# initialize LHCDev instance repository
 # create a directory if it doesn't exist
 # check gitlab for newer versions
-lhc = LHC()
+lhc = LHCDev()
 # for a check gitlab for updates
 lhc.check_local_branches()
 # list of branches
@@ -61,12 +61,11 @@ lhc.y2025
 An `LHCOptics` contains data for specifying a full LHC Optics. It contains global params and knobs and a list of LHC sections (`ir1`, `ir2`, ... , `ir8`, `a12`, `a23`, ..., `a78`) that contains strengths, local params and local knobs. The optics can contain a `model` that allows to compute twiss, plot and rematch the optics.
 
 Methods:
-- `LHCOptics.set_repository(branch)`: Create a link or a directory `acc-models-lhc` in the local directory from `gitlab.cern.ch/acc-models/acc-models-lhc` if it does not exists. Branch are `2024`, `hl16` etc. If `$HOME/local/acc-models-lhc/branch` exists, a symlink to this directory is created, else the a full git clone is done.
-
 - `LHCOptics.from_json(filename)`: Create optics from a json file
 - `LHCOptics.from_dict(dct)`: Create optics from a dict containing strengths, paramns and knobs, irs and arcs dict
-- `LHCOptics.from_madx(filename,model)`: Create optics from a madx istance by extracting strengths, params and knobs from variables. If model is 'madx' or 'xsuite' it will attach the model to the optics
-- `LHCOptics.from_madxfile(madxfile)`: As before, but creating a madx instance from a madx script
+- `LHCOptics.from_cpymad(madx)`: Create optics from a cpymad instance by extracting strengths, params and knobs from variables
+- `LHCOptics.from_madx_scripts(*madxfiles)`: Create optics from one or more MAD-X scripts
+- `LHCOptics.from_madx_optics(filename)`: Create optics from a MAD-X optics file
 
 
 ## LHC section methods
@@ -75,8 +74,9 @@ An `LHCSection`  is indentified by name, start, end, strengths, params and knobs
 Methods:
 - `cls.from_json(filename)`: Create section  from a json file
 - `cls.from_dict(dct)`: Create section from a dict containing strengths, paramns and knobs
-- `cls.from_madxfile(filename)`: Create section from a madx file
-- `cls.from_madx(madx)`: Create section from a madx instance
+- `cls.from_cpymad(madx)`: Create section from a cpymad instance
+- `cls.from_madx_scripts(*filenames)`: Create section from one or more MAD-X scripts
+- `cls.from_madx_optics(filename)`: Create section from a MAD-X optics file
 - `to_json(filename)`: Save section to a json file
 - `to_dict()`: Save section to a dict
 - `to_madx(filename,dst)`: Save section to dst which could be `str`, filename, a madx instance, an open file.

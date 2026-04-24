@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .lsa_util import get_lsa
-from .utils import read_json
+from .utils import read_json, write_json
 # from .nxcals_util import get_nxcals
 
 
@@ -455,8 +455,7 @@ class LHCCircuits:
         }
 
     def to_json(self, filename):
-        with open(filename, "w") as f:
-            json.dump(self.to_dict(), f, indent=2)
+        write_json(self.to_dict(), filename)
         return self
 
     def get_2in1(self, madname=None, logicalname=None):

@@ -40,6 +40,8 @@ from .utils import (
     git_push,
     unixtime_to_string,
 )
+import datetime
+
 
 P_MASS = 0.938272046e9  # proton mass in eV/c2
 
@@ -69,6 +71,47 @@ def check_repobasedir(basedir):
         else:
             raise ValueError(f"Repository {basedir} does not exists.")
     return basedir
+
+
+def save_tfs(twiss_folder,tag, lname, tw, env, config):
+        from xtrack import Table
+        tw_include_cols = [
+            'name', 's', 'element_type', 'length',
+            'betx', 'bety', 'alfx', 'alfy', 'gamx', 'gamy',
+            'dx', 'dpx', 'dy', 'dpy',
+            'mux', 'muy',
+            'ax_chrom', 'ay_chrom', 'bx_chrom', 'by_chrom', 'wx_chrom', 'wy_chrom',
+            'ddx', 'ddpx', 'ddy', 'ddpy',
+            'angle_rad',
+            'k0l', 'k1l', 'k2l', 'k3l', 'k4l', 'k5l',
+            'k0sl', 'k1sl', 'k2sl', 'k3sl', 'k4sl', 'k5sl',
+            'isthick']
+        scalars = dict(
+            table='TWISS',
+            version=tag,
+            line=lname.upper(),
+            configuration=config.upper(),
+            line_length=tw['s'][-1],
+            mass0=env[lname].particle_ref.mass0,
+            q0=env[lname].particle_ref.q0,
+            energy0=env[lname].particle_ref.p0c[0],
+            gamma0=env[lname].particle_ref.gamma0[0],
+            beta0=env[lname].particle_ref.beta0[0],
+            qx=tw.qx,
+            qy=tw.qy,
+            dqx=tw.dqx,
+            dqy=tw.dqy,
+            momentum_compaction_factor=tw.momentum_compaction_factor,
+            timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        # To have the specified order:
+        tw_out = Table({kk: tw[kk] for kk in tw_include_cols})
+        for kk, vv in scalars.items():
+            tw_out[kk] = vv
+        # Save as tfs
+        tw_out.to_tfs(f'{twiss_folder}/twiss_{lname}.tfs')
+        tw_out.to_csv(f'{twiss_folder}/twiss_{lname}.csv')
+
 
 
 class LHCDev:
@@ -269,17 +312,17 @@ class LHCCycle:
         html = "<!DOCTYPE html>\n"
         html += "<html lang='en'>\n"
         html += "<head>\n"
-        html += f"<meta charset='UTF-8'>\n"
+        html += "<meta charset='UTF-8'>\n"
         html += (
-            f"<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+            "<meta name='viewport' content='width=device-width, initial-scale=1'>\n"
         )
-        html += f"<link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
+        html += "<link rel='stylesheet' href='/acc-models/lhc/mkish.css'>\n"
         html += f"<title>{self.parent.label}/{self.label}</title>\n"
         html += "</head>\n"
         html += "<body>\n"
         html += f"<h1>{lhclink} / {linkrepo} / {self.label}</h1>\n"
         html += f"<p>{self.description}</p>\n"
-        html += f"<h2>Beams</h2>\n"
+        html += "<h2>Beams</h2>\n"
         html += "<ul>\n"
         for i in range(len(self.particles)):
             html += f"<li>Beam {i + 1}:  {self.particles[i]}, charge {self.charges[i]} e, mass {self.masses[i]} GeV/c^2</li>\n"
@@ -959,7 +1002,7 @@ class LHCProcess:
         html += f"    <h1>{linkrepo}/{linkcycle}/{linkprocess}/{ts}</h1>\n"
         html += f"    <p>Optics definition: {optics}</p>\n"
         html += f"    <p>Time step: {ts} s</p>\n"
-        html += f"    <h2>Xsuite Model</h2>\n"
+        html += "    <h2>Xsuite Model</h2>\n"
         html += f"    <pre><code>{self.gen_xsuite_src(ts=ts)}</code></pre>\n"
         # end page
         html += "  </body>\n"
@@ -1461,7 +1504,7 @@ class LHCRepo:
     def from_basedir(cls, basedir):
         yaml = read_yaml(Path(basedir) / "scenarios" / "readme.yaml")
         name = yaml.get("name", basedir.name)
-        return cls(name=basedir.name, basedir=basedir)
+        return cls(name=name, basedir=basedir)
 
     def __dir__(self):
         return super().__dir__() + list(self.cycles.keys()) + list(self.sets.keys())
@@ -1570,7 +1613,7 @@ class LHCRepo:
         html += "<meta charset='UTF-8'>\n"
         html += f"<title>{self.label}</title>\n"
         html += "</head>\n"
-        html += f"<body>\n"
+        html += "<body>\n"
         linklhc = "<a href='https://acc-models.web.cern.ch/acc-models/lhc'>LHC</a>"
         html += f"<h1>{linklhc} / {self.label}</h1>\n"
         html += f"<p>{self.description}</p>\n"

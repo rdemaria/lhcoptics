@@ -1,5 +1,4 @@
 import json
-from pprint import pp
 import re
 from pathlib import Path
 import gzip
@@ -173,7 +172,7 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             out += [f"on_dx{irn}{hv}{ls}" for irn in "15" for hv in "hv" for ls in "ls"]
             out += [f"on_dsep{irn}{hv}" for irn in "15" for hv in "hv"]
             out += [
-                f"on_mo.b1",
+                "on_mo.b1",
                 "on_mo.b2",
                 "on_imo.b1",
                 "on_imo.b2",
@@ -211,11 +210,11 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
 
         return out
 
-    @classmethod
-    def get_default_knob_names(cls):
-        out = cls.knob_names[:]
-        for ss in cls._irs:
-            out.extend(ss.knob_names)
+    def gen_knob_names(self, full=True):
+        out = self._gen_knob_names(self.variant)
+        if full:
+            for ss in self.irs + self.arcs:
+                out.extend(ss.gen_knob_names())
         return out
 
     @classmethod
@@ -411,16 +410,16 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             print(f"Creating optics {name} with variant={variant}")
 
         if verbose:
-            print(f"Zero and extract global knobs")
+            print("Zero and extract global knobs")
         knobs = model.make_and_set0_knobs(
             knob_names=cls._gen_knob_names(variant), variant=variant
         )
         if verbose:
-            print(f"Generating sections")
+            print("Generating sections")
         irs = [IR.from_model(model, variant=variant) for IR in cls._irs]
         arcs = [Arc.from_model(model, variant=variant) for Arc in cls._arcs]
         if verbose:
-            print(f"Extracting global parameters")
+            print("Extracting global parameters")
         params = {k: model[k] for k in cls._global_param_names if k in model}
         opt = cls(
             name=name, irs=irs, arcs=arcs, params=params, knobs=knobs, variant=variant
@@ -429,12 +428,12 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             if model.is_full():
                 if hasattr(model, "madx"):
                     if verbose:
-                        print(f"Converting MADX model to Xsuite model")
+                        print("Converting MADX model to Xsuite model")
                     model = LHCXsuiteModel.from_cpymad(model.madx)
                     # this model may have knobs that cannot be deleted cleanly. It needs to be sanitized before being attached to the optics, otherwise it may cause issues when trying to delete the knobs later on.
-                    model.delete_expression_from_knob(knobs.values(), verbose=verbose)
+                    model.delete_expressions_from_knobs(knobs.values(), verbose=verbose)
                 if verbose:
-                    print(f"Attaching Xsuite model")
+                    print("Attaching Xsuite model")
                 opt.set_xsuite_model(model, verbose=verbose)
         elif attach_model:
             if model.is_full() and hasattr(model, "env"):
@@ -480,10 +479,12 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         elif hasattr(xsuite_model, "to_json"):
             xsuite_model = LHCXsuiteModel(xsuite_model)
 
-        if variant is None and xsuite_model is not None:
+        if variant is None:
+            if xsuite_model is None:
+                raise ValueError(
+                    "Variant must be provided if xsuite_model is not provided"
+                )
             variant = xsuite_model.get_variant()
-        else:
-            raise ValueError("Variant must be provided if xsuite_model is not provided")
 
         return cls.from_model(
             xsuite_model,
@@ -493,10 +494,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             circuits=circuits,
             verbose=verbose,
         )
-
-        # for k, knob in knobs.items():
-        #    xsuite_model[k] = knob.value
-        return self
 
     @classmethod
     def regenerate(
@@ -902,9 +899,10 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
 
     def find_knobs_null(self):
         """Find all knobs in the optics and its sections that are empty."""
-        knobs = self.find_knobs()
         return {
-            knob for knob in knobs.items() if sum(map(abs, knob.weights.values())) == 0
+            knob
+            for knob in self.find_knobs()
+            if sum(map(abs, knob.weights.values())) == 0
         }
 
     def get(self, k, default=None, full=True):
@@ -957,11 +955,11 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         """
         if tw1 is None:
             if verbose:
-                print(f"Computing twiss for beam 1 to get parameters")
+                print("Computing twiss for beam 1 to get parameters")
             tw1 = self.model.twiss(beam=1, chrom=True)
         if tw2 is None:
             if verbose:
-                print(f"Computing twiss for beam 2 to get parameters")
+                print("Computing twiss for beam 2 to get parameters")
             tw2 = self.model.twiss(beam=2, chrom=True)
         if verbose:
             print(f"Getting parameters (full={full}) with mode {mode}")
@@ -983,8 +981,8 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         if full:
             if mode == "full":
                 for ss in self.irs + self.arcs:
-                    pp = ss.get_params_from_twiss(tw1, tw2, verbose=verbose)
-                    params.update(pp)
+                    section_params = ss.get_params_from_twiss(tw1, tw2, verbose=verbose)
+                    params.update(section_params)
                 params.update(get_ats_factors(presqueeze, params))
                 for xy in "xy":
                     for irn in "15":
@@ -1027,8 +1025,8 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         temp = {}
         if full:
             for ss in self.irs + self.arcs:
-                pp = ss.get_params_from_twiss(tw1, tw2)
-                params.update(pp)
+                section_params = ss.get_params_from_twiss(tw1, tw2)
+                params.update(section_params)
             temp.update(params)
             ats_factors = get_ats_factors(presqueeze, temp)
             temp.update(presqueeze)
@@ -1066,8 +1064,8 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 params[k] = self.model[k]
         if full:
             for ss in self.irs + self.arcs:
-                pp = ss.get_params_from_variables(verbose=verbose)
-                params.update(pp)
+                section_params = ss.get_params_from_variables(verbose=verbose)
+                params.update(section_params)
         return params
 
     def get_phase_arcs(self):
@@ -1318,7 +1316,7 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         """
         match the chroma knobs
         """
-        for knob in self.find_knobs(f"dqp.*"):
+        for knob in self.find_knobs("dqp.*"):
             print(f"Match chroma knob {knob.name}", end="")
             knob.match(verbose=verbose)
             print(" - done")
@@ -2060,7 +2058,7 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 print("Update knobs from default list")
             knobs_dict = {
                 k: self.model.get_knob_by_probing(k)
-                for k in self.get_default_knob_names()
+                for k in self.gen_knob_names(full=False)
             }
         for k in self.knobs:
             if k in knobs_dict:
