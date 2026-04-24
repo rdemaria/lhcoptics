@@ -6,26 +6,13 @@ import xtrack as xt
 from .section import LHCSection, lhcprev, lhcsucc
 from .utils import match_compare_log
 
-
 def gen_acb_full_names(s1, s2, irn):
     return [
         f"acb{s1}{hv}{s2}.{lr}{irn}b{bb}" for hv in "hv" for lr in "lr" for bb in "12"
     ]
 
-
 def gen_acbx_names(irn):
     return [f"acbx{hv}{nn}.{lr}{irn}" for nn in "123" for hv in "hv" for lr in "lr"]
-
-
-def gen_d12_names(irn, variant):
-    out = [f"ad{nn}.{lr}{irn}" for nn in "12" for lr in "lr"]
-    #TODO temporary until we support new bends in non-HL models
-    if variant.startswith("hl"): 
-        out.extend(f"sep_mid_d1.{lr}{irn}" for lr in "lr")
-        out.extend(f"shift_d2.{lr}{irn}" for lr in "lr")
-    out.extend(f"kd{nn}.{lr}{irn}" for nn in "12" for lr in "lr")
-    return out
-
 
 def gen_crab_names(irn):
     return [
@@ -36,26 +23,14 @@ def gen_crab_names(irn):
         for ab in "ab"
     ]
 
-
-def gen_ttlhc(irn):
-    return [f"k{ss}.{lr}{irn}" for ss in ["qx", "tqx1", "tqx2"] for lr in "lr"]
-
-
-def gen_tthl(irn):
-    return [f"kqx{nn}.{lr}{irn}" for nn in [1, "2a", "2b", 3] for lr in "lr"]
-
-
-def gen_qq(nns, irn):
-    return [f"kq{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
-
-
-def gen_qt(nns, irn):
-    return [f"kqt{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
-
-
-def gen_qtl(nns, irn):
-    return [f"kqtl{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
-
+def gen_d12_names(irn, variant):
+    out = [f"ad{nn}.{lr}{irn}" for nn in "12" for lr in "lr"]
+    #TODO temporary until we support new bends in non-HL models
+    if variant.startswith("hl"):
+        out.extend(f"sep_mid_d1.{lr}{irn}" for lr in "lr")
+        out.extend(f"shift_d2.{lr}{irn}" for lr in "lr")
+    out.extend(f"kd{nn}.{lr}{irn}" for nn in "12" for lr in "lr")
+    return out
 
 def gen_param_names(irn):
     out = []
@@ -69,10 +44,23 @@ def gen_param_names(irn):
             out.append(f"{param}ip{irn}b{beam}_r")
     return out
 
+def gen_qq(nns, irn):
+    return [f"kq{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
+
+def gen_qt(nns, irn):
+    return [f"kqt{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
+
+def gen_qtl(nns, irn):
+    return [f"kqtl{nn}.{lr}{irn}b{bb}" for nn in nns for lr in "lr" for bb in "12"]
+
+def gen_tthl(irn):
+    return [f"kqx{nn}.{lr}{irn}" for nn in [1, "2a", "2b", 3] for lr in "lr"]
+
+def gen_ttlhc(irn):
+    return [f"k{ss}.{lr}{irn}" for ss in ["qx", "tqx1", "tqx2"] for lr in "lr"]
 
 def is_hllhc(variant):
     return variant.startswith("hl")
-
 
 class LHCIR(LHCSection):
     """
@@ -83,28 +71,9 @@ class LHCIR(LHCSection):
     twiss_full(beam) -> Make twiss using full sequence
     """
 
-    knob_names = []
     _extra_param_names = []
     default_twiss_method = "init"
-
-    @classmethod
-    def from_model(cls, model, name=None, variant=None):
-        if name is None:
-            name = cls.name
-        if variant is None:
-            variant = model.get_variant()
-        ir = cls(name=cls.name, strengths={}, params={}, knobs={}, variant=variant)
-        knobs = model.make_and_set0_knobs(
-            knob_names=ir.gen_knob_names(), variant=variant
-        )
-        ir.knobs.update(knobs)
-        for strength in ir.gen_strength_names():
-            if strength in model:
-                ir.strengths[strength] = model[strength]
-        for param in ir.gen_param_names():
-            if param in model:
-                ir.params[param] = model[param]
-        return ir
+    knob_names = []
 
     def __init__(
         self,
@@ -145,16 +114,24 @@ class LHCIR(LHCSection):
         self.startb12 = (self.startb1, self.startb2)
         self.endb12 = (self.endb1, self.endb2)
 
-    def copy(self):
-        return self.__class__(
-            name=self.name,
-            strengths=self.strengths.copy(),
-            params=self.params.copy(),
-            knobs={k: knob.copy() for k, knob in self.knobs.items()},
-            parent=self.parent,
-            filename=self.filename,
-            variant=self.variant,
+    @classmethod
+    def from_model(cls, model, name=None, variant=None):
+        if name is None:
+            name = cls.name
+        if variant is None:
+            variant = model.get_variant()
+        ir = cls(name=cls.name, strengths={}, params={}, knobs={}, variant=variant)
+        knobs = model.make_and_set0_knobs(
+            knob_names=ir.gen_knob_names(), variant=variant
         )
+        ir.knobs.update(knobs)
+        for strength in ir.gen_strength_names():
+            if strength in model:
+                ir.strengths[strength] = model[strength]
+        for param in ir.gen_param_names():
+            if param in model:
+                ir.params[param] = model[param]
+        return ir
 
     def __getitem__(self, key):
         if re.match(r"kqx[123]\.[lr]", key):
@@ -178,10 +155,6 @@ class LHCIR(LHCSection):
         return getattr(self.parent, self.arc_right_name)
 
     @property
-    def quads(self):
-        return {k: v for k, v in self.strengths.items() if re.match("kt?q[^s]", k)}
-
-    @property
     def corrs(self):
         return {k: v for k, v in self.strengths.items() if re.match("acb", k)}
 
@@ -192,6 +165,10 @@ class LHCIR(LHCSection):
     @property
     def kqxr(self):
         return [k for k in self.quads if "r" in k and "x" in k]
+
+    @property
+    def quads(self):
+        return {k: v for k, v in self.strengths.items() if re.match("kt?q[^s]", k)}
 
     @property
     def skew_quads(self):
@@ -236,8 +213,22 @@ class LHCIR(LHCSection):
                         print(f"{k:20} {v:12.8f} {kmin * 100:5.1f}% {kmax * 100:5.1f}%")
         return out
 
+    def copy(self):
+        return self.__class__(
+            name=self.name,
+            strengths=self.strengths.copy(),
+            params=self.params.copy(),
+            knobs={k: knob.copy() for k, knob in self.knobs.items()},
+            parent=self.parent,
+            filename=self.filename,
+            variant=self.variant,
+        )
+
     def gen_param_names(self):
         return gen_param_names(self.irn)
+
+    def get_extra_match_targets(self):
+        return []
 
     def get_kqx(self, n, lr):
         "Get the strength of the kqx{n}.{lr}{irn} the individual quadrupoles"
@@ -261,84 +252,6 @@ class LHCIR(LHCSection):
                 return kq + ktq
             else:
                 raise ValueError(f"Invalid n={n} for kqx{n}.{side}")
-
-    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init", verbose=False):
-        if verbose:
-            print(f"Getting parameters for {self} from twiss (mode={mode})")
-        if tw1 is None:
-            if mode == "init":
-                tw1 = self.twiss_from_init(1, strengths=False)
-            elif mode == "full":
-                tw1 = self.twiss_full(1, strengths=False)
-            else:
-                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
-        if tw2 is None:
-            if mode == "init":
-                tw2 = self.twiss_from_init(2, strengths=False)
-            elif mode == "full":
-                tw2 = self.twiss_full(2, strengths=False)
-            else:
-                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
-        ipname = self.ipname
-        params = {}
-        if self.init_left is None:
-            self.set_init()
-        if self.init_right is None:
-            self.set_init()
-        for param in "betx bety alfx alfy dx dpx".split():
-            for beam, tw in zip([1, 2], [tw1, tw2]):
-                params[f"{param}{ipname}b{beam}"] = tw[param, ipname]
-        for param in "mux muy".split():
-            for beam, tw in zip([1, 2], [tw1, tw2]):
-                params[f"{param}{ipname}b{beam}"] = (
-                    tw[param, self.endb12[beam - 1]]
-                    - tw[param, self.startb12[beam - 1]]
-                    + getattr(self.init_left[beam], param)  # ATS change
-                )
-        for param in "mux muy".split():
-            for beam, tw in zip([1, 2], [tw1, tw2]):
-                params[f"{param}{ipname}b{beam}_l"] = (
-                    tw[param, ipname]
-                    - tw[param, self.startb12[beam - 1]]
-                    + getattr(self.init_left[beam], param)  # ATS change
-                )
-        for param in "mux muy".split():
-            for beam, tw in zip([1, 2], [tw1, tw2]):
-                params[f"{param}{ipname}b{beam}_r"] = (
-                    tw[param, self.endb12[beam - 1]] - tw[param, ipname]
-                )
-        return params
-
-    def get_params_from_variables(self, model=None, verbose=False):
-        if verbose:
-            print(f"Getting parameters for {self} from variables")
-        if model is None:
-            model = self.parent.model
-
-        params = {}
-        for param in "betx bety alfx alfy dx dpx".split():
-            for beam in "12":
-                ppname = f"{param}ip{self.irn}b{beam}"
-                if ppname in model:
-                    params[ppname] = model[ppname]
-        for param in "mux muy".split():
-            for beam in "12":
-                for suffix in ["", "_l", "_r"]:
-                    ppname = f"{param}ip{self.irn}b{beam}{suffix}"
-                    if ppname in model:
-                        params[ppname] = model[ppname]
-        return params
-
-    def get_phase(self):
-        phases = {}
-        for xy in "xy":
-            for beam in "12":
-                nn = f"mu{xy}{self.ipname}b{beam}"
-                phases[nn] = self.params[nn]
-        return phases
-
-    def get_extra_match_targets(self):
-        return []
 
     def get_match_targets(
         self,
@@ -472,6 +385,96 @@ class LHCIR(LHCSection):
                     limits[1] *= 1 - dkmax
                 varylst.append(xt.Vary(kk, limits=limits, step=1e-9, tag=tag))
         return varylst
+
+    def get_params_from_twiss(self, tw1=None, tw2=None, mode="init", verbose=False):
+        if verbose:
+            print(f"Getting parameters for {self} from twiss (mode={mode})")
+        if tw1 is None:
+            if mode == "init":
+                tw1 = self.twiss_from_init(1, strengths=False)
+            elif mode == "full":
+                tw1 = self.twiss_full(1, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        if tw2 is None:
+            if mode == "init":
+                tw2 = self.twiss_from_init(2, strengths=False)
+            elif mode == "full":
+                tw2 = self.twiss_full(2, strengths=False)
+            else:
+                raise ValueError(f"Invalid mode {mode}, should be 'init' or 'full'")
+        ipname = self.ipname
+        params = {}
+        if self.init_left is None:
+            self.set_init()
+        if self.init_right is None:
+            self.set_init()
+        for param in "betx bety alfx alfy dx dpx".split():
+            for beam, tw in zip([1, 2], [tw1, tw2]):
+                params[f"{param}{ipname}b{beam}"] = tw[param, ipname]
+        for param in "mux muy".split():
+            for beam, tw in zip([1, 2], [tw1, tw2]):
+                params[f"{param}{ipname}b{beam}"] = (
+                    tw[param, self.endb12[beam - 1]]
+                    - tw[param, self.startb12[beam - 1]]
+                    + getattr(self.init_left[beam], param)  # ATS change
+                )
+        for param in "mux muy".split():
+            for beam, tw in zip([1, 2], [tw1, tw2]):
+                params[f"{param}{ipname}b{beam}_l"] = (
+                    tw[param, ipname]
+                    - tw[param, self.startb12[beam - 1]]
+                    + getattr(self.init_left[beam], param)  # ATS change
+                )
+        for param in "mux muy".split():
+            for beam, tw in zip([1, 2], [tw1, tw2]):
+                params[f"{param}{ipname}b{beam}_r"] = (
+                    tw[param, self.endb12[beam - 1]] - tw[param, ipname]
+                )
+        return params
+
+    def get_params_from_variables(self, model=None, verbose=False):
+        if verbose:
+            print(f"Getting parameters for {self} from variables")
+        if model is None:
+            model = self.parent.model
+
+        params = {}
+        for param in "betx bety alfx alfy dx dpx".split():
+            for beam in "12":
+                ppname = f"{param}ip{self.irn}b{beam}"
+                if ppname in model:
+                    params[ppname] = model[ppname]
+        for param in "mux muy".split():
+            for beam in "12":
+                for suffix in ["", "_l", "_r"]:
+                    ppname = f"{param}ip{self.irn}b{beam}{suffix}"
+                    if ppname in model:
+                        params[ppname] = model[ppname]
+        return params
+
+    def get_params_lrphase(self, verbose=True):
+        params = self.get_params_from_twiss(mode="init")
+        out = {}
+        for beam in "12":
+            for param in "mux muy".split():
+                k = f"{param}{self.ipname}b{beam}"
+                kl = f"{k}_l"
+                kr = f"{k}_r"
+                if verbose:
+                    print(f"Set {kl} from {self.params[kl]} to {params[kl]}")
+                    print(f"Set {kr} from {self.params[kr]} to {params[kr]}")
+                out[kl] = params[kl]
+                out[kr] = params[kr]
+        return out
+
+    def get_phase(self):
+        phases = {}
+        for xy in "xy":
+            for beam in "12":
+                nn = f"mu{xy}{self.ipname}b{beam}"
+                phases[nn] = self.params[nn]
+        return phases
 
     def get_quad_max_ratio(self, verbose=False, ratio=2):
         rmax = 1
@@ -678,6 +681,8 @@ class LHCIR(LHCSection):
                 print(f"Matching failed for {self.name} with error: {e}")
                 if fail:
                     raise ValueError(f"Matching failed for {self.name} with error: {e}")
+        if hasattr(self, "add_extra_params_from_twiss"):
+            self.add_extra_params_from_twiss()
         return match
 
     def match_knobs(self, **kwargs):
@@ -759,12 +764,6 @@ class LHCIR(LHCSection):
                 if not dryrun:
                     self.params[k_r] = round(self.params[k] - self.params[k_l], 4)
 
-    def set_bumps_off(self):
-        for k, knob in self.knobs.items():
-            if re.match(r"on_[xsao]", k):
-                knob.value = 0
-                self.parent.model[k] = 0
-
     def set_betastar(self, betx=None, bety=None):
         if bety is None:
             bety = betx
@@ -776,11 +775,11 @@ class LHCIR(LHCSection):
         else:
             raise ValueError(f"IR{self.irn} not allowed for beta* setting")
 
-    def set_init_left(self, beam):
-        self.init_left[beam] = self.arc_left.get_init_right(beam)
-
-    def set_init_right(self, beam):
-        self.init_right[beam] = self.arc_right.get_init_left(beam)
+    def set_bumps_off(self):
+        for k, knob in self.knobs.items():
+            if re.match(r"on_[xsao]", k):
+                knob.value = 0
+                self.parent.model[k] = 0
 
     def set_init(self):
         self.init_left = {}
@@ -789,6 +788,12 @@ class LHCIR(LHCSection):
         self.init_right = {}
         (self.set_init_right(1),)
         (self.set_init_right(2),)
+
+    def set_init_left(self, beam):
+        self.init_left[beam] = self.arc_left.get_init_right(beam)
+
+    def set_init_right(self, beam):
+        self.init_right[beam] = self.arc_right.get_init_left(beam)
 
     def specialize_knobs(self):
         for k, knob in list(self.knobs.items()):
@@ -860,18 +865,3 @@ class LHCIR(LHCSection):
         end = self.endb12[beam - 1]
         init = sequence.twiss(strengths=strengths).get_twiss_init(start)
         return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
-
-    def get_params_lrphase(self, verbose=True):
-        params = self.get_params_from_twiss(mode="init")
-        out = {}
-        for beam in "12":
-            for param in "mux muy".split():
-                k = f"{param}{self.ipname}b{beam}"
-                kl = f"{k}_l"
-                kr = f"{k}_r"
-                if verbose:
-                    print(f"Set {kl} from {self.params[kl]} to {params[kl]}")
-                    print(f"Set {kr} from {self.params[kr]} to {params[kr]}")
-                out[kl] = params[kl]
-                out[kr] = params[kr]
-        return out

@@ -2,7 +2,6 @@ from .irs import LHCIR, gen_qt, gen_qtl, gen_qq
 from .model_xsuite import SinglePassDispersion
 from .section import gen_acb_alt_names
 
-
 class LHCIR3(LHCIR):
     collimators = [
         "tcp.6l3.b1",
@@ -24,10 +23,8 @@ class LHCIR3(LHCIR):
         "tcla.6l3.b2",
         "tcla.7l3.b2",
     ]
-
     colls_ir3b1 = collimators[:9]
     colls_ir3b2 = collimators[9:]
-
     knobsRematched13b_mu = {
         "kqt4.l3": 0.0006887129999999986,
         "kqt4.r3": 0.000688713,
@@ -143,8 +140,6 @@ class LHCIR3(LHCIR):
             params["dx_tcp_tcsb1"] = self.action_sp1.run()["dx"]
             params["dx_tcp_tcsb2"] = self.action_sp2.run()["dx"]
         return params
-
-
 """
     def match(self):
         lhc=self.env

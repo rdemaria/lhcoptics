@@ -15,8 +15,9 @@ optics model:
     - knobs
 """
 
-from pathlib import Path
+import datetime
 import os
+from pathlib import Path
 import re
 import site
 import xml.etree.ElementTree as ET
@@ -40,23 +41,16 @@ from .utils import (
     git_push,
     unixtime_to_string,
 )
-import datetime
-
 
 P_MASS = 0.938272046e9  # proton mass in eV/c2
-
 default_basedir = os.getenv(
     "LHCOPTICS_BASEDIR", default=Path(site.getuserbase()) / "acc-models-lhc"
 )
-
 default_basedir = Path(default_basedir)
-
 git_url = os.getenv(
     "LHCOPTICS_GIT_URL", "https://gitlab.cern.ch/acc-models/acc-models-lhc.git"
 )
-
 projectt_id = 76507
-
 
 def check_repobasedir(basedir):
     if basedir is None:
@@ -71,7 +65,6 @@ def check_repobasedir(basedir):
         else:
             raise ValueError(f"Repository {basedir} does not exists.")
     return basedir
-
 
 def save_tfs(twiss_folder,tag, lname, tw, env, config):
         from xtrack import Table
@@ -111,131 +104,6 @@ def save_tfs(twiss_folder,tag, lname, tw, env, config):
         # Save as tfs
         tw_out.to_tfs(f'{twiss_folder}/twiss_{lname}.tfs')
         tw_out.to_csv(f'{twiss_folder}/twiss_{lname}.csv')
-
-
-
-class LHCDev:
-    """LHC optics repository
-
-    The structure is as follows:
-    branch_or_tag.cycle_or_collection.process_or_stage -> optics model
-
-    """
-
-    def __init__(self, basedir=None):
-        self.basedir = check_repobasedir(basedir)
-        self.cache_file = self.basedir / "cache.yaml"
-        self.branches, self.tags = self.get_branches_and_tags()
-        self.check_local_branches()
-        self._repo_cache = {}
-
-    def __dir__(self):
-        othernames = []
-        for name in self.branches:
-            if name[0] in "0123456789":
-                othernames.append("y" + name)
-            else:
-                othernames.append(name)
-        return super().__dir__() + othernames
-
-    def __getattr__(self, name):
-        if name.startswith("y"):
-            name = name[1:]
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError(f"No branch or tag named {name}")
-
-    def __getitem__(self, name):
-        """Get the repository for a given branch or tag"""
-        if name in self._repo_cache:
-            return self._repo_cache[name]
-        if name in self.branches or name in self.tags:
-            repo_dir = self.basedir / name
-            if not repo_dir.exists():
-                print(f"Repository {repo_dir} does not exist")
-                self.clone_repo(name)
-            self._repo_cache[name] = LHCRepo(repo_dir, name=name, parent=self)
-            return self._repo_cache[name]
-        else:
-            raise KeyError(f"No branch or tag named {name}")
-
-    def __repr__(self):
-        return f"<LHC Repo at '{self.basedir}'>"
-
-    def _ipython_key_completions_(self):
-        return list(self.branches.keys()) + list(self.tags.keys())
-
-    def check_local_branches(self, dry_run=False, force_update=False):
-        """
-        Check if the local branches are up to date with the remote branches
-        """
-        if force_update:
-            self.get_branches_and_tags(force_update=True)
-        for branch, commit in self.branches.items():
-            branch_dir = self.basedir / branch
-            if branch_dir.exists():
-                dir_commit = git_get_current_commit(branch_dir)
-                if dir_commit != commit:
-                    print(f"Branch {branch} is not up to date")
-                    print(f"Local commit: {dir_commit}")
-                    print(f"Remote commit: {commit}")
-                    self.branches[branch] = commit
-                    if not dry_run:
-                        print(git_pull(branch_dir))
-
-    def clone_repo(self, branch_or_tag):
-        """
-        Manually the repository given a branch or tag
-        """
-        repo_dir = self.basedir / branch_or_tag
-        if not repo_dir.exists():
-            print(f"Cloning repository {repo_dir}")
-            git_clone_repo(git_url, repo_dir, branch_or_tag)
-
-    def get_branches_and_tags(self, force_update=False):
-        """
-        Get the list of branches in the repository
-        """
-        cache_file_good = self.cache_file.exists() and file_one_day_old(self.cache_file)
-        if force_update or not cache_file_good:
-            print("Getting branches and tags from gitlab")
-            cache = gitlab_get_branches_and_tags(
-                project_id=76507,
-                gitlab_url="https://gitlab.cern.ch",
-                timeout=0.5,
-            )
-            if cache is None:
-                print("Error getting branches and tags from gitlab")
-            else:
-                write_yaml(cache, self.cache_file)
-
-        if self.cache_file.exists():
-            cache = read_yaml(self.cache_file)
-            branches = cache["branches"]
-            tags = cache["tags"]
-
-            for name in list(branches):
-                if len(name) != 4 or name[0] not in "2h":
-                    del branches[name]
-
-            self.branches = branches
-            self.tags = tags
-
-            return branches, tags
-        else:
-            raise ValueError("Error creating cache file")
-
-        return f"{self.parent.git_url.replace('.git', '')}/-/tree/{self.name}"
-
-    def get_web_url(self):
-        return "https://acc-models.web.cern.ch/acc-models/lhc"
-
-    def refresh(self):
-        """Refresh the repository"""
-        self._repo_cache.clear()
-        self.check_local_branches(force_update=True)
-
 
 class LHCCycle:
     """
@@ -437,6 +305,127 @@ class LHCCycle:
             "optics": self.optics,
         }
 
+class LHCDev:
+    """LHC optics repository
+
+    The structure is as follows:
+    branch_or_tag.cycle_or_collection.process_or_stage -> optics model
+
+    """
+
+    def __init__(self, basedir=None):
+        self.basedir = check_repobasedir(basedir)
+        self.cache_file = self.basedir / "cache.yaml"
+        self.branches, self.tags = self.get_branches_and_tags()
+        self.check_local_branches()
+        self._repo_cache = {}
+
+    def __dir__(self):
+        othernames = []
+        for name in self.branches:
+            if name[0] in "0123456789":
+                othernames.append("y" + name)
+            else:
+                othernames.append(name)
+        return super().__dir__() + othernames
+
+    def __getattr__(self, name):
+        if name.startswith("y"):
+            name = name[1:]
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(f"No branch or tag named {name}")
+
+    def __getitem__(self, name):
+        """Get the repository for a given branch or tag"""
+        if name in self._repo_cache:
+            return self._repo_cache[name]
+        if name in self.branches or name in self.tags:
+            repo_dir = self.basedir / name
+            if not repo_dir.exists():
+                print(f"Repository {repo_dir} does not exist")
+                self.clone_repo(name)
+            self._repo_cache[name] = LHCRepo(repo_dir, name=name, parent=self)
+            return self._repo_cache[name]
+        else:
+            raise KeyError(f"No branch or tag named {name}")
+
+    def __repr__(self):
+        return f"<LHC Repo at '{self.basedir}'>"
+
+    def _ipython_key_completions_(self):
+        return list(self.branches.keys()) + list(self.tags.keys())
+
+    def check_local_branches(self, dry_run=False, force_update=False):
+        """
+        Check if the local branches are up to date with the remote branches
+        """
+        if force_update:
+            self.get_branches_and_tags(force_update=True)
+        for branch, commit in self.branches.items():
+            branch_dir = self.basedir / branch
+            if branch_dir.exists():
+                dir_commit = git_get_current_commit(branch_dir)
+                if dir_commit != commit:
+                    print(f"Branch {branch} is not up to date")
+                    print(f"Local commit: {dir_commit}")
+                    print(f"Remote commit: {commit}")
+                    self.branches[branch] = commit
+                    if not dry_run:
+                        print(git_pull(branch_dir))
+
+    def clone_repo(self, branch_or_tag):
+        """
+        Manually the repository given a branch or tag
+        """
+        repo_dir = self.basedir / branch_or_tag
+        if not repo_dir.exists():
+            print(f"Cloning repository {repo_dir}")
+            git_clone_repo(git_url, repo_dir, branch_or_tag)
+
+    def get_branches_and_tags(self, force_update=False):
+        """
+        Get the list of branches in the repository
+        """
+        cache_file_good = self.cache_file.exists() and file_one_day_old(self.cache_file)
+        if force_update or not cache_file_good:
+            print("Getting branches and tags from gitlab")
+            cache = gitlab_get_branches_and_tags(
+                project_id=76507,
+                gitlab_url="https://gitlab.cern.ch",
+                timeout=0.5,
+            )
+            if cache is None:
+                print("Error getting branches and tags from gitlab")
+            else:
+                write_yaml(cache, self.cache_file)
+
+        if self.cache_file.exists():
+            cache = read_yaml(self.cache_file)
+            branches = cache["branches"]
+            tags = cache["tags"]
+
+            for name in list(branches):
+                if len(name) != 4 or name[0] not in "2h":
+                    del branches[name]
+
+            self.branches = branches
+            self.tags = tags
+
+            return branches, tags
+        else:
+            raise ValueError("Error creating cache file")
+
+        return f"{self.parent.git_url.replace('.git', '')}/-/tree/{self.name}"
+
+    def get_web_url(self):
+        return "https://acc-models.web.cern.ch/acc-models/lhc"
+
+    def refresh(self):
+        """Refresh the repository"""
+        self._repo_cache.clear()
+        self.check_local_branches(force_update=True)
 
 class LHCFill:
     def __init__(self, filln, beam_processes):
@@ -457,7 +446,6 @@ class LHCFill:
             if "@" not in bp and bp not in out:
                 out.append(bp)
         return out
-
 
 class LHCKnobDef:
     def __init__(self, mad, lsa, scaling, test):
@@ -480,7 +468,6 @@ class LHCKnobDef:
 
     def to_mad(self, lsa_value):
         return f"{self.mad}={self.mad_value(lsa_value)};"
-
 
 class LHCKnobDefs:
     def __init__(self, knob_list):
@@ -533,7 +520,6 @@ class LHCKnobDefs:
     def to_mad(self, lsa_name, lsa_value):
         """Return the MAD string for a given LSA name and LSA value"""
         return self.lsa[lsa_name].to_mad(lsa_value)
-
 
 class LHCOpticsDef:
     """LHC optics definition
@@ -593,7 +579,6 @@ class LHCOpticsDef:
             "charges": self.charges,
             "masses": self.masses,
         }
-
 
 class LHCOpticsSet:
     """LHC optics set"""
@@ -688,7 +673,6 @@ class LHCOpticsSet:
             "label": self.label,
             "optics": list(self.optics),
         }
-
 
 class LHCProcess:
     knob_blacklist = set(
@@ -1279,7 +1263,28 @@ call, file="acc-models-lhc/{settings_path}";
             else:
                 raise FileNotFoundError(f"Optics file {eos_optics} does not exist")
         return opt
-    
+
+    def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
+        """Get the MADX model for the given time step
+        If idx is provided, it will use the corresponding time step from self.ts.
+
+        """
+        assert idx is not None or ts is not None, "Either idx or ts must be provided"
+        if idx is not None:
+            ts = self.ts[idx]
+        if ts in self.optics:
+            optics_dir = self.basedir / str(ts)
+            madxfile = "model.madx"
+            if madx is None:
+                from cpymad.madx import Madx
+
+                madx = Madx(stdout=stdout)
+            madx.chdir(str(optics_dir))
+            madx.call(str(madxfile))
+            return madx
+        else:
+            raise ValueError(f"Optics {ts} not found in {self.name}")
+
     def get_madx_model_basedir(self, idx=None, ts=None):
         """Get the MADX model directory for the given time step
         If idx is provided, it will use the corresponding time step from self.ts.
@@ -1312,27 +1317,6 @@ call, file="acc-models-lhc/{settings_path}";
                 return madxfile
             else:
                 raise FileNotFoundError(f"MADX file {madxfile} does not exist")
-        else:
-            raise ValueError(f"Optics {ts} not found in {self.name}")
-
-    def get_madx_model(self, idx=None, ts=None, madx=None, stdout=False):
-        """Get the MADX model for the given time step
-        If idx is provided, it will use the corresponding time step from self.ts.
-
-        """
-        assert idx is not None or ts is not None, "Either idx or ts must be provided"
-        if idx is not None:
-            ts = self.ts[idx]
-        if ts in self.optics:
-            optics_dir = self.basedir / str(ts)
-            madxfile = "model.madx"
-            if madx is None:
-                from cpymad.madx import Madx
-
-                madx = Madx(stdout=stdout)
-            madx.chdir(str(optics_dir))
-            madx.call(str(madxfile))
-            return madx
         else:
             raise ValueError(f"Optics {ts} not found in {self.name}")
 
@@ -1488,7 +1472,6 @@ call, file="acc-models-lhc/{settings_path}";
             "optics": self.optics,
             "settings": self.settings,
         }
-
 
 class LHCRepo:
     """LHC optics for a specific branch or tag"""
@@ -1821,7 +1804,6 @@ class LHCRepo:
             "cycles": list(self.cycles),
             "sets": list(self.sets),
         }
-
 
 class LHCRun:
     def __init__(self, year):

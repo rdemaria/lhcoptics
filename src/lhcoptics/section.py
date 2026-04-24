@@ -13,9 +13,7 @@ _ac = {
     0: [("h", "l", "1"), ("v", "l", "1"), ("h", "r", "2"), ("v", "r", "2")],
     1: [("h", "l", "2"), ("v", "l", "2"), ("h", "r", "1"), ("v", "r", "1")],
 }
-
 _lb = [(ll, bb) for ll in "lr" for bb in "12"]
-
 
 def filter_lrb12(irn, left=True, right=True, b1=True, b2=True):
     if b1 and b2 and left and right:
@@ -41,7 +39,6 @@ def filter_lrb12(irn, left=True, right=True, b1=True, b2=True):
             elif b2 and right:
                 return lambda x: "b2" in x and f"r{irn}" in x
 
-
 def gen_acb_alt_names(s1, nns, pol, lr, irn):
     """
     Return alternate names for the acb. pol select the symmetry.
@@ -61,14 +58,11 @@ def gen_acb_alt_names(s1, nns, pol, lr, irn):
         out.extend([f"acb{s1}{hv}{nn}.{lr}{irn}b{bb}" for hv, lr, bb in hvlrb])
     return out
 
-
 def lhcprev(n):
     return (n - 2) % 8 + 1
 
-
 def lhcsucc(n):
     return n % 8 + 1
-
 
 def sort_n(lst):
     out = []
@@ -78,7 +72,6 @@ def sort_n(lst):
         else:
             out.append((0, s))
     return [s for _, s in sorted(out)]
-
 
 class LHCSection:
     """
@@ -127,6 +120,11 @@ class LHCSection:
         self._circuits = None
 
     @classmethod
+    def from_cpymad(cls, madx, name=None, variant=None):
+        model = LHCMadxModel(madx)
+        return cls.from_model(model, name, variant=variant)
+
+    @classmethod
     def from_dict(cls, data, filename=None, variant=None):
         return cls(
             name=data["name"],
@@ -144,11 +142,6 @@ class LHCSection:
         with open(filename) as f:
             data = json.load(f)
             return cls.from_dict(data, filename=filename, variant=variant)
-
-    @classmethod
-    def from_cpymad(cls, madx, name=None, variant=None):
-        model = LHCMadxModel(madx)
-        return cls.from_model(model, name, variant=variant)
 
     @classmethod
     def from_madx_optics(cls, madx_optics, name=None, variant=None):

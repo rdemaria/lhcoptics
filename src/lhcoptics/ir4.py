@@ -1,7 +1,6 @@
 from .irs import LHCIR, gen_qq, gen_qt, gen_qtl
 from .section import gen_acb_alt_names
 
-
 class LHCIR4(LHCIR):
     name = "ir4"
 

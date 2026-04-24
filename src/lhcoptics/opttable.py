@@ -1,5 +1,5 @@
-import re
 import json
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +8,28 @@ import xdeps as xd
 from .lsa_util import get_lsa
 from .rdmsignal import poly_fit, poly_val
 
+class BeamProcess:
+    def __init__(self, name, opticstable, parameters=None):
+        self.name = name
+        self.opticstable = opticstable
+        self.parameters = parameters
+
+    @classmethod
+    def from_lsa(cls, name, beamprocess, parameters=None):
+        if parameters is None:
+            parameters = ["LHCBEAM/MOMENTUM"]
+        lsa = get_lsa()
+        opttable = lsa.getOpticTable(beamprocess)
+        out = {
+            "name": np.array([oo.name for oo in opttable]),
+            "time": np.array([oo.time for oo in opttable]),
+        }
+        for pp in parameters:
+            trim = lsa.getLastTrim(pp, beamprocess)
+            ptime = trim.data[0]
+            pval = trim.data[1]
+            out[pp] = np.interp(out["time"], ptime, pval)
+        return xd.Table(out)
 
 class Col:
     def __init__(self, attr, rows):
@@ -18,6 +40,9 @@ class Col:
         attrs = [getattr(row, self.attr) for row in self.rows]
         return np.array([attr[k] for attr in attrs])
 
+    def __repr__(self) -> str:
+        return f"<Col {self.attr!r} {len(self.rows)} rows>"
+
     def __setitem__(self, k, v):
         attrs = [getattr(row, self.attr) for row in self.rows]
         if np.isscalar(v):
@@ -27,14 +52,10 @@ class Col:
             for attr, vv in zip(attrs, v):
                 attr[k] = vv
 
-    def __repr__(self) -> str:
-        return f"<Col {self.attr!r} {len(self.rows)} rows>"
-
     def show(self):
         attrs = getattr(self.rows[0], self.attr)
         for k in attrs:
             print(k, self[k])
-
 
 class ColKnob:
     def __init__(self, attr, rows):
@@ -48,22 +69,7 @@ class ColKnob:
     def __repr__(self) -> str:
         return f"<ColKnob {self.attr!r} {len(self.rows)} rows>"
 
-
 class LHCSectionTable:
-    def to_json(self, filename):
-        rows = [row.to_dict() for row in self.rows]
-        clsname = self.rows[0].__class__.__name__
-        dct = {"class": clsname, "rows": rows}
-        json.dump(dct, open(filename, "w"), indent=2)
-        return self
-
-    @classmethod
-    def from_json(cls, filename):
-        dct = json.load(open(filename))
-        rowcls = globals()[dct["class"]]
-        rows = [rowcls.from_dict(row) for row in dct["rows"]]
-        return cls(rows)
-
     def __init__(self, rows, parent=None):
         rows = list(rows)
         self.rows = rows
@@ -72,9 +78,57 @@ class LHCSectionTable:
         self.knobs = Col("knobs", rows)
         self.parent = parent
 
-    def clear(self):
-        self.rows.clear()
-        return self
+    @classmethod
+    def from_json(cls, filename):
+        dct = json.load(open(filename))
+        rowcls = globals()[dct["class"]]
+        rows = [rowcls.from_dict(row) for row in dct["rows"]]
+        return cls(rows)
+
+    def __getitem__(self, k):
+        if isinstance(k, int):
+            return self.rows[k]
+        elif k == "id":
+            return np.arange(len(self))
+        else:
+            return np.array([ss[k] for ss in self.rows])
+
+    def __iter__(self):
+        return iter(self.rows)
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __repr__(self):
+        if len(self) == 0:
+            return "<Table: 0 rows>"
+        cls = self.rows[0].__class__.__name__
+        return f"<Table {cls}: {len(self)} rows>"
+
+    def __setitem__(self, k, row):
+        if isinstance(k, int):
+            self.rows[k] = row
+            if hasattr(self, "irs") and hasattr(row, "irs"):
+                print(k, row)
+                for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
+                    ss.rows[k] = ss_row
+        else:
+            raise ValueError(f"Cannot set item {k}")
+
+    @property
+    def tab(self):
+        tab = {}
+        tab["id"] = np.arange(len(self))
+        ir0 = self.rows[0]
+        for k in ir0.strengths:
+            tab[k] = [ir.strengths[k] for ir in self.rows]
+        for k in ir0.params:
+            tab[k] = [ir.params[k] for ir in self.rows]
+        for k in ir0.knobs:
+            tab[f"{k}_value"] = [ir.knobs[k].value for ir in self.rows]
+            for w in ir0.knobs[k].weights:
+                tab[f"{k}_{w}"] = [ir.knobs[k].weights[w] for ir in self.rows]
+        return xd.Table(tab, index="id")
 
     def append(self, row):
         self.rows.append(row)
@@ -93,47 +147,29 @@ class LHCSectionTable:
     def append_from_madxfile(self, filename):
         return self.append_from_madx_optics(filename)
 
-    def extend(self, rows):
-        self.rows.extend(rows)
+    def clear(self):
+        self.rows.clear()
         return self
-
-    def insert(self, i, row):
-        self.rows.insert(i, row)
-        return self
-
-    def remove(self, row):
-        self.rows.remove(row)
-        return self
-
-    def pop(self, i):
-        return self.rows.pop(i)
-
-    def index(self, row):
-        return self.rows.index(row)
-
-    def count(self, row):
-        return self.rows.count(row)
-
-    def get_p0c(self):
-        return [row.params["p0c"] for row in self.rows]
 
     def copy(self):
         return self.__class__([row.copy() for row in self.rows], self.parent)
 
-    @property
-    def tab(self):
-        tab = {}
-        tab["id"] = np.arange(len(self))
-        ir0 = self.rows[0]
-        for k in ir0.strengths:
-            tab[k] = [ir.strengths[k] for ir in self.rows]
-        for k in ir0.params:
-            tab[k] = [ir.params[k] for ir in self.rows]
-        for k in ir0.knobs:
-            tab[f"{k}_value"] = [ir.knobs[k].value for ir in self.rows]
-            for w in ir0.knobs[k].weights:
-                tab[f"{k}_{w}"] = [ir.knobs[k].weights[w] for ir in self.rows]
-        return xd.Table(tab, index="id")
+    def count(self, row):
+        return self.rows.count(row)
+
+    def extend(self, rows):
+        self.rows.extend(rows)
+        return self
+
+    def get_p0c(self):
+        return [row.params["p0c"] for row in self.rows]
+
+    def index(self, row):
+        return self.rows.index(row)
+
+    def insert(self, i, row):
+        self.rows.insert(i, row)
+        return self
 
     def interp_val(self, x, kname, order=1, xname="id", soft=False):
         xx = self[xname]
@@ -159,35 +195,17 @@ class LHCSectionTable:
         else:
             return np.interp(x, xx, yy)
 
-    def __getitem__(self, k):
-        if isinstance(k, int):
-            return self.rows[k]
-        elif k == "id":
-            return np.arange(len(self))
-        else:
-            return np.array([ss[k] for ss in self.rows])
-
-    def __setitem__(self, k, row):
-        if isinstance(k, int):
-            self.rows[k] = row
-            if hasattr(self, "irs") and hasattr(row, "irs"):
-                print(k, row)
-                for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
-                    ss.rows[k] = ss_row
-        else:
-            raise ValueError(f"Cannot set item {k}")
-
-    def __iter__(self):
-        return iter(self.rows)
-
-    def __len__(self):
-        return len(self.rows)
-
-    def __repr__(self):
-        if len(self) == 0:
-            return "<Table: 0 rows>"
-        cls = self.rows[0].__class__.__name__
-        return f"<Table {cls}: {len(self)} rows>"
+    def knob_plot(self, knobname):
+        tab = self.knob_table(knobname, max=False)
+        fig, ax = plt.subplots(num=knobname)
+        for k in tab:
+            if k == "id":
+                continue
+            ax.plot(tab["id"], tab[k], label=k)
+        ax.legend()
+        ax.set_xlabel("id")
+        ax.set_ylabel("factors")
+        ax.set_title(knobname)
 
     def knob_table(self, knobname, max=True):
         knob = self.knobs[knobname]
@@ -201,31 +219,60 @@ class LHCSectionTable:
             )
         return xd.Table(weights, index="id")
 
-    def knob_plot(self, knobname):
-        tab = self.knob_table(knobname, max=False)
-        fig, ax = plt.subplots(num=knobname)
-        for k in tab:
-            if k == "id":
-                continue
-            ax.plot(tab["id"], tab[k], label=k)
-        ax.legend()
-        ax.set_xlabel("id")
-        ax.set_ylabel("factors")
-        ax.set_title(knobname)
+    def pop(self, i):
+        return self.rows.pop(i)
 
+    def remove(self, row):
+        self.rows.remove(row)
+        return self
 
-class LHCIRTable(LHCSectionTable):
-    def interp(self, n, order=1, xaxis="id"):
-        ir0 = self.rows[0]
-        strengths = {k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths}
-        params = {k: self.interp_val(n, k, order, xaxis) for k in ir0.params}
+    def to_json(self, filename):
+        rows = [row.to_dict() for row in self.rows]
+        clsname = self.rows[0].__class__.__name__
+        dct = {"class": clsname, "rows": rows}
+        json.dump(dct, open(filename, "w"), indent=2)
+        return self
+
+class LHCArcTable(LHCSectionTable):
+    def interp(self, n, order=1, xaxis="id", soft=True):
+        arc0 = self.rows[0]
+        strengths = {
+            k: self.interp_val(n, k, order, xaxis, soft=soft) for k in arc0.strengths
+        }
+        params = {
+            k: self.interp_val(
+                n,
+                k,
+                order,
+                xaxis,
+                soft=soft,
+            )
+            for k in arc0.params
+        }
         ##TODO add knobs
-        return ir0.__class__(
+        return arc0.__class__(
+            arc0.name,
             strengths=strengths,
             params=params,
             parent=self.parent,
-            variant=ir0.variant,
+            variant=arc0.variant,
         )
+
+class LHCIRTable(LHCSectionTable):
+    def get(self, k):
+        return np.array([ir[k] for ir in self.rows])
+
+    def get_gradient(self, kname, p0c=None):
+        if p0c is None:
+            p0c = self.get_p0c()
+        brho = p0c / 299792458
+        return self[kname] * brho
+
+    def get_p0c(self):
+        if self.rows[0].parent is None or self.rows[-1].parent is None:
+            return np.array([7e12 for row in self.rows])
+        else:
+            return np.array([row.parent.params["p0c"] for row in self.rows])
 
     def get_quads(self, n=None):
         if n is None:
@@ -242,20 +289,35 @@ class LHCIRTable(LHCSectionTable):
                 quad_names = []
             return {k: [ir.quads[k] for ir in self.rows] for k in quad_names}
 
-    def get_p0c(self):
-        if self.rows[0].parent is None or self.rows[-1].parent is None:
-            return np.array([7e12 for row in self.rows])
-        else:
-            return np.array([row.parent.params["p0c"] for row in self.rows])
+    def interp(self, n, order=1, xaxis="id"):
+        ir0 = self.rows[0]
+        strengths = {k: self.interp_val(n, k, order, xaxis) for k in ir0.strengths}
+        params = {k: self.interp_val(n, k, order, xaxis) for k in ir0.params}
+        ##TODO add knobs
+        return ir0.__class__(
+            strengths=strengths,
+            params=params,
+            parent=self.parent,
+            variant=ir0.variant,
+        )
 
-    def get(self, k):
-        return np.array([ir[k] for ir in self.rows])
-
-    def get_gradient(self, kname, p0c=None):
-        if p0c is None:
-            p0c = self.get_p0c()
-        brho = p0c / 299792458
-        return self[kname] * brho
+    def plot_param_fit(
+        self, attr, order=1, xaxis="id", soft=False, ax=None, title=None
+    ):
+        if title is None:
+            title = f"{self.rows[0].name.upper()} {attr}"
+        if ax is None:
+            fig, ax = plt.subplots(num=title)
+        xx = self[xaxis]
+        yy = self[attr]
+        xx_fit = np.linspace(xx[0], xx[-1], 1001)
+        yy_fit = self.interp_val(xx_fit, attr, order=order, xname=xaxis, soft=soft)
+        ax.plot(xx, yy, "o", label=attr)
+        ax.plot(xx_fit, yy_fit, label=f"fit {attr}")
+        ax.set_title(title)
+        ax.set_xlabel(xaxis)
+        ax.set_ylabel(attr)
+        ax.legend()
 
     def plot_params(self, xaxis="id", ax=None, figname=None):
         xx = self[xaxis]
@@ -361,24 +423,6 @@ class LHCIRTable(LHCSectionTable):
         ax.set_ylabel(r"k [$T/m$]")
         ax.legend()
 
-    def plot_param_fit(
-        self, attr, order=1, xaxis="id", soft=False, ax=None, title=None
-    ):
-        if title is None:
-            title = f"{self.rows[0].name.upper()} {attr}"
-        if ax is None:
-            fig, ax = plt.subplots(num=title)
-        xx = self[xaxis]
-        yy = self[attr]
-        xx_fit = np.linspace(xx[0], xx[-1], 1001)
-        yy_fit = self.interp_val(xx_fit, attr, order=order, xname=xaxis, soft=soft)
-        ax.plot(xx, yy, "o", label=attr)
-        ax.plot(xx_fit, yy_fit, label=f"fit {attr}")
-        ax.set_title(title)
-        ax.set_xlabel(xaxis)
-        ax.set_ylabel(attr)
-        ax.legend()
-
     def plot_quads(
         self,
         xaxis="id",
@@ -422,59 +466,7 @@ class LHCIRTable(LHCSectionTable):
         plt.suptitle(title)
         # plt.tight_layout()
 
-
-class LHCArcTable(LHCSectionTable):
-    def interp(self, n, order=1, xaxis="id", soft=True):
-        arc0 = self.rows[0]
-        strengths = {
-            k: self.interp_val(n, k, order, xaxis, soft=soft) for k in arc0.strengths
-        }
-        params = {
-            k: self.interp_val(
-                n,
-                k,
-                order,
-                xaxis,
-                soft=soft,
-            )
-            for k in arc0.params
-        }
-        ##TODO add knobs
-        return arc0.__class__(
-            arc0.name,
-            strengths=strengths,
-            params=params,
-            parent=self.parent,
-            variant=arc0.variant,
-        )
-
-
 class LHCOpticsTable(LHCSectionTable):
-    def append_from_madx_optics(self, filename):
-        row0 = self.rows[0]
-        row = row0.__class__.from_madx_optics(
-            filename,
-            name=row0.name,
-        )
-        self.rows.append(row)
-        return self
-
-    def tab_from_lsa(self, beamprocess, parameters=None):
-        if parameters is None:
-            parameters = ["LHCBEAM/MOMENTUM"]
-        lsa = get_lsa()
-        opttable = lsa.getOpticTable(beamprocess)
-        out = {
-            "name": np.array([oo.name for oo in opttable]),
-            "time": np.array([oo.time for oo in opttable]),
-        }
-        for pp in parameters:
-            trim = lsa.getLastTrim(pp, beamprocess)
-            ptime = trim.data[0]
-            pval = trim.data[1]
-            out[pp] = np.interp(out["time"], ptime, pval)
-        return xd.Table(out)
-
     def __init__(self, rows, time=None, beamprocess=None):
         self.rows = rows
         self.params = Col("params", rows)
@@ -494,29 +486,25 @@ class LHCOpticsTable(LHCSectionTable):
         self.time = time
         self.beamprocess = beamprocess
 
-    def interp(self, n, order=1, xaxis="id"):
-        opt0 = self.rows[0]
-        params = {k: self.interp_val(n, k, order, xaxis) for k in opt0.params}
-        irs = [ir.interp(n, order, xaxis) for ir in self.irs]
-        arcs = [arc.interp(n, order, xaxis) for arc in self.arcs]
-        return opt0.__class__(
-            name=f"{xaxis}={n}",
-            params=params,
-            irs=irs,
-            arcs=arcs,
-            variant=opt0.variant,
+    def append(self, row):
+        self.rows.append(row)
+        for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
+            ss.rows.append(ss_row)
+        return self
+
+    def append_from_madx_optics(self, filename):
+        row0 = self.rows[0]
+        row = row0.__class__.from_madx_optics(
+            filename,
+            name=row0.name,
         )
+        self.rows.append(row)
+        return self
 
     def clear(self):
         self.rows.clear()
         for ss in self.irs + self.arcs:
             ss.clear()
-        return self
-
-    def append(self, row):
-        self.rows.append(row)
-        for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
-            ss.rows.append(ss_row)
         return self
 
     def extend(self, rows):
@@ -531,25 +519,30 @@ class LHCOpticsTable(LHCSectionTable):
             ss.rows.insert(i, ss_row)
         return self
 
+    def interp(self, n, order=1, xaxis="id"):
+        opt0 = self.rows[0]
+        params = {k: self.interp_val(n, k, order, xaxis) for k in opt0.params}
+        irs = [ir.interp(n, order, xaxis) for ir in self.irs]
+        arcs = [arc.interp(n, order, xaxis) for arc in self.arcs]
+        return opt0.__class__(
+            name=f"{xaxis}={n}",
+            params=params,
+            irs=irs,
+            arcs=arcs,
+            variant=opt0.variant,
+        )
+
+    def plot_quads(self, current=False, p0c=None):
+        for ir in self.irs:
+            ir.plot_quads(current=current, p0c=p0c)
+
     def remove(self, row):
         self.rows.remove(row)
         for ss, ss_row in zip(self.irs + self.arcs, row.irs + row.arcs):
             ss.rows.remove(ss_row)
         return self
 
-    def plot_quads(self, current=False, p0c=None):
-        for ir in self.irs:
-            ir.plot_quads(current=current, p0c=p0c)
-
-
-class BeamProcess:
-    def __init__(self, name, opticstable, parameters=None):
-        self.name = name
-        self.opticstable = opticstable
-        self.parameters = parameters
-
-    @classmethod
-    def from_lsa(cls, name, beamprocess, parameters=None):
+    def tab_from_lsa(self, beamprocess, parameters=None):
         if parameters is None:
             parameters = ["LHCBEAM/MOMENTUM"]
         lsa = get_lsa()
@@ -564,7 +557,6 @@ class BeamProcess:
             pval = trim.data[1]
             out[pp] = np.interp(out["time"], ptime, pval)
         return xd.Table(out)
-
 
 class PolyProcess:
     def __init__(self, name, xa, xb, targets=None, parameters=None):

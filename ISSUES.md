@@ -1,25 +1,12 @@
 # Issues
 
 Fixes:
-- verify loading run 3, add particles to json in acc-models Run 3
-- madx optics, json_thin -> LHCOptics -> match -> check
-
+- add energy dependent knob as Knob instances
 - add i_mo, on_mo knobs
-
-- lhc.vars.load() does not create the knob structure with name expected by opt.update()
-  a workaround is needed. LHCOptics.from_xsuite does the correct thing, but it is not atomic
-  very dangerous...
-
-- after matching we want to update all the parameters, but not those that would be slightly mismatched,
-  even after a proper rematching. Rounding is not really an option because some the parameters are set from linear scans.
-
-- opt.get_params(full=True) still give atsfactor=1 and betxip1 not correct
-
+- add experimental knobs
 - investigate strange bug, dqx.b12 knobs are matched but
   needs update_model to have a proper model for beam2
-
 - aperture for collision, add phase dep logic in limits
-
 - make transition examples
 - check 50cm strengths margins
 - match injection transition
@@ -32,7 +19,6 @@ Fixes:
 - Make sure to use model.create_knob (that deletes and recreate the knob) before matching in all knobs
 
 Features:
-- add improved bend models in Run 3 jsons 
 - add matching for MBs (in particular for flat)
 - add per-arc dispersion knobs
 - introduce multi i/k power converter for triplets
@@ -45,4 +31,3 @@ Features:
 - verify disp knobs closeness with coupling
 - improve max_chrom target in global_w chrom for flat optics
 - test matching chrom and w at the same time
-- add energy dependent knob as Knob instances

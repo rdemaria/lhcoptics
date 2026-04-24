@@ -10,7 +10,6 @@ from .irs import (
 )
 from .section import gen_acb_alt_names
 
-
 class LHCIR8(LHCIR):
     knob_names = [
         "on_x8h",

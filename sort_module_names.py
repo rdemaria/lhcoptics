@@ -40,9 +40,15 @@ def parse_args() -> argparse.Namespace:
         help="Rewrite files in place instead of opening a dry-run diff.",
     )
     mode_group.add_argument(
-        "--check-only",
+        "-c",
         action="store_true",
+        dest="check_only",
         help="Only run sorting and sanity checks without diffing or writing.",
+    )
+    mode_group.add_argument(
+        "--stdout",
+        action="store_true",
+        help="Write the sorted source to stdout without diffing or writing.",
     )
     parser.add_argument(
         "modules",
@@ -50,7 +56,10 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Path(s) to the Python module(s) to sort.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.stdout and len(args.modules) != 1:
+        parser.error("--stdout requires exactly one module")
+    return args
 
 
 def main() -> int:
@@ -65,6 +74,7 @@ def main() -> int:
                 module,
                 in_place=args.in_place,
                 check_only=args.check_only,
+                stdout=args.stdout,
                 internal_roots=internal_roots,
             )
         except (OSError, SyntaxError, UnicodeDecodeError) as exc:
@@ -72,6 +82,8 @@ def main() -> int:
             exit_code = 1
             continue
 
+        if args.stdout:
+            continue
         if not changed:
             action = "ok" if args.check_only else "already sorted"
             print(f"{module}: {action}")
@@ -84,12 +96,17 @@ def process_file(
     *,
     in_place: bool,
     check_only: bool,
+    stdout: bool,
     internal_roots: set[str],
 ) -> bool:
     """Sort one file and either rewrite it, check it, or show a diff."""
     source, encoding = read_source(module)
     sorted_source = sort_module_source(source, internal_roots=internal_roots)
     sanity_check_source(sorted_source, filename=str(module))
+
+    if stdout:
+        print(sorted_source, end="")
+        return sorted_source != source
 
     if sorted_source == source:
         return False
@@ -131,7 +148,7 @@ def sort_module_source(source: str, *, internal_roots: set[str]) -> str:
     start_index = 0
 
     if is_docstring_stmt(blocks[0].node):
-        parts.append(raw_block_text(blocks[0], lines))
+        parts.append(trim_blank_edges(raw_block_text(blocks[0], lines)))
         start_index = 1
 
     rendered = render_sorted_sequence(
@@ -146,6 +163,7 @@ def sort_module_source(source: str, *, internal_roots: set[str]) -> str:
         separator=lambda left, right: module_separator(
             left, right, internal_roots=internal_roots
         ),
+        dependency_names=runtime_dependency_names,
     )
     if start_index and start_index < len(blocks) and classify_module_block(
         blocks[start_index].node
@@ -186,7 +204,7 @@ def render_class_block(
     body_parts = [header]
     start_index = 0
     if is_docstring_stmt(child_blocks[0].node):
-        body_parts.append(raw_block_text(child_blocks[0], lines))
+        body_parts.append(trim_blank_edges(raw_block_text(child_blocks[0], lines)))
         start_index = 1
 
     rendered = render_sorted_sequence(
@@ -195,6 +213,7 @@ def render_class_block(
         sort_key=class_sort_key,
         render_block=lambda child: raw_block_text(child, lines),
         separator=class_separator,
+        dependency_names=runtime_dependency_names,
     )
     if start_index and start_index < len(child_blocks) and classify_class_block(
         child_blocks[start_index].node
@@ -212,6 +231,7 @@ def render_sorted_sequence(
     sort_key,
     render_block,
     separator,
+    dependency_names=None,
 ) -> str:
     """Sort supported runs while leaving unsupported blocks in place."""
     parts: list[str] = []
@@ -220,8 +240,10 @@ def render_sorted_sequence(
     def flush_run() -> None:
         if not sortable_run:
             return
-        ordered = sorted(
-            sortable_run, key=lambda item: sort_key(item[1], item[0])
+        ordered = order_sortable_run(
+            sortable_run,
+            sort_key=sort_key,
+            dependency_names=dependency_names,
         )
         previous_block: Block | None = None
         for _, block in ordered:
@@ -241,6 +263,45 @@ def render_sorted_sequence(
 
     flush_run()
     return "".join(parts)
+
+
+def order_sortable_run(
+    blocks: Sequence[tuple[int, Block]],
+    *,
+    sort_key,
+    dependency_names,
+) -> list[tuple[int, Block]]:
+    """Sort a run while keeping declaration dependencies before their users."""
+    sorted_blocks = sorted(blocks, key=lambda item: sort_key(item[1], item[0]))
+    if dependency_names is None:
+        return sorted_blocks
+
+    declared_by_block = {id(block): declared_names(block.node) for _, block in blocks}
+    all_declared = set().union(*declared_by_block.values()) if blocks else set()
+    deps_by_block = {
+        id(block): (
+            dependency_names(block.node) & all_declared - declared_by_block[id(block)]
+        )
+        for _, block in blocks
+    }
+
+    emitted: set[str] = set()
+    ordered: list[tuple[int, Block]] = []
+    remaining = list(sorted_blocks)
+
+    while remaining:
+        for item in remaining:
+            block = item[1]
+            if deps_by_block[id(block)] <= emitted:
+                break
+        else:
+            item = min(remaining, key=lambda candidate: candidate[0])
+
+        remaining.remove(item)
+        ordered.append(item)
+        emitted.update(declared_by_block[id(item[1])])
+
+    return ordered
 
 
 def collect_blocks(
@@ -453,7 +514,9 @@ def class_sort_key(block: Block, index: int) -> tuple[object, ...]:
     }
     if kind == "attribute":
         return (order[kind], alphabetical_key(declaration_name(statement)), index)
-    if kind == "property" and isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+    if kind == "property" and isinstance(
+        statement, (ast.FunctionDef, ast.AsyncFunctionDef)
+    ):
         property_name, property_order = property_sort_info(statement)
         return (
             order[kind],
@@ -485,8 +548,25 @@ def is_assignment(statement: ast.stmt) -> bool:
 
 def declaration_name(statement: ast.stmt) -> str:
     """Return a representative bound name for a declaration."""
+    names = list(declared_names(statement))
+    if not names:
+        return ""
+    return min(names, key=alphabetical_key)
+
+
+def declared_names(statement: ast.stmt) -> set[str]:
+    """Return names bound by a top-level or class-level statement."""
     names: list[str] = []
-    if isinstance(statement, ast.Assign):
+    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        names.append(statement.name)
+    elif isinstance(statement, ast.Import):
+        for alias in statement.names:
+            names.append(alias.asname or alias.name.split(".", 1)[0])
+    elif isinstance(statement, ast.ImportFrom):
+        for alias in statement.names:
+            if alias.name != "*":
+                names.append(alias.asname or alias.name)
+    elif isinstance(statement, ast.Assign):
         for target in statement.targets:
             names.extend(extract_target_names(target))
     elif isinstance(statement, ast.AnnAssign):
@@ -497,9 +577,70 @@ def declaration_name(statement: ast.stmt) -> str:
         type_alias = getattr(ast, "TypeAlias", None)
         if type_alias is not None and isinstance(statement, type_alias):
             names.extend(extract_target_names(statement.name))
-    if not names:
-        return ""
-    return min(names, key=alphabetical_key)
+    return set(names)
+
+
+def runtime_dependency_names(statement: ast.stmt) -> set[str]:
+    """Return names needed while executing a declaration statement."""
+    if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return function_runtime_dependency_names(statement)
+    if isinstance(statement, ast.ClassDef):
+        nodes: list[ast.AST] = [*statement.decorator_list, *statement.bases]
+        nodes.extend(keyword.value for keyword in statement.keywords)
+        nodes.extend(
+            child
+            for child in statement.body
+            if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+        )
+        return referenced_names(*nodes)
+    if isinstance(statement, ast.Assign):
+        return referenced_names(statement.value)
+    if isinstance(statement, ast.AnnAssign):
+        nodes = [statement.annotation]
+        if statement.value is not None:
+            nodes.append(statement.value)
+        return referenced_names(*nodes)
+    if isinstance(statement, ast.AugAssign):
+        return referenced_names(statement.target, statement.value)
+    type_alias = getattr(ast, "TypeAlias", None)
+    if type_alias is not None and isinstance(statement, type_alias):
+        return referenced_names(statement.value)
+    return set()
+
+
+def function_runtime_dependency_names(
+    statement: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> set[str]:
+    """Return names needed while creating a function object."""
+    nodes: list[ast.AST] = [*statement.decorator_list, *statement.args.defaults]
+    nodes.extend(
+        default for default in statement.args.kw_defaults if default is not None
+    )
+    if statement.returns is not None:
+        nodes.append(statement.returns)
+    args = [
+        *statement.args.posonlyargs,
+        *statement.args.args,
+        *statement.args.kwonlyargs,
+    ]
+    if statement.args.vararg is not None:
+        args.append(statement.args.vararg)
+    if statement.args.kwarg is not None:
+        args.append(statement.args.kwarg)
+    nodes.extend(arg.annotation for arg in args if arg.annotation is not None)
+    return referenced_names(*nodes)
+
+
+def referenced_names(*nodes: ast.AST | None) -> set[str]:
+    """Return loaded names referenced by the given AST nodes."""
+    names: set[str] = set()
+    for node in nodes:
+        if node is None:
+            continue
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load):
+                names.add(child.id)
+    return names
 
 
 def extract_target_names(target: ast.expr) -> list[str]:

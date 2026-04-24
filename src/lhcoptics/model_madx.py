@@ -8,7 +8,6 @@ import xdeps as xd
 from .knob import Knob
 from .utils import print_diff_dict_float
 
-
 def get_ap_limit(section, ap, verbose=True):
     energy = ap.energy
     if energy < 500e9:
@@ -38,7 +37,6 @@ def get_ap_limit(section, ap, verbose=True):
         print(
             f"{section}: limit {name2min:20} {color}{n1min:9.3f}{reset} σ at s={smin:.1f} m"
         )
-
 
 class LHCMadxModel:
     extra_defs = """
@@ -96,7 +94,6 @@ abxwh.l8      := +0.000180681598453109894*on_lhcb   ;
 ablw.r8       := -0.000180681598453109894*on_lhcb   ;
 abxws.r8      := +0.000045681598453109894*on_lhcb   ;
     """
-
     extra_defs_hllhc = """
 ! Solenoids and spectrometers
 abas               := 12.00/6.0*clight/(7e12)*on_sol_atlas ;
@@ -334,7 +331,6 @@ kb.a67             := ab.a67/l.mb*(1+6.9e-13)      ;
 kb.a78             := ab.a78/l.mb*(1+6.9e-13)      ;
 kb.a81             := ab.a81/l.mb*(1+6.9e-13)      ;
 """
-
     extra_madx = (
         extra_defs
         + """
@@ -646,7 +642,6 @@ use, sequence=lhcb2;
                 print(f"{k:20} {self[k]:15.6g} -> {v:15.6g}")
             self[k] = v
 
-
 class MADSequence:
     def __init__(self, madx, sequence_name):
         self.madx = madx
@@ -763,7 +758,6 @@ class MADSequence:
         tw = self.madx.twiss(sequence=self.sequence)
         return xd.Table(tw)
 
-
 class RMatrix:
     def __init__(self, matrix):
         self.matrix = matrix
@@ -771,7 +765,6 @@ class RMatrix:
     @classmethod
     def from_twiss(cls, tw):
         pass
-
 
 class TwissInit:
     def __init__(

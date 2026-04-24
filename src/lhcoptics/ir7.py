@@ -1,9 +1,8 @@
 import xtrack as xt
 
 from .irs import LHCIR, match_compare_log, gen_qq, gen_qt, gen_qtl
-from .section import gen_acb_alt_names
 from .model_xsuite import SinglePassDispersion
-
+from .section import gen_acb_alt_names
 
 class LHCIR7(LHCIR):
     collimators = [
@@ -32,7 +31,6 @@ class LHCIR7(LHCIR):
         "tcsg.a5r7.b2",
         "tcsg.a5r7.b2",
     ]
-
     knobsRematched12c6b = {
         "kqt4.l7": 0.0012257364160585084,
         "kqt4.r7": 0.0012659632628095638,

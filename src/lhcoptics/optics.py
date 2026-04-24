@@ -1,14 +1,14 @@
-import json
-import re
-from pathlib import Path
 import gzip
+import json
+from pathlib import Path
+import re
 from turtle import clear
 
+from cpymad.madx import Madx
+import matplotlib.pyplot as plt
 import numpy as np
 
-import matplotlib.pyplot as plt
-from cpymad.madx import Madx
-
+from .aperture import LHCAperture
 from .arcs import (
     LHCArc,
     LHCA12,
@@ -22,15 +22,14 @@ from .arcs import (
 )
 from .circuits import LHCCircuits
 from .ir15 import LHCIR1
+from .ir15 import LHCIR5
 from .ir2 import LHCIR2
 from .ir3 import LHCIR3
 from .ir4 import LHCIR4
-from .ir15 import LHCIR5
 from .ir6 import LHCIR6
 from .ir7 import LHCIR7
 from .ir8 import LHCIR8
 from .model_xsuite import LHCMadxModel, LHCXsuiteModel
-from .aperture import LHCAperture
 from .section import Knob
 from .utils import (
     deliver_list_str,
@@ -41,7 +40,6 @@ from .utils import (
 )
 
 _opl = ["_op", "_sq", ""]
-
 
 def get_ats_factors(presqueeze, squeezed):
     out = {}
@@ -63,6 +61,12 @@ def get_ats_factors(presqueeze, squeezed):
                 )
     return out
 
+def is_madx_optics(src):
+    if isinstance(src, str) and src.endswith(".madx"):
+        return True
+    if isinstance(src, Path) and src.suffix == ".madx":
+        return True
+    return False
 
 def set_ip_labels(ax, tw):
     ips = tw.rows["ip[1-8]"].s
@@ -75,15 +79,6 @@ def set_ip_labels(ax, tw):
         lbl = ["IP1"] + lbl
     ax.set_xticks(ips, labels=lbl)
     ax.set_xlabel(None)
-
-
-def is_madx_optics(src):
-    if isinstance(src, str) and src.endswith(".madx"):
-        return True
-    if isinstance(src, Path) and src.suffix == ".madx":
-        return True
-    return False
-
 
 class LHCOptics:
     """
@@ -143,8 +138,6 @@ kb.a67             := ab.a67/l.mb*(1+e_kb);
 kb.a78             := ab.a78/l.mb*(1+e_kb);
 kb.a81             := ab.a81/l.mb*(1+e_kb);
 """
-    _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
-
     _global_param_names = [
         "p0c",
         "qxb1",
@@ -160,6 +153,49 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         "rx_ip5",
         "ry_ip5",
     ]
+    _irs = [LHCIR1, LHCIR2, LHCIR3, LHCIR4, LHCIR5, LHCIR6, LHCIR7, LHCIR8]
+
+    def __init__(
+        self,
+        name,
+        irs=None,
+        arcs=None,
+        params=None,
+        knobs=None,
+        model=None,
+        circuits=None,
+        aperture=None,
+        variant="2025",
+    ):
+        if name is None:
+            name = "lhcoptics"
+        self.name = name
+        if irs is None:
+            irs = [IR(variant=variant) for IR in self._irs]
+        if arcs is None:
+            arcs = [LHCArc(arc, variant=variant) for arc in self._arc_names]
+        for ir in irs:
+            setattr(self, ir.name, ir)
+            ir.parent = self
+        for arc in arcs:
+            setattr(self, arc.name, arc)
+            arc.parent = self
+        if params is None:
+            params = {}
+        if knobs is None:
+            knobs = {}
+        self.params = params
+        self.knobs = knobs
+        self.model = model
+        self.circuits = circuits
+        self.aperture = aperture
+        self.variant = variant
+        # print(f"Optics {self.name} created")
+        for knob in knobs.values():
+            knob.parent = self
+        for ss in irs + arcs:
+            for knob in ss.knobs.values():
+                knob.parent = self
 
     @classmethod
     def _gen_knob_names(cls, variant):
@@ -210,12 +246,29 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
 
         return out
 
-    def gen_knob_names(self, full=True):
-        out = self._gen_knob_names(self.variant)
-        if full:
-            for ss in self.irs + self.arcs:
-                out.extend(ss.gen_knob_names())
-        return out
+    @classmethod
+    def from_cpymad(
+        cls,
+        madx,
+        name=None,
+        attach_model="auto",
+        circuits=None,
+        variant=None,
+        verbose=False,
+    ):
+        """
+        Create an LHCOptics object from a MADX model.
+
+        """
+        madmodel = LHCMadxModel(madx)
+        return cls.from_model(
+            madmodel,
+            name=name,
+            attach_model=attach_model,
+            circuits=circuits,
+            verbose=verbose,
+            variant=variant,
+        )
 
     @classmethod
     def from_dict(
@@ -288,52 +341,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             return out
 
     @classmethod
-    def from_cpymad(
-        cls,
-        madx,
-        name=None,
-        attach_model="auto",
-        circuits=None,
-        variant=None,
-        verbose=False,
-    ):
-        """
-        Create an LHCOptics object from a MADX model.
-
-        """
-        madmodel = LHCMadxModel(madx)
-        return cls.from_model(
-            madmodel,
-            name=name,
-            attach_model=attach_model,
-            circuits=circuits,
-            verbose=verbose,
-            variant=variant,
-        )
-
-    @classmethod
-    def from_madx_scripts(
-        cls,
-        *filenames,
-        extra=False,
-        stdout=False,
-        attach_model="auto",
-        basedir=None,
-        circuits=None,
-        verbose=False,
-    ):
-        model = LHCMadxModel.from_madx_scripts(
-            *filenames, extra=extra, stdout=stdout, basedir=basedir
-        )
-        return cls.from_model(
-            model,
-            name=",".join(map(str, filenames)),
-            attach_model=attach_model,
-            circuits=circuits,
-            verbose=verbose,
-        )
-
-    @classmethod
     def from_madx_optics(
         cls, filename, model=None, name=None, circuits=None, verbose=False
     ):
@@ -363,6 +370,28 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             if circuits is not None:
                 opt.set_circuits(circuits)
         return opt
+
+    @classmethod
+    def from_madx_scripts(
+        cls,
+        *filenames,
+        extra=False,
+        stdout=False,
+        attach_model="auto",
+        basedir=None,
+        circuits=None,
+        verbose=False,
+    ):
+        model = LHCMadxModel.from_madx_scripts(
+            *filenames, extra=extra, stdout=stdout, basedir=basedir
+        )
+        return cls.from_model(
+            model,
+            name=",".join(map(str, filenames)),
+            attach_model=attach_model,
+            circuits=circuits,
+            verbose=verbose,
+        )
 
     @classmethod
     def from_model(
@@ -532,47 +561,8 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         opt.check()
         opt.to_madx(outfile)
 
-    def __init__(
-        self,
-        name,
-        irs=None,
-        arcs=None,
-        params=None,
-        knobs=None,
-        model=None,
-        circuits=None,
-        aperture=None,
-        variant="2025",
-    ):
-        if name is None:
-            name = "lhcoptics"
-        self.name = name
-        if irs is None:
-            irs = [IR(variant=variant) for IR in self._irs]
-        if arcs is None:
-            arcs = [LHCArc(arc, variant=variant) for arc in self._arc_names]
-        for ir in irs:
-            setattr(self, ir.name, ir)
-            ir.parent = self
-        for arc in arcs:
-            setattr(self, arc.name, arc)
-            arc.parent = self
-        if params is None:
-            params = {}
-        if knobs is None:
-            knobs = {}
-        self.params = params
-        self.knobs = knobs
-        self.model = model
-        self.circuits = circuits
-        self.aperture = aperture
-        self.variant = variant
-        # print(f"Optics {self.name} created")
-        for knob in knobs.values():
-            knob.parent = self
-        for ss in irs + arcs:
-            for knob in ss.knobs.values():
-                knob.parent = self
+    def __contains__(self, k):
+        return k in self.params or k in self.knobs
 
     def __getitem__(self, k):
         if k in self.params:
@@ -583,9 +573,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             if k in ss:
                 return ss[k]
         raise KeyError(f"{k} not found in {self}")
-
-    def __contains__(self, k):
-        return k in self.params or k in self.knobs
 
     def __repr__(self) -> str:
         return f"<LHCOptics {self.name!r}>"
@@ -600,22 +587,79 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         """List of IRs"""
         return [getattr(self, ir.name) for ir in self._irs]
 
-    def twissip(self):
-        """Compute twiss and print orbit at IPs, tunes and chromaticity"""
-        tw1, tw2 = self.twiss(chrom=True, strengths=False)
-        header = True
-        cols = "betx bety dx dpx px*1e6 py*1e6 x*1e3 y*1e3"
-        for ip in ["ip1", "ip2", "ip5", "ip8"]:
-            tw1.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
-            if header:
-                header = False
-            tw2.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
-        print("         HB1         HB2         VB1         VB2")
-        print(f"Tunes:  {tw1.qx:11.6f} {tw2.qx:11.6f} {tw1.qy:11.6f} {tw2.qy:11.6f}")
-        print(
-            f"Chroma: {tw1.dqx:11.6f} {tw2.dqx:11.6f} {tw1.dqy:11.6f} {tw2.dqy:11.6f}"
-        )
-        return self
+    def _get_params_from_twiss(self, tw1=None, tw2=None, full=False, mode="init"):
+        """
+        Get the parameters from the twiss object.
+        """
+        p0c = tw1.particle_on_co.p0c[0]
+        params = {
+            "p0c": p0c,
+            "qxb1": tw1.qx,
+            "qyb1": tw1.qy,
+            "qxb2": tw2.qx,
+            "qyb2": tw2.qy,
+            "qpxb1": tw1.dqx,
+            "qpyb1": tw1.dqy,
+            "qpxb2": tw2.dqx,
+            "qpyb2": tw2.dqy,
+        }
+        presqueeze = {}
+        presqueeze.update(self.ir1.get_params_from_twiss(mode="init"))
+        presqueeze.update(self.ir5.get_params_from_twiss(mode="init"))
+        temp = {}
+        if full:
+            for ss in self.irs + self.arcs:
+                section_params = ss.get_params_from_twiss(tw1, tw2)
+                params.update(section_params)
+            temp.update(params)
+            ats_factors = get_ats_factors(presqueeze, temp)
+            temp.update(presqueeze)
+            temp.update(ats_factors)
+        else:
+            temp.update(self.ir1.get_params_from_twiss(mode="init"))
+            temp.update(self.ir5.get_params_from_twiss(mode="init"))
+        for irn in [1, 5]:
+            for xy in "xy":
+                rname = f"r{xy}_ip{irn}"
+                rr_ipb1 = temp[f"bet{xy}ip{irn}b1"] / tw1[f"bet{xy}", f"ip{irn}"]
+                rr_ibb2 = temp[f"bet{xy}ip{irn}b2"] / tw2[f"bet{xy}", f"ip{irn}"]
+                params[rname] = (rr_ipb1 + rr_ibb2) / 2
+                if abs(rr_ipb1 - rr_ibb2) > 0.00001:
+                    print(
+                        f"Warning: r{xy}_ip{irn} from beam 1 and beam 2 differ by more than 0.00001: {rr_ipb1} vs {rr_ibb2}"
+                    )
+        return params
+
+    def _get_section_src(self, src, section, index, verbose=False):
+        if src is None:
+            if verbose:
+                print(f"No source provided for {section.name}")
+            return None
+        if hasattr(src, section.name):
+            if verbose:
+                print(f"Using attribute {section.name!r} from {src} for {section.name}")
+            return getattr(src, section.name)
+        if isinstance(src, dict):
+            if section.name in src:
+                if verbose:
+                    print(f"Using dict key {section.name!r} for {section.name}")
+                return src[section.name]
+            if section in self.irs and "irs" in src:
+                if verbose:
+                    print(f"Using serialized irs[{index}] for {section.name}")
+                return src["irs"][index]
+            if section in self.arcs and "arcs" in src:
+                arc_index = index - len(self.irs)
+                if verbose:
+                    print(f"Using serialized arcs[{arc_index}] for {section.name}")
+                return src["arcs"][arc_index]
+            if any(key in src for key in ("params", "knobs", "irs", "arcs")):
+                if verbose:
+                    print(f"No section source found for {section.name} in structured dict")
+                return None
+        if verbose:
+            print(f"Using flat source {src} for {section.name}")
+        return src
 
     def check(self, verbose=False):
         """Compute twiss and print orbit at IPs, tunes and chromaticity"""
@@ -686,43 +730,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 print(f" Section {k} match status: {v}")
         return np.all(out.values())
 
-    def check_phase_params(self, verbose=False, tol=1e-9, fail=False, correct=False):
-        ret = True
-        for xy in "xy":
-            for beam in "12":
-                data = {}
-                for arc in self.arcs:
-                    nn = f"mu{xy}{arc.name}b{beam}"
-                    data[nn] = arc.params[nn]
-                for ir in self.irs:
-                    nn = f"mu{xy}ip{ir.irn}b{beam}"
-                    data[nn] = ir.params[nn]
-                sum = 0
-                for k, v in data.items():
-                    sum += v
-                qq = self.params[f"q{xy}b{beam}"]
-                if abs(sum - qq) > tol:
-                    if verbose:
-                        print(
-                            f"mu{xy}b{beam}: Sum={sum} Q={qq} Diff={sum - qq} > tol={tol} FAIL"
-                        )
-                    ret = False
-                    if fail:
-                        raise ValueError(
-                            f"Phase parameter mu{xy}b{beam} check failed: Sum={sum}, Q={qq}"
-                        )
-                nn = f"mu{xy}a34b{beam}"
-                if correct and abs(sum - qq) > tol:
-                    old = data[nn]
-                    new = old + qq - sum
-                    if verbose:
-                        print(
-                            f"Correcting {nn} from {old} to {new} to enforce sum of phases equal to Q"
-                        )
-                    self.arcs[2].params[nn] = new
-                    ret = True
-        return ret
-
     def check_params(self, verbose=True, tol=5e-8, fail=False):
         ret = True
         rows = []
@@ -758,6 +765,43 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 print(
                     f"{section:8s} {k:20s} {v:18.10g} {vtw:18.10g} {diff:12.3e} {tol:10.1e} {'FAIL':>6s}"
                 )
+        return ret
+
+    def check_phase_params(self, verbose=False, tol=1e-9, fail=False, correct=False):
+        ret = True
+        for xy in "xy":
+            for beam in "12":
+                data = {}
+                for arc in self.arcs:
+                    nn = f"mu{xy}{arc.name}b{beam}"
+                    data[nn] = arc.params[nn]
+                for ir in self.irs:
+                    nn = f"mu{xy}ip{ir.irn}b{beam}"
+                    data[nn] = ir.params[nn]
+                sum = 0
+                for k, v in data.items():
+                    sum += v
+                qq = self.params[f"q{xy}b{beam}"]
+                if abs(sum - qq) > tol:
+                    if verbose:
+                        print(
+                            f"mu{xy}b{beam}: Sum={sum} Q={qq} Diff={sum - qq} > tol={tol} FAIL"
+                        )
+                    ret = False
+                    if fail:
+                        raise ValueError(
+                            f"Phase parameter mu{xy}b{beam} check failed: Sum={sum}, Q={qq}"
+                        )
+                nn = f"mu{xy}a34b{beam}"
+                if correct and abs(sum - qq) > tol:
+                    old = data[nn]
+                    new = old + qq - sum
+                    if verbose:
+                        print(
+                            f"Correcting {nn} from {old} to {new} to enforce sum of phases equal to Q"
+                        )
+                    self.arcs[2].params[nn] = new
+                    ret = True
         return ret
 
     def check_quad_strengths(
@@ -867,25 +911,17 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                     ss.diff_knobs(so)
                     ss.diff_params(so)
 
+    def diff_knobs(self, other):
+        print_diff_dict_objs(self.knobs, other.knobs)
+
     def diff_model(self, model=None):
         """Display differences in strengths with respect to a model."""
         model = self.model if model is None else model
         for ss in self.irs + self.arcs:
             ss.diff_model(model=model)
 
-    def diff_knobs(self, other):
-        print_diff_dict_objs(self.knobs, other.knobs)
-
     def diff_params(self, other):
         print_diff_dict_float(self.params, other.params)
-
-    def find_strengths(self, regexp=None):
-        strengths = {}
-        for ss in self.irs + self.arcs:
-            strengths.update(ss.strengths)
-        if regexp is not None:
-            strengths = {k: v for k, v in strengths.items() if re.match(regexp, k)}
-        return strengths
 
     def find_knobs(self, regexp=None):
         """Find all knobs in the optics and its sections."""
@@ -905,36 +941,20 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             if sum(map(abs, knob.weights.values())) == 0
         }
 
-    def _get_section_src(self, src, section, index, verbose=False):
-        if src is None:
-            if verbose:
-                print(f"No source provided for {section.name}")
-            return None
-        if hasattr(src, section.name):
-            if verbose:
-                print(f"Using attribute {section.name!r} from {src} for {section.name}")
-            return getattr(src, section.name)
-        if isinstance(src, dict):
-            if section.name in src:
-                if verbose:
-                    print(f"Using dict key {section.name!r} for {section.name}")
-                return src[section.name]
-            if section in self.irs and "irs" in src:
-                if verbose:
-                    print(f"Using serialized irs[{index}] for {section.name}")
-                return src["irs"][index]
-            if section in self.arcs and "arcs" in src:
-                arc_index = index - len(self.irs)
-                if verbose:
-                    print(f"Using serialized arcs[{arc_index}] for {section.name}")
-                return src["arcs"][arc_index]
-            if any(key in src for key in ("params", "knobs", "irs", "arcs")):
-                if verbose:
-                    print(f"No section source found for {section.name} in structured dict")
-                return None
-        if verbose:
-            print(f"Using flat source {src} for {section.name}")
-        return src
+    def find_strengths(self, regexp=None):
+        strengths = {}
+        for ss in self.irs + self.arcs:
+            strengths.update(ss.strengths)
+        if regexp is not None:
+            strengths = {k: v for k, v in strengths.items() if re.match(regexp, k)}
+        return strengths
+
+    def gen_knob_names(self, full=True):
+        out = self._gen_knob_names(self.variant)
+        if full:
+            for ss in self.irs + self.arcs:
+                out.extend(ss.gen_knob_names())
+        return out
 
     def get(self, k, default=None, full=True):
         """
@@ -948,11 +968,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 if k in ss:
                     return ss[k]
         return default
-
-    def get_knobs_active(self):
-        """Return the active knobs in the model."""
-        model = self.model
-        return {k: v for k in self.find_knobs() if (v := model[k.name]) != 0}
 
     def get_bumps(self):
         """Return the orbit bumps values from model."""
@@ -973,6 +988,11 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         for ss in self.irs + self.arcs:
             out[ss.name] = list(ss.knobs.keys())
         return out
+
+    def get_knobs_active(self):
+        """Return the active knobs in the model."""
+        model = self.model
+        return {k: v for k in self.find_knobs() if (v := model[k.name]) != 0}
 
     def get_params_from_twiss(
         self, tw1=None, tw2=None, full=False, verbose=False, mode="init"
@@ -1032,49 +1052,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 params.update(get_ats_factors(presqueeze, squeezed))
             else:
                 raise ValueError(f"Unknown mode {mode} for get_params_from_twiss")
-        return params
-
-    def _get_params_from_twiss(self, tw1=None, tw2=None, full=False, mode="init"):
-        """
-        Get the parameters from the twiss object.
-        """
-        p0c = tw1.particle_on_co.p0c[0]
-        params = {
-            "p0c": p0c,
-            "qxb1": tw1.qx,
-            "qyb1": tw1.qy,
-            "qxb2": tw2.qx,
-            "qyb2": tw2.qy,
-            "qpxb1": tw1.dqx,
-            "qpyb1": tw1.dqy,
-            "qpxb2": tw2.dqx,
-            "qpyb2": tw2.dqy,
-        }
-        presqueeze = {}
-        presqueeze.update(self.ir1.get_params_from_twiss(mode="init"))
-        presqueeze.update(self.ir5.get_params_from_twiss(mode="init"))
-        temp = {}
-        if full:
-            for ss in self.irs + self.arcs:
-                section_params = ss.get_params_from_twiss(tw1, tw2)
-                params.update(section_params)
-            temp.update(params)
-            ats_factors = get_ats_factors(presqueeze, temp)
-            temp.update(presqueeze)
-            temp.update(ats_factors)
-        else:
-            temp.update(self.ir1.get_params_from_twiss(mode="init"))
-            temp.update(self.ir5.get_params_from_twiss(mode="init"))
-        for irn in [1, 5]:
-            for xy in "xy":
-                rname = f"r{xy}_ip{irn}"
-                rr_ipb1 = temp[f"bet{xy}ip{irn}b1"] / tw1[f"bet{xy}", f"ip{irn}"]
-                rr_ibb2 = temp[f"bet{xy}ip{irn}b2"] / tw2[f"bet{xy}", f"ip{irn}"]
-                params[rname] = (rr_ipb1 + rr_ibb2) / 2
-                if abs(rr_ipb1 - rr_ibb2) > 0.00001:
-                    print(
-                        f"Warning: r{xy}_ip{irn} from beam 1 and beam 2 differ by more than 0.00001: {rr_ipb1} vs {rr_ibb2}"
-                    )
         return params
 
     def get_params_from_variables(self, full=False, verbose=False):
@@ -1197,15 +1174,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             phases.update(ir.get_phase())
         return phases
 
-    def get_quad_max_ratio(self, verbose=False, ratio=1.5):
-        """
-        Get the maximum ratio of the quadrupole strengths in the IRs.
-        """
-        ratios = np.array(
-            [ir.get_quad_max_ratio(verbose=verbose, ratio=ratio) for ir in self.irs]
-        )
-        return ratios.max()
-
     def get_quad_margin(self, name, verbose=True, p0c=None, model=True):
         """
         Get the margin of the quadrupole strengths in the IRs.
@@ -1223,6 +1191,15 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         if verbose and (margin0 < 0 or margin1 < 0):
             print(f"{name}:  {limits[0]:.3e}<{v:.3e}<{limits[1]:.3e}")
         return (margin0, margin1)
+
+    def get_quad_max_ratio(self, verbose=False, ratio=1.5):
+        """
+        Get the maximum ratio of the quadrupole strengths in the IRs.
+        """
+        ratios = np.array(
+            [ir.get_quad_max_ratio(verbose=verbose, ratio=ratio) for ir in self.irs]
+        )
+        return ratios.max()
 
     def get_strong_sextupoles(self):
         out = {}
@@ -1343,15 +1320,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             tar1 = arc.get_match()
             print(f" -> {tar1:.3e} - done")
 
-    def match_chroma_knobs(self, verbose=False):
-        """
-        match the chroma knobs
-        """
-        for knob in self.find_knobs("dqp.*"):
-            print(f"Match chroma knob {knob.name}", end="")
-            knob.match(verbose=verbose)
-            print(" - done")
-
     def match_chroma(self, arcs="weak", verbose=True):
         """
         match chroma, destroy all the knobs
@@ -1362,6 +1330,15 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         self.model.match_chroma(arcs=arcs, beam=2, verbose=verbose, solve=True)
         # for knob in self.find_knobs(f"dqp.*"):
         #    self.model.create_knob(knob)
+
+    def match_chroma_knobs(self, verbose=False):
+        """
+        match the chroma knobs
+        """
+        for knob in self.find_knobs("dqp.*"):
+            print(f"Match chroma knob {knob.name}", end="")
+            knob.match(verbose=verbose)
+            print(" - done")
 
     def match_irs(self, verbose=False):
         """
@@ -1591,6 +1568,36 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             tw.plot("wx_chrom wy_chrom", ax=ax)
             set_ip_labels(ax, tw)
 
+    def print_ats_phase(self):
+        out = {}
+        tw1, tw2 = self.twiss(strengths=False, chrom=False)
+        for ipn in [1, 5]:
+            for tw, beam in ((tw1, 1), (tw2, 2)):
+                muxip = tw["mux", f"ip{ipn}"]
+                muyip = tw["muy", f"ip{ipn}"]
+                print(f"IP{ipn} B{beam} mux={muxip:.3f} muy={muyip:.3f}")
+                betx = tw["betx", f"ms.15r{ipn}.b{beam}"]
+                bety = tw["bety", f"ms.15r{ipn}.b{beam}"]
+                if betx > bety:
+                    nn = 14, 15
+                else:
+                    nn = 15, 14
+                msfr = tw["mux", f"ms.{nn[1]}r{ipn}.b{beam}"]
+                msdr = tw["muy", f"ms.{nn[0]}r{ipn}.b{beam}"]
+                msfl = tw["mux", f"ms.{nn[0]}l{ipn}.b{beam}"]
+                msdl = tw["muy", f"ms.{nn[1]}l{ipn}.b{beam}"]
+                out[f"dmuxip{ipn}b{beam}_ms{nn[1]}r"] = msfr - muxip
+                out[f"dmuyip{ipn}b{beam}_ms{nn[0]}r"] = msdr - muyip
+                out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] = muxip - msfl
+                out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] = muyip - msdl
+                if ipn == 1:  # or cycle
+                    out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] += tw.qx
+                    out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] += tw.qy
+
+        for k, ph in out.items():
+            # print(f"{k:15} -> {(ph):9.3f}")
+            print(f"{k:15} -> {(ph % 0.5) * 360:9.3f} deg")
+
     def print_disp_knob_orbit(self):
         for hv in "hv":
             for ir in "15":
@@ -1629,19 +1636,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                         vv = arc.strengths[f"kqt{fd}.{arc.name}b{beam}"] * brho
                     print(f"{vv:10.3f}", end="")
             print()
-
-    def print_strong_sextupoles(self):
-        for fd in "fd":
-            for arc in self.a81, self.a12, self.a45, self.a56:
-                for beam in "12":
-                    ii = (
-                        "1"
-                        if fd == "f" and beam == "1" or fd == "d" and beam == "2"
-                        else "2"
-                    )
-                    kk = f"ks{fd}{ii}.{arc.name}b{beam}"
-                    if kk.startswith("ks") and abs(arc.strengths[kk]) > 0.1:
-                        print(f"{kk:10} -> {arc.strengths[kk]:16.3e} m^-3")
 
     def print_phase_constraints(self):
         """
@@ -1711,35 +1705,18 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                         print(f"{color}{cc:10.2f}\033[0m ", end="")
                 print()
 
-    def print_ats_phase(self):
-        out = {}
-        tw1, tw2 = self.twiss(strengths=False, chrom=False)
-        for ipn in [1, 5]:
-            for tw, beam in ((tw1, 1), (tw2, 2)):
-                muxip = tw["mux", f"ip{ipn}"]
-                muyip = tw["muy", f"ip{ipn}"]
-                print(f"IP{ipn} B{beam} mux={muxip:.3f} muy={muyip:.3f}")
-                betx = tw["betx", f"ms.15r{ipn}.b{beam}"]
-                bety = tw["bety", f"ms.15r{ipn}.b{beam}"]
-                if betx > bety:
-                    nn = 14, 15
-                else:
-                    nn = 15, 14
-                msfr = tw["mux", f"ms.{nn[1]}r{ipn}.b{beam}"]
-                msdr = tw["muy", f"ms.{nn[0]}r{ipn}.b{beam}"]
-                msfl = tw["mux", f"ms.{nn[0]}l{ipn}.b{beam}"]
-                msdl = tw["muy", f"ms.{nn[1]}l{ipn}.b{beam}"]
-                out[f"dmuxip{ipn}b{beam}_ms{nn[1]}r"] = msfr - muxip
-                out[f"dmuyip{ipn}b{beam}_ms{nn[0]}r"] = msdr - muyip
-                out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] = muxip - msfl
-                out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] = muyip - msdl
-                if ipn == 1:  # or cycle
-                    out[f"dmuxip{ipn}b{beam}_ms{nn[0]}l"] += tw.qx
-                    out[f"dmuyip{ipn}b{beam}_ms{nn[1]}l"] += tw.qy
-
-        for k, ph in out.items():
-            # print(f"{k:15} -> {(ph):9.3f}")
-            print(f"{k:15} -> {(ph % 0.5) * 360:9.3f} deg")
+    def print_strong_sextupoles(self):
+        for fd in "fd":
+            for arc in self.a81, self.a12, self.a45, self.a56:
+                for beam in "12":
+                    ii = (
+                        "1"
+                        if fd == "f" and beam == "1" or fd == "d" and beam == "2"
+                        else "2"
+                    )
+                    kk = f"ks{fd}{ii}.{arc.name}b{beam}"
+                    if kk.startswith("ks") and abs(arc.strengths[kk]) > 0.1:
+                        print(f"{kk:10} -> {arc.strengths[kk]:16.3e} m^-3")
 
     def rephase_a2334_diff(self, dmux=0.0, dmuy=0.0):
         """
@@ -1808,13 +1785,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                 if not dryrun:
                     self.params[rname] = rr_ipb1
 
-    def set_ats_phase(self):
-        """
-        Set the ATS phase advances from the model.
-        """
-        for arc in self.a81, self.a12, self.a45, self.a56:
-            arc.set_ats_phase()
-
     def set_ats_params(self, bet_cross, bet_sep=None, flat="hv", verbose=True):
         """
         Set the ATS parameters from the beta functions at the IPs.
@@ -1841,6 +1811,13 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             print(
                 f"Set rx_ip1={self.params['rx_ip1']}, ry_ip1={self.params['ry_ip1']}, rx_ip5={self.params['rx_ip5']}, ry_ip5={self.params['ry_ip5']}"
             )
+
+    def set_ats_phase(self):
+        """
+        Set the ATS phase advances from the model.
+        """
+        for arc in self.a81, self.a12, self.a45, self.a56:
+            arc.set_ats_phase()
 
     def set_bumps(self, bumps, verbose=False):
         """Set the bump parameters."""
@@ -2016,6 +1993,23 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         return getattr(self.model, f"b{beam}").twiss(
             compute_chromatic_properties=chrom, strengths=strengths, init_at=init_at
         )
+
+    def twissip(self):
+        """Compute twiss and print orbit at IPs, tunes and chromaticity"""
+        tw1, tw2 = self.twiss(chrom=True, strengths=False)
+        header = True
+        cols = "betx bety dx dpx px*1e6 py*1e6 x*1e3 y*1e3"
+        for ip in ["ip1", "ip2", "ip5", "ip8"]:
+            tw1.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
+            if header:
+                header = False
+            tw2.rows[ip].cols[cols].show(digits=4, fixed="f", header=header)
+        print("         HB1         HB2         VB1         VB2")
+        print(f"Tunes:  {tw1.qx:11.6f} {tw2.qx:11.6f} {tw1.qy:11.6f} {tw2.qy:11.6f}")
+        print(
+            f"Chroma: {tw1.dqx:11.6f} {tw2.dqx:11.6f} {tw1.dqy:11.6f} {tw2.dqy:11.6f}"
+        )
+        return self
 
     def update(
         self,

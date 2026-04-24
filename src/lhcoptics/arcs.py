@@ -1,10 +1,8 @@
 import numpy as np
-
 import xtrack as xt
 
 from .section import LHCSection, gen_acb_alt_names
 from .utils import match_compare_log
-
 
 class ActionArcPhaseAdvance(xt.Action):
     def __init__(self, arc, beam):
@@ -20,28 +18,8 @@ class ActionArcPhaseAdvance(xt.Action):
             "muy": tw_arc["muy", -1] - tw_arc["muy", 0],
         }
 
-
 class LHCArc(LHCSection):
     default_twiss_method = "periodic"
-
-    @classmethod
-    def from_model(cls, model, name=None, variant=None):
-        if name is None:
-            name = cls.name
-        if variant is None:
-            variant = model.get_variant()
-        arc = cls(name=name, strengths={}, params={}, knobs={}, variant=variant)
-        knobs = model.make_and_set0_knobs(
-            knob_names=arc.gen_knob_names(), variant=variant
-        )
-        arc.knobs.update(knobs)
-        for strength in arc.gen_strength_names():
-            if strength in model:
-                arc.strengths[strength] = model[strength]
-        for param in arc.gen_param_names():
-            if param in model:
-                arc.params[param] = model[param]
-        return arc
 
     def __init__(
         self,
@@ -98,60 +76,45 @@ class LHCArc(LHCSection):
             f"muycell{self.name[1:]}b2",
         ]
 
+    @classmethod
+    def from_model(cls, model, name=None, variant=None):
+        if name is None:
+            name = cls.name
+        if variant is None:
+            variant = model.get_variant()
+        arc = cls(name=name, strengths={}, params={}, knobs={}, variant=variant)
+        knobs = model.make_and_set0_knobs(
+            knob_names=arc.gen_knob_names(), variant=variant
+        )
+        arc.knobs.update(knobs)
+        for strength in arc.gen_strength_names():
+            if strength in model:
+                arc.strengths[strength] = model[strength]
+        for param in arc.gen_param_names():
+            if param in model:
+                arc.params[param] = model[param]
+        return arc
+
     def __repr__(self):
         if self.parent is None:
             return f"<LHCArc {self.name}>"
         else:
             return f"<LHCArc {self.name} in {self.parent.name!r}>"
 
-    def gen_skewquad_names(self):
-        a = self.i1 % 2 + 1
-        b = self.i2 % 2 + 1
-        return [f"kqs.{self.name}b{a}", f"kqs.r{self.i1}b{b}", f"kqs.l{self.i2}b{b}"]
+    @property
+    def quads(self):
+        """Get quads in the arc"""
+        return {k: v for k, v in self.strengths.items() if "kqf" in k or "kqd" in k}
 
-    def gen_acb_names(self):
-        out = []
-        if self.i1 % 2 == 1:
-            out.extend(gen_acb_alt_names("", range(14, 34), 0, "r", self.i1))
-            out.extend(gen_acb_alt_names("", range(34, 13, -1), 1, "l", self.i2))
-        else:
-            out.extend(gen_acb_alt_names("", range(14, 34), 1, "r", self.i1))
-            out.extend(gen_acb_alt_names("", range(34, 13, -1), 0, "l", self.i2))
-        return out
+    @property
+    def sexts(self):
+        """Get sextupoles in the arc"""
+        return {k: v for k, v in self.strengths.items() if "ksf" in k or "ksd" in k}
 
-    def gen_bend_names(self):
-        return [f"ab.{self.name}", f"kb.{self.name}"]
-
-    def gen_quad_names(self):
-        return [
-            f"kqf.{self.name}",
-            f"kqd.{self.name}",
-            f"kqtf.{self.name}b1",
-            f"kqtf.{self.name}b2",
-            f"kqtd.{self.name}b1",
-            f"kqtd.{self.name}b2",
-        ]
-
-    def gen_sext_names(self):
-        return [
-            f"ks{fd}{nn}.{self.name}b{bb}" for fd in "fd" for nn in "12" for bb in "12"
-        ]
-
-    def gen_oct_names(self):
-        return [f"ko{fd}.{self.name}b{bb}" for fd in "fd" for bb in "12"]
-
-    def gen_param_names(self):
-        return self.phase_names + self.cell_phase_names
-
-    def gen_strength_names(self):
-        out = []
-        out.extend(self.gen_quad_names())
-        out.extend(self.gen_bend_names())
-        out.extend(self.gen_acb_names())
-        out.extend(self.gen_skewquad_names())
-        out.extend(self.gen_sext_names())
-        out.extend(self.gen_oct_names())
-        return out
+    @property
+    def skew_quads(self):
+        """Get skew quads in the arc"""
+        return {k: v for k, v in self.strengths.items() if "kqs" in k}
 
     def check_acb_names(self, verbose=True):
         gen = set(self.gen_acb_names())
@@ -170,6 +133,60 @@ class LHCArc(LHCSection):
             print(f"Extra ACB names in {self.name}: {extra}")
             print(f"Missing ACB names in {self.name}: {missing}")
         return passed
+
+    def gen_acb_names(self):
+        out = []
+        if self.i1 % 2 == 1:
+            out.extend(gen_acb_alt_names("", range(14, 34), 0, "r", self.i1))
+            out.extend(gen_acb_alt_names("", range(34, 13, -1), 1, "l", self.i2))
+        else:
+            out.extend(gen_acb_alt_names("", range(14, 34), 1, "r", self.i1))
+            out.extend(gen_acb_alt_names("", range(34, 13, -1), 0, "l", self.i2))
+        return out
+
+    def gen_bend_names(self):
+        return [f"ab.{self.name}", f"kb.{self.name}"]
+
+    def gen_oct_names(self):
+        return [f"ko{fd}.{self.name}b{bb}" for fd in "fd" for bb in "12"]
+
+    def gen_param_names(self):
+        return self.phase_names + self.cell_phase_names
+
+    def gen_quad_names(self):
+        return [
+            f"kqf.{self.name}",
+            f"kqd.{self.name}",
+            f"kqtf.{self.name}b1",
+            f"kqtf.{self.name}b2",
+            f"kqtd.{self.name}b1",
+            f"kqtd.{self.name}b2",
+        ]
+
+    def gen_sext_names(self):
+        return [
+            f"ks{fd}{nn}.{self.name}b{bb}" for fd in "fd" for nn in "12" for bb in "12"
+        ]
+
+    def gen_skewquad_names(self):
+        a = self.i1 % 2 + 1
+        b = self.i2 % 2 + 1
+        return [f"kqs.{self.name}b{a}", f"kqs.r{self.i1}b{b}", f"kqs.l{self.i2}b{b}"]
+
+    def gen_strength_names(self):
+        out = []
+        out.extend(self.gen_quad_names())
+        out.extend(self.gen_bend_names())
+        out.extend(self.gen_acb_names())
+        out.extend(self.gen_skewquad_names())
+        out.extend(self.gen_sext_names())
+        out.extend(self.gen_oct_names())
+        return out
+
+    def get_close_irs(self):
+        ira = getattr(self.parent, f"ir{self.i1}")
+        irb = getattr(self.parent, f"ir{self.i2}")
+        return ira, irb
 
     def get_init(self, beam):
         """Get twiss init at the beginning and end of the arc."""
@@ -203,14 +220,6 @@ class LHCArc(LHCSection):
         start.muy = 0
         return start
 
-    def get_init_right(self, beam):
-        """Get twiss init at the end of the arc."""
-        tw = self.twiss(beam, strengths=False)
-        end = tw.get_twiss_init(self.endb12[beam - 1])
-        end.mux = 0
-        end.muy = 0
-        return end
-
     def get_init_periodic(self, beam):
         """Get twiss init at the beginning and end of the arc."""
         tw = self.twiss_periodic(beam, strengths=False)
@@ -222,19 +231,45 @@ class LHCArc(LHCSection):
         end.muy = 0
         return [start, end]
 
-    def twiss_full(self, beam=None, strengths=True):
-        """Get twiss table of full arc of the full LHC periodic solution"""
-        if beam is None:
-            return [
-                self.twiss_full(beam=1, strengths=strengths),
-                self.twiss_full(beam=2, strengths=strengths),
-            ]
+    def get_init_right(self, beam):
+        """Get twiss init at the end of the arc."""
+        tw = self.twiss(beam, strengths=False)
+        end = tw.get_twiss_init(self.endb12[beam - 1])
+        end.mux = 0
+        end.muy = 0
+        return end
+
+    def get_match_kq_vary(self, fd, beam="", dkmax=0.0):
+        """Get match vary for the arc"""
+        if beam:
+            kname = f"kqt{fd}.{self.name}{beam}"
         else:
-            sequence = self.model.sequence[beam]
-            start = self.startb12[beam - 1]
-            end = self.endb12[beam - 1]
-            init = sequence.twiss(strengths=False).get_twiss_init(start)
-            return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
+            kname = f"kq{fd}.{self.name}"
+        limits = self.parent.circuits.get_klimits(kname, self.parent.params["p0c"])
+        limits[0] *= 1 + dkmax
+        limits[1] *= 1 - dkmax
+        tag = beam if beam else "common"
+        return xt.Vary(name=kname, limits=limits, step=1e-10, tag=tag)
+
+    def get_match_targets(self, b1=True, b2=True):
+        """Get match targets for the arc"""
+        targets = []
+        beams = []
+        if b1:
+            beams.append(1)
+        if b2:
+            beams.append(2)
+        for beam in beams:
+            for mu in "mux", "muy":
+                targets.append(
+                    xt.Target(
+                        action=ActionArcPhaseAdvance(self, beam),
+                        tar=mu,
+                        value=self.params[f"{mu}{self.name}b{beam}"],
+                        tag=f"b{beam}",
+                    )
+                )
+        return targets
 
     def get_params_from_twiss(self, tw1=None, tw2=None, mode="init", verbose=False):
         if verbose:
@@ -292,52 +327,9 @@ class LHCArc(LHCSection):
                         params[key] = model[key2]
         return params
 
-    @property
-    def quads(self):
-        """Get quads in the arc"""
-        return {k: v for k, v in self.strengths.items() if "kqf" in k or "kqd" in k}
-
-    @property
-    def skew_quads(self):
-        """Get skew quads in the arc"""
-        return {k: v for k, v in self.strengths.items() if "kqs" in k}
-
-    @property
-    def sexts(self):
-        """Get sextupoles in the arc"""
-        return {k: v for k, v in self.strengths.items() if "ksf" in k or "ksd" in k}
-
-    def get_match_targets(self, b1=True, b2=True):
-        """Get match targets for the arc"""
-        targets = []
-        beams = []
-        if b1:
-            beams.append(1)
-        if b2:
-            beams.append(2)
-        for beam in beams:
-            for mu in "mux", "muy":
-                targets.append(
-                    xt.Target(
-                        action=ActionArcPhaseAdvance(self, beam),
-                        tar=mu,
-                        value=self.params[f"{mu}{self.name}b{beam}"],
-                        tag=f"b{beam}",
-                    )
-                )
-        return targets
-
-    def get_match_kq_vary(self, fd, beam="", dkmax=0.0):
-        """Get match vary for the arc"""
-        if beam:
-            kname = f"kqt{fd}.{self.name}{beam}"
-        else:
-            kname = f"kq{fd}.{self.name}"
-        limits = self.parent.circuits.get_klimits(kname, self.parent.params["p0c"])
-        limits[0] *= 1 + dkmax
-        limits[1] *= 1 - dkmax
-        tag = beam if beam else "common"
-        return xt.Vary(name=kname, limits=limits, step=1e-10, tag=tag)
+    def get_phase(self):
+        params = self.get_params_from_twiss()
+        return {k: params[k] for k in self.phase_names}
 
     def match(self, b1=True, b2=True, verbose=False, solve=True, tol=5e-10, fail=True):
         """Match the arc"""
@@ -393,19 +385,6 @@ class LHCArc(LHCSection):
                     )
         return mtc
 
-    def get_close_irs(self):
-        ira = getattr(self.parent, f"ir{self.i1}")
-        irb = getattr(self.parent, f"ir{self.i2}")
-        return ira, irb
-
-    def shift_phase(self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0, rematch_irs=True):
-        arc = self.name
-        self.params[f"mux{arc}b1"] += dmuxb1
-        self.params[f"muy{arc}b1"] += dmuyb1
-        self.params[f"mux{arc}b2"] += dmuxb2
-        self.params[f"muy{arc}b2"] += dmuyb2
-        self.match_phase(rematch_irs=rematch_irs)
-
     def match_phase(self, rematch_irs=True):
         print(f"Match {self.name.upper()}")
         self.match().solve()
@@ -415,10 +394,6 @@ class LHCArc(LHCSection):
             ira.match().solve()
             print(f"Match {irb}")
             irb.match().solve()
-
-    def get_phase(self):
-        params = self.get_params_from_twiss()
-        return {k: params[k] for k in self.phase_names}
 
     def round_params(self, verbose=False, dryrun=False):
         if dryrun:
@@ -439,6 +414,14 @@ class LHCArc(LHCSection):
                 self.strengths[kname] = 0
         self.update_model()
         self.set_params()
+
+    def shift_phase(self, dmuxb1=0, dmuyb1=0, dmuxb2=0, dmuyb2=0, rematch_irs=True):
+        arc = self.name
+        self.params[f"mux{arc}b1"] += dmuxb1
+        self.params[f"muy{arc}b1"] += dmuyb1
+        self.params[f"mux{arc}b2"] += dmuxb2
+        self.params[f"muy{arc}b2"] += dmuyb2
+        self.match_phase(rematch_irs=rematch_irs)
 
     def to_table(self, *rows):
         from .opttable import LHCArcTable
@@ -461,6 +444,20 @@ class LHCArc(LHCSection):
             init="periodic",
             strengths=strengths,
         )
+
+    def twiss_full(self, beam=None, strengths=True):
+        """Get twiss table of full arc of the full LHC periodic solution"""
+        if beam is None:
+            return [
+                self.twiss_full(beam=1, strengths=strengths),
+                self.twiss_full(beam=2, strengths=strengths),
+            ]
+        else:
+            sequence = self.model.sequence[beam]
+            start = self.startb12[beam - 1]
+            end = self.endb12[beam - 1]
+            init = sequence.twiss(strengths=False).get_twiss_init(start)
+            return sequence.twiss(start=start, end=end, init=init, strengths=strengths)
 
     def twiss_periodic(self, beam=None, strengths=True):
         """Get twiss table of matched arc."""
@@ -487,34 +484,26 @@ class LHCArc(LHCSection):
 
             return res
 
-
 class LHCA12(LHCArc):
     name = "a12"
-
 
 class LHCA23(LHCArc):
     name = "a23"
 
-
 class LHCA34(LHCArc):
     name = "a34"
-
 
 class LHCA45(LHCArc):
     name = "a45"
 
-
 class LHCA56(LHCArc):
     name = "a56"
-
 
 class LHCA67(LHCArc):
     name = "a67"
 
-
 class LHCA78(LHCArc):
     name = "a78"
-
 
 class LHCA81(LHCArc):
     name = "a81"

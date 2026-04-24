@@ -11,9 +11,8 @@ from .irs import (
     gen_tthl,
     gen_ttlhc,
 )
-from .section import gen_acb_alt_names
 from .irs import gen_d12_names
-
+from .section import gen_acb_alt_names
 
 class LHCIR15(LHCIR):
     """IR15-specific optics model."""
@@ -89,7 +88,6 @@ class LHCIR15(LHCIR):
     def has_ats_phase(self):
         return self.params[f"betxip{self.irn}b1"] <= 2.5
 
-
 class LHCIR1(LHCIR15):
     """IR1-specific optics model."""
 
@@ -108,7 +106,6 @@ class LHCIR1(LHCIR15):
 
     def gen_experiment_names(self):
         return ["abas"]
-
 
 class LHCIR5(LHCIR15):
     name = "ir5"

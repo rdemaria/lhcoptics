@@ -1,7 +1,13 @@
-_spark = None
-_nxcals = None
 import numpy as np
 
+_nxcals = None
+_spark = None
+
+def get_nxcals():
+    global _nxcals
+    if _nxcals is None:
+        _nxcals = NXCals(spark=get_spark())
+    return _nxcals
 
 def get_spark():
     global _spark
@@ -10,14 +16,6 @@ def get_spark():
 
         _spark = spark_session_builder.get_or_create(app_name="lhcoptics")
     return _spark
-
-
-def get_nxcals():
-    global _nxcals
-    if _nxcals is None:
-        _nxcals = NXCals(spark=get_spark())
-    return _nxcals
-
 
 class NXCals:
     def __init__(self, spark=None):

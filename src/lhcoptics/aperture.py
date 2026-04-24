@@ -1,193 +1,28 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import json
 
+import matplotlib.pyplot as plt
+import numpy as np
 import xdeps as xd
 
-
-class Rectellipse:
-    """
-    Intersect a rectangle with an ellipse.
-
-    ah, av: half-widths of the rectangle
-    rh, rv: half-widths of the ellipse
-    """
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data["ah"], data["av"], data["rh"], data["rv"])
-
-    @classmethod
-    def from_layout_spec(cls, spec):
-        return cls(*spec)
-
-    def __init__(self, ah, av, rh, rv):
-        self.ah = ah
-        self.av = av
-        self.rh = rh
-        self.rv = rv
-
-    def bbox(self):
-        return min(self.rh, self.ah), min(self.rv, self.av)
-
-    def __repr__(self):
-        return f"Rectellipse({self.ah}, {self.av}, {self.rh}, {self.rv})"
-
-    def to_dict(self):
-        return {
-            "shape": "rectellipse",
-            "ah": self.ah,
-            "av": self.av,
-            "rh": self.rh,
-            "rv": self.rv,
-        }
-
-
-class Ellipse:
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data["rh"], data["rv"])
-
-    @classmethod
-    def from_layout_spec(cls, spec):
-        return cls(spec[0], spec[1])
-
-    def __init__(self, rh, rv):
-        self.rh = rh
-        self.rv = rv
-
-    def bbox(self):
-        return self.rh, self.rv
-
-    def __repr__(self):
-        return f"Ellipse({self.rh}, {self.rv})"
-
-    def to_dict(self):
-        return {
-            "shape": "ellipse",
-            "rh": self.rh,
-            "rv": self.rv,
-        }
-
-
-class Rectangle:
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data["ah"], data["av"])
-
-    @classmethod
-    def from_layout_spec(cls, spec):
-        return cls(spec[0], spec[1])
-
-    def __init__(self, ah, av):
-        self.ah = ah
-        self.av = av
-
-    def bbox(self):
-        return self.ah, self.av
-
-    def __repr__(self):
-        return f"Rectangle({self.ah}, {self.av})"
-
-    def to_dict(self):
-        return {
-            "shape": "rectangle",
-            "ah": self.ah,
-            "av": self.av,
-        }
-
-
-class Circle:
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data["r"])
-
-    @classmethod
-    def from_layout_spec(cls, spec):
-        return cls(spec[0])
-
-    def __init__(self, r):
-        self.r = r
-
-    def bbox(self):
-        return self.r, self.r
-
-    def __repr__(self):
-        return f"Circle({self.r})"
-
-    def to_dict(self):
-        return {
-            "shape": "circle",
-            "r": self.r,
-        }
-
-
-class Octagon:
-    """
-    Octagon with sides parallel to the axes and 45 degrees.
-
-    ah, av: horizontal, vertical half-widths
-    ar: half-width at 45 degrees
-    """
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data["ah"], data["av"], data["ar"])
-
-    @classmethod
-    def from_layout_spec(cls, spec):
-        return cls(spec[0], spec[1], spec[3])
-
-    def __init__(self, ah, av, ar):
-        self.ah = ah
-        self.av = av
-        self.ar = ar
-
-    def bbox(self):
-        return self.ah, self.av
-
-    def __repr__(self):
-        return f"Octagon({self.ah}, {self.av}, {self.ar})"
-
-    def to_dict(self):
-        return {
-            "shape": "octagon",
-            "ah": self.ah,
-            "av": self.av,
-            "ar": self.ar,
-        }
-
-
-class Racetrack:
-    @classmethod
-    def from_dict(cls, data):
-        return cls(data["ah"], data["av"], data["rh"], data["rv"])
-
-    @classmethod
-    def from_layout_spec(cls, spec):
-        return cls(spec[0], spec[1], spec[2], spec[3])
-
-    def __init__(self, ah, av, rh, rv):
-        self.ah = ah
-        self.av = av
-        self.rh = rh
-        self.rv = rv
-
-    def bbox(self):
-        return self.ah, self.av
-
-    def __repr__(self):
-        return f"Racetrack({self.ah}, {self.av}, {self.rh}, {self.rv})"
-
-    def to_dict(self):
-        return {
-            "shape": "racetrack",
-            "ah": self.ah,
-            "av": self.av,
-            "rh": self.rh,
-            "rv": self.rv,
-        }
-
+offsets1 = {
+    "tanar.4r1": (0.08, 0.000, 0.000),
+    "tanc.4l5": (-0.08, 0.000, 0.000),
+    "tanc.4r5": (0.08, 0.000, 0.000),
+    "tanal.4l1": (-0.08, 0.000, 0.000),
+    "btvse.a4l6.b1": (-0.025, 0.000, 0.000),
+    "bpmse.4l6.b1": (-0.025, 0.000, 0.000),
+    "tcdsa.4l6.b1": (-0.025, 0.000, 0.000),
+}
+offsets2 = {
+    "tanc.4l5": (-0.08, 0.000, 0.000),
+    "tanc.4r5": (0.08, 0.000, 0.000),
+    "tanal.4l1": (-0.08, 0.000, 0.000),
+    "tanar.4r1": (0.08, 0.000, 0.000),
+    "btvse.a4l6.b1": (0.025, 0.000, 0.000),
+    "bpmse.4l6.b1": (0.025, 0.000, 0.000),
+    "tcdsa.4l6.b1": (0.025, 0.000, 0.000),
+}
+offsets = (offsets1, offsets2)
 
 class AperList:
     dtype = np.dtype(
@@ -206,16 +41,8 @@ class AperList:
         self.lookup = {a["name"]: ii for ii, a in enumerate(self.apertures)}
 
     @property
-    def name(self):
-        return self.apertures["name"]
-
-    @property
     def ap_s(self):
         return self.apertures["ap_s"]
-
-    @property
-    def offset(self):
-        return self.apertures["offset"]
 
     @property
     def ap_x(self):
@@ -230,25 +57,30 @@ class AperList:
         return self.apertures["bbox"]
 
     @property
+    def mask(self):
+        return self.apertures["profile"] != -1
+
+    @property
+    def name(self):
+        return self.apertures["name"]
+
+    @property
+    def offset(self):
+        return self.apertures["offset"]
+
+    @property
     def profile(self):
         return self.apertures["profile"]
 
     @property
-    def mask(self):
-        return self.apertures["profile"] != -1
-
-    def to_list(self):
-        return [
-            (
-                name,
-                s,
-                offset.tolist(),
-                bbox.tolist(),
-                int(profile),
-                tols.tolist(),
-            )
-            for name, s, offset, bbox, profile, tols in self.apertures
-        ]
+    def tab(self):
+        dct = {
+            "name": self.name,
+            "s": self.ap_s,
+            "x": self.ap_x,
+            "y": self.ap_y,
+        }
+        return xd.Table(dct, index="name")
 
     def plotx(self, ax=None):
         """
@@ -311,39 +143,68 @@ class AperList:
 
         return ax
 
-    @property
-    def tab(self):
-        dct = {
-            "name": self.name,
-            "s": self.ap_s,
-            "x": self.ap_x,
-            "y": self.ap_y,
+    def to_list(self):
+        return [
+            (
+                name,
+                s,
+                offset.tolist(),
+                bbox.tolist(),
+                int(profile),
+                tols.tolist(),
+            )
+            for name, s, offset, bbox, profile, tols in self.apertures
+        ]
+
+class Circle:
+    def __init__(self, r):
+        self.r = r
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["r"])
+
+    @classmethod
+    def from_layout_spec(cls, spec):
+        return cls(spec[0])
+
+    def __repr__(self):
+        return f"Circle({self.r})"
+
+    def bbox(self):
+        return self.r, self.r
+
+    def to_dict(self):
+        return {
+            "shape": "circle",
+            "r": self.r,
         }
-        return xd.Table(dct, index="name")
 
+class Ellipse:
+    def __init__(self, rh, rv):
+        self.rh = rh
+        self.rv = rv
 
-offsets1 = {
-    "tanar.4r1": (0.08, 0.000, 0.000),
-    "tanc.4l5": (-0.08, 0.000, 0.000),
-    "tanc.4r5": (0.08, 0.000, 0.000),
-    "tanal.4l1": (-0.08, 0.000, 0.000),
-    "btvse.a4l6.b1": (-0.025, 0.000, 0.000),
-    "bpmse.4l6.b1": (-0.025, 0.000, 0.000),
-    "tcdsa.4l6.b1": (-0.025, 0.000, 0.000),
-}
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["rh"], data["rv"])
 
-offsets2 = {
-    "tanc.4l5": (-0.08, 0.000, 0.000),
-    "tanc.4r5": (0.08, 0.000, 0.000),
-    "tanal.4l1": (-0.08, 0.000, 0.000),
-    "tanar.4r1": (0.08, 0.000, 0.000),
-    "btvse.a4l6.b1": (0.025, 0.000, 0.000),
-    "bpmse.4l6.b1": (0.025, 0.000, 0.000),
-    "tcdsa.4l6.b1": (0.025, 0.000, 0.000),
-}
+    @classmethod
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1])
 
-offsets = (offsets1, offsets2)
+    def __repr__(self):
+        return f"Ellipse({self.rh}, {self.rv})"
 
+    def bbox(self):
+        return self.rh, self.rv
+
+    def to_dict(self):
+        return {
+            "shape": "ellipse",
+            "rh": self.rh,
+            "rv": self.rv,
+        }
 
 class LHCAperture:
     """
@@ -351,6 +212,24 @@ class LHCAperture:
     survey: su_x, su_y
     aperture: ap_h,ap_v,ap_x,ap_y,ap_phi,ap_profile
     """
+
+    def __init__(self, apertures, profiles, model=None, survey=None):
+        self.apertures = apertures
+        self.profiles = profiles
+        self.survey = survey
+        self.model = model
+
+    @classmethod
+    def from_json(cls, fn):
+        data = json.load(open(fn))
+        apertures = [
+            AperList(list(map(tuple, aplist))) for aplist in data["apertures"]
+        ]
+        profiles = {
+            ii: globals()[d["shape"].capitalize()].from_dict(d)
+            for ii, d in enumerate(data["profiles"])
+        }
+        return cls(apertures, profiles)
 
     @classmethod
     def from_xsuite_model(cls, model):
@@ -426,12 +305,6 @@ class LHCAperture:
             aplists.append(AperList(aplist))
         return cls(aplists, profiles, model, survey)
 
-    def __init__(self, apertures, profiles, model=None, survey=None):
-        self.apertures = apertures
-        self.profiles = profiles
-        self.survey = survey
-        self.model = model
-
     def to_dict(self):
         return {
             "apertures": [a.tolist() for a in self.apertures],
@@ -441,14 +314,130 @@ class LHCAperture:
     def to_json(self, fn):
         return json.dump(self.to_dict(), open(fn, "w"), indent=2)
 
+class Octagon:
+    """
+    Octagon with sides parallel to the axes and 45 degrees.
+
+    ah, av: horizontal, vertical half-widths
+    ar: half-width at 45 degrees
+    """
+
+    def __init__(self, ah, av, ar):
+        self.ah = ah
+        self.av = av
+        self.ar = ar
+
     @classmethod
-    def from_json(cls, fn):
-        data = json.load(open(fn))
-        apertures = [
-            AperList(list(map(tuple, aplist))) for aplist in data["apertures"]
-        ]
-        profiles = {
-            ii: globals()[d["shape"].capitalize()].from_dict(d)
-            for ii, d in enumerate(data["profiles"])
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"], data["ar"])
+
+    @classmethod
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1], spec[3])
+
+    def __repr__(self):
+        return f"Octagon({self.ah}, {self.av}, {self.ar})"
+
+    def bbox(self):
+        return self.ah, self.av
+
+    def to_dict(self):
+        return {
+            "shape": "octagon",
+            "ah": self.ah,
+            "av": self.av,
+            "ar": self.ar,
         }
-        return cls(apertures, profiles)
+
+class Racetrack:
+    def __init__(self, ah, av, rh, rv):
+        self.ah = ah
+        self.av = av
+        self.rh = rh
+        self.rv = rv
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"], data["rh"], data["rv"])
+
+    @classmethod
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1], spec[2], spec[3])
+
+    def __repr__(self):
+        return f"Racetrack({self.ah}, {self.av}, {self.rh}, {self.rv})"
+
+    def bbox(self):
+        return self.ah, self.av
+
+    def to_dict(self):
+        return {
+            "shape": "racetrack",
+            "ah": self.ah,
+            "av": self.av,
+            "rh": self.rh,
+            "rv": self.rv,
+        }
+
+class Rectangle:
+    def __init__(self, ah, av):
+        self.ah = ah
+        self.av = av
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"])
+
+    @classmethod
+    def from_layout_spec(cls, spec):
+        return cls(spec[0], spec[1])
+
+    def __repr__(self):
+        return f"Rectangle({self.ah}, {self.av})"
+
+    def bbox(self):
+        return self.ah, self.av
+
+    def to_dict(self):
+        return {
+            "shape": "rectangle",
+            "ah": self.ah,
+            "av": self.av,
+        }
+
+class Rectellipse:
+    """
+    Intersect a rectangle with an ellipse.
+
+    ah, av: half-widths of the rectangle
+    rh, rv: half-widths of the ellipse
+    """
+
+    def __init__(self, ah, av, rh, rv):
+        self.ah = ah
+        self.av = av
+        self.rh = rh
+        self.rv = rv
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data["ah"], data["av"], data["rh"], data["rv"])
+
+    @classmethod
+    def from_layout_spec(cls, spec):
+        return cls(*spec)
+
+    def __repr__(self):
+        return f"Rectellipse({self.ah}, {self.av}, {self.rh}, {self.rv})"
+
+    def bbox(self):
+        return min(self.rh, self.ah), min(self.rv, self.av)
+
+    def to_dict(self):
+        return {
+            "shape": "rectellipse",
+            "ah": self.ah,
+            "av": self.av,
+            "rh": self.rh,
+            "rv": self.rv,
+        }

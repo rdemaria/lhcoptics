@@ -1,7 +1,7 @@
 """Xsuite-backed LHC optics model helpers."""
 
-import re
 from pathlib import Path
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -159,17 +159,6 @@ rbend_data = {
 ### MB correction is  0.00035664252265824644 vs nominal of 0.00035664252265800027
 ### kd12 = (1+6.9e-13) *
 
-
-def configure_rbend_helper(lhc, element_name, angle, angle_diff, k0, rbend_shift):
-    element = lhc[element_name]
-    element.rbend_model = "straight-body"
-    element.rbend_compensate_sagitta = False
-    element.angle = angle
-    element.rbend_angle_diff = angle_diff
-    element.k0 = k0
-    element.rbend_shift = rbend_shift
-
-
 def config_rbend_ir15(lhc):
     beam_angle_diff_signs = (("b1", -1), ("b2", 1))
 
@@ -210,7 +199,6 @@ def config_rbend_ir15(lhc):
                 k0_sign * k0_ref,
                 shift_sign * shift_ref,
             )
-
 
 def config_rbend_ir28(lhc):
     beam_angle_diff_signs = (("b1", 1), ("b2", -1))
@@ -253,29 +241,6 @@ def config_rbend_ir28(lhc):
                 shift_sign * shift_ref,
             )
 
-
-def config_rbend_ir7(lhc):
-    for side in ("r7", "l7"):
-        for section in "abcd":
-            if section in "ab":
-                k0 = lhc.ref["kd34.lr7"] + lhc.ref[f"e_kd3.{side}"]
-            else:
-                k0 = -lhc.ref["kd34.lr7"] - lhc.ref[f"e_kd4.{side}"]
-            prefix = f"{section}6{side}"
-            angle_ref = lhc.ref[f"abw.{prefix}"]
-            angle_diff_ref = lhc.ref[f"adiff.bw.{prefix}"]
-            shift = -lhc.ref[f"shift.bw.{prefix}"]
-            for beam, angle_diff_sign in (("b1", 1), ("b2", -1)):
-                configure_rbend_helper(
-                    lhc,
-                    f"mbw.{prefix}.{beam}",
-                    angle_ref,
-                    angle_diff_sign * angle_diff_ref,
-                    k0,
-                    shift,
-                )
-
-
 def config_rbend_ir3(lhc):
     for side in ("r3", "l3"):
         for section in "abcdef":
@@ -296,7 +261,6 @@ def config_rbend_ir3(lhc):
                     k0,
                     shift,
                 )
-
 
 def config_rbend_ir4(lhc):
     for side, beam_b1_angle_diff_sign in (("r4", -1), ("l4", 1)):
@@ -320,6 +284,35 @@ def config_rbend_ir4(lhc):
                     shift,
                 )
 
+def config_rbend_ir7(lhc):
+    for side in ("r7", "l7"):
+        for section in "abcd":
+            if section in "ab":
+                k0 = lhc.ref["kd34.lr7"] + lhc.ref[f"e_kd3.{side}"]
+            else:
+                k0 = -lhc.ref["kd34.lr7"] - lhc.ref[f"e_kd4.{side}"]
+            prefix = f"{section}6{side}"
+            angle_ref = lhc.ref[f"abw.{prefix}"]
+            angle_diff_ref = lhc.ref[f"adiff.bw.{prefix}"]
+            shift = -lhc.ref[f"shift.bw.{prefix}"]
+            for beam, angle_diff_sign in (("b1", 1), ("b2", -1)):
+                configure_rbend_helper(
+                    lhc,
+                    f"mbw.{prefix}.{beam}",
+                    angle_ref,
+                    angle_diff_sign * angle_diff_ref,
+                    k0,
+                    shift,
+                )
+
+def configure_rbend_helper(lhc, element_name, angle, angle_diff, k0, rbend_shift):
+    element = lhc[element_name]
+    element.rbend_model = "straight-body"
+    element.rbend_compensate_sagitta = False
+    element.angle = angle
+    element.rbend_angle_diff = angle_diff
+    element.k0 = k0
+    element.rbend_shift = rbend_shift
 
 def delete_term(ex, var):
     terms = []
@@ -329,10 +322,8 @@ def delete_term(ex, var):
         terms.append(term)
     return sum(terms)
 
-
 def pprint(expr):
     return "\n + ".join(str(term) for term in termlist(expr))
-
 
 def termlist(ex, lst=None):
     if lst is None:
@@ -346,7 +337,6 @@ def termlist(ex, lst=None):
             ex = ex._lhs + (-1) * ex._rhs
         return lst + termlist(ex._lhs) + termlist(ex._rhs)
     return [ex]
-
 
 def test_chroma_knobs(collider):
     # Test the knobs
@@ -371,7 +361,6 @@ def test_chroma_knobs(collider):
 
     return twtest.dqx, twtest.dqy
 
-
 def test_coupling_knobs(collider):
     line = collider.b1
     # Check orthogonality
@@ -387,12 +376,10 @@ def test_coupling_knobs(collider):
         collider.b2.twiss().c_minus / np.sqrt(2), 1e-3, rtol=0, atol=1.5e-5
     )
 
-
 class LHCXsuiteModel:
     """Model wrapper around an Xsuite environment for LHC optics workflows."""
 
     _xt = xt
-
     slicing_recipe = [
         {"element_type": "Cavity", "num_kicks": 1},
         {"element_type": "CrabCavity", "num_kicks": 1},
@@ -431,6 +418,7 @@ class LHCXsuiteModel:
         {"name": r"mqt\..*", "num_kicks": 2},
         {"name": r"mqs.*", "num_kicks": 2},
     ]
+
     @staticmethod
     def _configure_sequence(lhc, variant, verbose=False):
         if verbose:
@@ -529,6 +517,16 @@ class LHCXsuiteModel:
         return cls(env=env, madxfile=madxfile)
 
     @classmethod
+    def from_madx_scripts(cls, *madxfiles, extra=True, stdout=False, basedir=None):
+        """Create an `LHCXsuiteModel` from a MAD-X input file."""
+
+        madmodel = LHCMadxModel.from_madx_scripts(
+            *madxfiles, basedir=basedir, extra=extra, stdout=stdout
+        )
+        model = cls.from_cpymad(madmodel.madx, madxfile=", ".join(map(str, madxfiles)))
+        return model
+
+    @classmethod
     def from_madx_sequence(cls, filename, verbose=False):
         """Create an `LHCXsuiteModel` from a MAD-X sequence file."""
         if verbose:
@@ -554,16 +552,6 @@ class LHCXsuiteModel:
         )
         model = cls(env=lhc)
         cls._configure_sequence(lhc,model.get_variant(),verbose=verbose)
-        return model
-
-    @classmethod
-    def from_madx_scripts(cls, *madxfiles, extra=True, stdout=False, basedir=None):
-        """Create an `LHCXsuiteModel` from a MAD-X input file."""
-
-        madmodel = LHCMadxModel.from_madx_scripts(
-            *madxfiles, basedir=basedir, extra=extra, stdout=stdout
-        )
-        model = cls.from_cpymad(madmodel.madx, madxfile=", ".join(map(str, madxfiles)))
         return model
 
     @classmethod
@@ -696,20 +684,6 @@ class LHCXsuiteModel:
     #    self.env.b1.particle_ref.p0c = value
     #    self.nv.b2.particle_ref.p0c = value
 
-    def _match_d12r(self, ipn):
-        lhc = self.env
-        ipr = f"ip{ipn}"
-        sds = f"s.ds.r{ipn}.b1"
-        print(f"match {ipr} right from {ipr} to {sds}")
-        lhc.b1.match(
-            vary=xt.VaryList([f"kd1.r{ipn}", f"kd2.r{ipn}"], step=1e-12),
-            targets=xt.TargetSet(at=sds, px=0, x=0, tol=1e-16),
-            betx=1,
-            bety=1,
-            start=ipr,
-            end=sds,
-        )
-
     def _match_d12l(self, ipn):
         lhc = self.env
         ipl = "ip1.l1" if ipn == 1 else f"ip{ipn}"
@@ -724,6 +698,20 @@ class LHCXsuiteModel:
             end=ipl,
         )
 
+    def _match_d12r(self, ipn):
+        lhc = self.env
+        ipr = f"ip{ipn}"
+        sds = f"s.ds.r{ipn}.b1"
+        print(f"match {ipr} right from {ipr} to {sds}")
+        lhc.b1.match(
+            vary=xt.VaryList([f"kd1.r{ipn}", f"kd2.r{ipn}"], step=1e-12),
+            targets=xt.TargetSet(at=sds, px=0, x=0, tol=1e-16),
+            betx=1,
+            bety=1,
+            start=ipr,
+            end=sds,
+        )
+
     def _match_d34l(self, ipn):
         lhc = self.env
         ipl = f"ip{ipn}"
@@ -732,6 +720,20 @@ class LHCXsuiteModel:
 
         lhc.b1.match(
             vary=xt.VaryList([f"e_kd3.l{ipn}", f"e_kd4.l{ipn}"], step=1e-12),
+            targets=xt.TargetSet(at=ipl, px=0, x=0, tol=1e-16),
+            betx=1,
+            bety=1,
+            start=eds,
+            end=ipl,
+        )
+
+    def _match_d34l4(self):
+        lhc = self.env
+        ipl = "ip4"
+        eds = "e.ds.l4.b1"
+        print(f"match {ipl} left from {eds} to {ipl}")
+        lhc.b1.match(
+            vary=xt.VaryList(["kd3.l4", "kd4.l4"], step=1e-12),
             targets=xt.TargetSet(at=ipl, px=0, x=0, tol=1e-16),
             betx=1,
             bety=1,
@@ -751,20 +753,6 @@ class LHCXsuiteModel:
             bety=1,
             start=ipr,
             end=sds,
-        )
-
-    def _match_d34l4(self):
-        lhc = self.env
-        ipl = "ip4"
-        eds = "e.ds.l4.b1"
-        print(f"match {ipl} left from {eds} to {ipl}")
-        lhc.b1.match(
-            vary=xt.VaryList(["kd3.l4", "kd4.l4"], step=1e-12),
-            targets=xt.TargetSet(at=ipl, px=0, x=0, tol=1e-16),
-            betx=1,
-            bety=1,
-            start=eds,
-            end=ipl,
         )
 
     def _match_d34r4(self):
@@ -847,6 +835,15 @@ class LHCXsuiteModel:
         self.b1.cycle(element, inplace=True)
         self.b2.cycle(element, inplace=True)
 
+    def delete_expressions_from_knobs(self, knobs,verbose=False):
+        for knob in knobs:
+            if verbose:
+                print(f"Deleting expressions from targets of knob {knob.name}")
+            for wtarget in knob.weights.keys():
+                if verbose:
+                    print(f" Deleting expression in {wtarget}")
+                self.ref[wtarget]=self[wtarget]
+
     def delete_knob(self, knobname, verbose=False, dry_run=False):
         direct_deps = list(self.mgr.rdeps.get(self.ref[knobname], {}))
         for dependency in direct_deps:
@@ -866,15 +863,6 @@ class LHCXsuiteModel:
                 print(f" - {dependency}")
             raise ValueError(f"Knob {knobname} still has dependencies after deletion")
 
-    def delete_expressions_from_knobs(self, knobs,verbose=False):
-        for knob in knobs:
-            if verbose:
-                print(f"Deleting expressions from targets of knob {knob.name}")
-            for wtarget in knob.weights.keys():
-                if verbose:
-                    print(f" Deleting expression in {wtarget}")
-                self.ref[wtarget]=self[wtarget]
-
     def diff(self, other):
         all_keys = set(self._var_values.keys()) | set(other._var_values.keys())
         for key in all_keys:
@@ -891,6 +879,9 @@ class LHCXsuiteModel:
         var_values = list(self._var_values.keys())
         return list(filter(lambda item: re.match(pattern, item), var_values))
 
+    def get(self, key, default=None):
+        return self._var_values.get(key, default)
+
     def get_acb_names(self, pattern="mcb", debug=False):
         out = {}
         for k, v in self.search(pattern).items():
@@ -904,20 +895,6 @@ class LHCXsuiteModel:
                 elif debug:
                     print(f"Warning: no expression found for {k}")
         return out
-
-    def get_kq_names(self, pattern="mq[^s]", debug=False):
-        out = {}
-        for k, v in self.search(pattern).items():
-            if hasattr(v, "k1"):
-                exp = self.eref[k].k1._expr
-                if exp is not None:
-                    out[k] = exp._get_dependencies().pop()._key
-                elif debug:
-                    print(f"Warning: no expression found for {k}")
-        return out
-
-    def get(self, key, default=None):
-        return self._var_values.get(key, default)
 
     def get_cmin(self, beam=None, pos="ip1"):
         """Compute the c-minus at a given position."""
@@ -1008,6 +985,17 @@ class LHCXsuiteModel:
                     weights[wname] = value
         value = self[name]
         return Knob(name, value, weights, variant=variant).specialize()
+
+    def get_kq_names(self, pattern="mq[^s]", debug=False):
+        out = {}
+        for k, v in self.search(pattern).items():
+            if hasattr(v, "k1"):
+                exp = self.eref[k].k1._expr
+                if exp is not None:
+                    out[k] = exp._get_dependencies().pop()._key
+                elif debug:
+                    print(f"Warning: no expression found for {k}")
+        return out
 
     def get_mo_rdt(self, qx=62.270, qy=60.295, i_mo=40, beam=None, verbose=True):
         if beam is None:
@@ -1184,14 +1172,14 @@ class LHCXsuiteModel:
             self[knob_name] = 0
         return knobs
 
-    def make_thin_model(self):
-        self.__class__.make_thin_env(self.env)
-        return self
-
     def make_aperture(self):
         from .aperture import LHCAperture
 
         return LHCAperture.from_xsuite_model(self)
+
+    def make_thin_model(self):
+        self.__class__.make_thin_env(self.env)
+        return self
 
     def match(self, *args, **kwargs):
         return self.env.match(*args, **kwargs)
@@ -1262,9 +1250,6 @@ class LHCXsuiteModel:
             match_compare_log(mtc)
         return mtc
 
-    def match_knob(self, *args, **kwargs):
-        return self.env.match_knob(*args, **kwargs)
-
     def match_dipoles(self, check=False):
         for ipn in [1, 2, 5, 8]:
             self._match_d12l(ipn)
@@ -1297,6 +1282,9 @@ class LHCXsuiteModel:
             ]
         var_names += ["kd3.l4", "kd4.l4", "kd3.r4", "kd4.r4"]
         return {var_name: float(lhc[var_name]) for var_name in var_names}
+
+    def match_knob(self, *args, **kwargs):
+        return self.env.match_knob(*args, **kwargs)
 
     def match_w(self, beam=None, target="triplet", k2max=0.42, verbose=True):
         """
@@ -1666,6 +1654,11 @@ class LHCXsuiteModel:
         if hasattr(src, "knobs"):
             self.update_knobs(src.knobs, knobs_check=knobs_check)
 
+    def update_from_madx_optics(self, filename, knobs=None, verbose=False):
+        self.env.vars.load(filename)
+        if knobs is not None:
+            self.create_knobs(knobs)
+
     def update_knob(self, knob, verbose=False, set_value=True, knobs_check=True):
         """
         Update the model with the knob weight values
@@ -1709,12 +1702,6 @@ class LHCXsuiteModel:
                 if key in self and self[key] != value:
                     print(f"Update {key} from {self[key]:15.6g} to {value:15.6g}")
             self[key] = value
-
-    def update_from_madx_optics(self, filename, knobs=None, verbose=False):
-        self.env.vars.load(filename)
-        if knobs is not None:
-            self.create_knobs(knobs)
-
 
 class SinglePassDispersion(xdeps.Action):
     """Action computing single-pass dispersion between two elements."""

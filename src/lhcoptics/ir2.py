@@ -10,7 +10,6 @@ from .irs import (
 )
 from .section import gen_acb_alt_names
 
-
 class LHCIR2(LHCIR):
     """IR2-specific optics model."""
 
@@ -78,9 +77,6 @@ class LHCIR2(LHCIR):
         #TODO need to support energy dependent knobs
         #out.extend([f"on_alice", f"on_sol_alice"])
         return out
-
- 
-
 
     def gen_quad_names(self):
         quads = []

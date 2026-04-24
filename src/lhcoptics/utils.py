@@ -1,48 +1,18 @@
-from pathlib import Path
 from collections import namedtuple
-import subprocess
-from fractions import Fraction
-
-import requests
-import json
-import time
 from datetime import datetime, timezone
+from fractions import Fraction
+import json
+from pathlib import Path
+import subprocess
+import time
 import xml.etree.ElementTree as ET
-import numpy as np
 
+import numpy as np
+import requests
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML()
 yaml.indent(mapping=4, sequence=2, offset=2)
-
-
-def get_yaml():
-    return yaml
-
-
-def string_to_unixtime(timestr: str, utc: bool = False) -> int:
-    """
-    Convert a time string "%Y-%m-%d %H:%M:%S" to Unix time.
-    If utc=True, interpret the string as UTC else local time;
-    """
-    dt = datetime.strptime(timestr, "%Y-%m-%d %H:%M:%S")
-    if utc:
-        dt = dt.replace(tzinfo=timezone.utc)
-    else:
-        dt = dt.astimezone()
-    return int(dt.timestamp())
-
-
-def unixtime_to_string(unixtime: int, utc: bool = False) -> str:
-    """
-    Convert Unix time to a time string "%Y-%m-%d %H:%M:%S".
-    If utc=True, interpret the string as UTC else local time;
-    """
-    if utc:
-        dt = datetime.fromtimestamp(unixtime, tz=timezone.utc)
-    else:
-        dt = datetime.fromtimestamp(unixtime)
-    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def deliver_list_str(out, output=None):
@@ -68,6 +38,128 @@ def deliver_list_str(out, output=None):
     else:
         raise ValueError(f"Unknown output type {output}")
 
+def etree_to_dict(elem):
+    """Turn an ElementTree into a dict."""
+    # convert an Element and its children into a dict
+    d = {elem.tag: {} if elem.attrib else None}
+    children = list(elem)
+    if children:
+        dd = {}
+        for dc in map(etree_to_dict, children):
+            for k, v in dc.items():
+                if k in dd:
+                    # group multiple children with same tag into a list
+                    if not isinstance(dd[k], list):
+                        dd[k] = [dd[k]]
+                    dd[k].append(v)
+                else:
+                    dd[k] = v
+        d = {elem.tag: dd}
+    if elem.attrib:
+        d[elem.tag].update(("@" + k, v) for k, v in elem.attrib.items())
+    if elem.text and elem.text.strip():
+        text = elem.text.strip()
+        if children or elem.attrib:
+            d[elem.tag]["#text"] = text
+        else:
+            d[elem.tag] = text
+    return d
+
+def file_expired(path, max_age):
+    """
+    Check if a file is older than max_age seconds.
+    """
+    return path.stat().st_mtime > time.time() - max_age
+
+def file_one_day_old(path):
+    """
+    Check if a file is older than one day.
+    """
+    return path.stat().st_mtime > time.time() - 24 * 3600
+
+def find_comparable_values(a, b, tol=1e-6):
+    """
+    Return the indices of values that are comparable between two lists a and b ascending values, not necessarily of the same length.
+
+    Args:
+        a (list of float): First list of values.
+        b (list of float): Second list of values.
+        tol (float): Tolerance for comparison.
+    Returns:
+        list of int: Indices of comparable values.
+    """
+    a = sorted(a)
+    b = sorted(b)
+    ia = 0
+    ib = 0
+    indices_a = []
+    indices_b = []
+    while ia < len(a) and ib < len(b):
+        if abs(a[ia] - b[ib]) < tol:
+            indices_a.append(ia)
+            indices_b.append(ib)
+            ia += 1
+            ib += 1
+        elif a[ia] < b[ib]:
+            ia += 1
+        else:
+            ib += 1
+    return np.array(indices_a), np.array(indices_b)
+
+def get_yaml():
+    return yaml
+
+def git_add(directory, *args):
+    """
+    Add files to the staging area.
+    """
+    result = subprocess.run(
+        ["git", "add"] + list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to add files: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+def git_clone_repo(repo_url, target_directory, branch=None):
+    """
+    Clone a Git repository.
+    """
+    cmds = ["git", "clone", repo_url, target_directory]
+    if branch:
+        cmds.extend(["--branch", branch])
+    result = subprocess.run(
+        cmds,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to clone repository: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+def git_commit(directory, message, *args):
+    result = subprocess.run(
+        ["git", "commit", "-m", message] + list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to commit changes: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+def git_get_branch_name(directory):
+    result = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to get branch name: {result.stderr.strip()}")
+    return result.stdout.strip()
 
 def git_get_current_branch(directory):
     import subprocess
@@ -83,60 +175,57 @@ def git_get_current_branch(directory):
         .strip()
     )
 
+def git_get_current_commit(directory):
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to get current commit: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+def git_pull(directory):
+    result = subprocess.run(
+        ["git", "pull"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to pull branch: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+def git_push(directory, *args):
+    """
+    Push changes to the remote repository.
+    """
+    result = subprocess.run(
+        ["git", "push"] + list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to push changes: {result.stderr.strip()}")
+    return result.stdout.strip()
 
 def git_set_branch(directory, branch):
     import subprocess
 
     subprocess.run(["git", "switch", branch], cwd=directory)
 
-
-def iter_rows(table):
-    Row = namedtuple("Row", table._col_names)
-    for i in range(len(table)):
-        yield Row(*[table._data[cn][i] for cn in table._col_names])
-
-
-def print_diff_dict_float(dct1, dct2, keys="union"):
-    if keys == "union":
-        allk = set(dct1.keys()) | set(dct2.keys())
-    elif keys == "intersection":
-        allk = set(dct1.keys()) & set(dct2.keys())
-    else:
-        allk = set(keys)
-    diffes = []
-    for k in sorted(allk):
-        if k not in dct1:
-            print(f"{k:20} {dct2[k]:15.6g} only in other")
-        elif k not in dct2:
-            print(f"{k:20} {dct1[k]:15.6g} only in self")
-        elif dct1[k] != dct2[k]:
-            v1 = dct1[k]
-            v2 = dct2[k]
-            diffes.append((abs(v1 - v2), k, v1, v2))
-            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1 - v2:15.6g}")
-
-    if len(diffes) > 0:
-        diffes.sort(reverse=True)
-        print("\nLargest differences:")
-        for diff, k, v1, v2 in diffes[:1]:
-            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1 - v2:15.6g}")
-
-
-def print_diff_dict_objs(dct1, dct2, keys="union"):
-    if keys == "union":
-        allk = set(dct1.keys()) | set(dct2.keys())
-    elif keys == "intersection":
-        allk = set(dct1.keys()) & set(dct2.keys())
-    else:
-        allk = set(keys)
-    for k in sorted(allk):
-        if k not in dct1:
-            print(f"{k:20} only in other")
-        elif k not in dct2:
-            print(f"{k:20} only in self")
-        else:
-            dct1[k].diff(dct2[k])
-
+def git_status(directory, *args):
+    result = subprocess.run(
+        ["git", "status"] + list(args),
+        cwd=directory,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to get git status: {result.stderr.strip()}")
+    return result.stdout.strip()
 
 def gitlab_get_branches_and_tags(
     project_id=76507,
@@ -194,225 +283,10 @@ def gitlab_get_branches_and_tags(
 
     return None
 
-
-def file_one_day_old(path):
-    """
-    Check if a file is older than one day.
-    """
-    return path.stat().st_mtime > time.time() - 24 * 3600
-
-
-def file_expired(path, max_age):
-    """
-    Check if a file is older than max_age seconds.
-    """
-    return path.stat().st_mtime > time.time() - max_age
-
-
-def read_yaml(filename):
-    if str(filename).startswith("http://") or str(filename).startswith("https://"):
-        return yaml.load(read_url(filename))
-    with open(filename, "r") as fid:
-        return yaml.load(fid)
-
-
-def write_yaml(data, filename):
-    with open(filename, "w") as fid:
-        yaml.dump(data, fid)
-
-def read_json(filename):
-    if str(filename).startswith("http://") or str(filename).startswith("https://"):
-        return json.loads(read_url(filename))
-    with open(filename, "r") as fid:
-        return json.load(fid)
-
-
-def write_json(data, filename):
-    with open(filename, "w") as fid:
-        json.dump(data, fid, indent=4)
-
-
-def git_get_current_commit(directory):
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=directory,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to get current commit: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def git_pull(directory):
-    result = subprocess.run(
-        ["git", "pull"],
-        cwd=directory,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to pull branch: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def git_get_branch_name(directory):
-    result = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        cwd=directory,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to get branch name: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def git_clone_repo(repo_url, target_directory, branch=None):
-    """
-    Clone a Git repository.
-    """
-    cmds = ["git", "clone", repo_url, target_directory]
-    if branch:
-        cmds.extend(["--branch", branch])
-    result = subprocess.run(
-        cmds,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to clone repository: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def git_status(directory, *args):
-    result = subprocess.run(
-        ["git", "status"] + list(args),
-        cwd=directory,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to get git status: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def git_commit(directory, message, *args):
-    result = subprocess.run(
-        ["git", "commit", "-m", message] + list(args),
-        cwd=directory,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to commit changes: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def git_push(directory, *args):
-    """
-    Push changes to the remote repository.
-    """
-    result = subprocess.run(
-        ["git", "push"] + list(args),
-        cwd=directory,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to push changes: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def git_add(directory, *args):
-    """
-    Add files to the staging area.
-    """
-    result = subprocess.run(
-        ["git", "add"] + list(args),
-        cwd=directory,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Failed to add files: {result.stderr.strip()}")
-    return result.stdout.strip()
-
-
-def read_url(url, timeout=0.1):
-    """
-    Read content from a URL.
-    """
-    try:
-        response = requests.get(url, timeout=timeout)
-        response.raise_for_status()  # Raise an error for bad responses
-        return response.text
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Failed to read from URL {url}: {e}")
-
-
-def xmltodict(filename):
-    root = ET.parse(filename).getroot()
-    return etree_to_dict(root)
-
-
-def etree_to_dict(elem):
-    """Turn an ElementTree into a dict."""
-    # convert an Element and its children into a dict
-    d = {elem.tag: {} if elem.attrib else None}
-    children = list(elem)
-    if children:
-        dd = {}
-        for dc in map(etree_to_dict, children):
-            for k, v in dc.items():
-                if k in dd:
-                    # group multiple children with same tag into a list
-                    if not isinstance(dd[k], list):
-                        dd[k] = [dd[k]]
-                    dd[k].append(v)
-                else:
-                    dd[k] = v
-        d = {elem.tag: dd}
-    if elem.attrib:
-        d[elem.tag].update(("@" + k, v) for k, v in elem.attrib.items())
-    if elem.text and elem.text.strip():
-        text = elem.text.strip()
-        if children or elem.attrib:
-            d[elem.tag]["#text"] = text
-        else:
-            d[elem.tag] = text
-    return d
-
-
-def find_comparable_values(a, b, tol=1e-6):
-    """
-    Return the indices of values that are comparable between two lists a and b ascending values, not necessarily of the same length.
-
-    Args:
-        a (list of float): First list of values.
-        b (list of float): Second list of values.
-        tol (float): Tolerance for comparison.
-    Returns:
-        list of int: Indices of comparable values.
-    """
-    a = sorted(a)
-    b = sorted(b)
-    ia = 0
-    ib = 0
-    indices_a = []
-    indices_b = []
-    while ia < len(a) and ib < len(b):
-        if abs(a[ia] - b[ib]) < tol:
-            indices_a.append(ia)
-            indices_b.append(ib)
-            ia += 1
-            ib += 1
-        elif a[ia] < b[ib]:
-            ia += 1
-        else:
-            ib += 1
-    return np.array(indices_a), np.array(indices_b)
-
+def iter_rows(table):
+    Row = namedtuple("Row", table._col_names)
+    for i in range(len(table)):
+        yield Row(*[table._data[cn][i] for cn in table._col_names])
 
 def match_compare_log(mtc, entry1=0, entry2=-1):
     log = mtc.log()
@@ -432,6 +306,68 @@ def match_compare_log(mtc, entry1=0, entry2=-1):
         name = f"{target.tag} {target.tar}"
         print(f"{name:<35} {value1:18.9g} {value2:18.9g} {diff:18.9g}")
 
+def print_diff_dict_float(dct1, dct2, keys="union"):
+    if keys == "union":
+        allk = set(dct1.keys()) | set(dct2.keys())
+    elif keys == "intersection":
+        allk = set(dct1.keys()) & set(dct2.keys())
+    else:
+        allk = set(keys)
+    diffes = []
+    for k in sorted(allk):
+        if k not in dct1:
+            print(f"{k:20} {dct2[k]:15.6g} only in other")
+        elif k not in dct2:
+            print(f"{k:20} {dct1[k]:15.6g} only in self")
+        elif dct1[k] != dct2[k]:
+            v1 = dct1[k]
+            v2 = dct2[k]
+            diffes.append((abs(v1 - v2), k, v1, v2))
+            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1 - v2:15.6g}")
+
+    if len(diffes) > 0:
+        diffes.sort(reverse=True)
+        print("\nLargest differences:")
+        for diff, k, v1, v2 in diffes[:1]:
+            print(f"{k:20} {v1:15.6g} - {v2:15.6g} = {v1 - v2:15.6g}")
+
+def print_diff_dict_objs(dct1, dct2, keys="union"):
+    if keys == "union":
+        allk = set(dct1.keys()) | set(dct2.keys())
+    elif keys == "intersection":
+        allk = set(dct1.keys()) & set(dct2.keys())
+    else:
+        allk = set(keys)
+    for k in sorted(allk):
+        if k not in dct1:
+            print(f"{k:20} only in other")
+        elif k not in dct2:
+            print(f"{k:20} only in self")
+        else:
+            dct1[k].diff(dct2[k])
+
+def read_json(filename):
+    if str(filename).startswith("http://") or str(filename).startswith("https://"):
+        return json.loads(read_url(filename))
+    with open(filename, "r") as fid:
+        return json.load(fid)
+
+def read_url(url, timeout=0.1):
+    """
+    Read content from a URL.
+    """
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()  # Raise an error for bad responses
+        return response.text
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"Failed to read from URL {url}: {e}")
+
+def read_yaml(filename):
+    if str(filename).startswith("http://") or str(filename).startswith("https://"):
+        return yaml.load(read_url(filename))
+    with open(filename, "r") as fid:
+        return yaml.load(fid)
 
 def round_to_close_rational(x):
     """
@@ -440,3 +376,38 @@ def round_to_close_rational(x):
 
     frac = Fraction(x).limit_denominator(max_denominator=1000000)
     return float(frac)
+
+def string_to_unixtime(timestr: str, utc: bool = False) -> int:
+    """
+    Convert a time string "%Y-%m-%d %H:%M:%S" to Unix time.
+    If utc=True, interpret the string as UTC else local time;
+    """
+    dt = datetime.strptime(timestr, "%Y-%m-%d %H:%M:%S")
+    if utc:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone()
+    return int(dt.timestamp())
+
+def unixtime_to_string(unixtime: int, utc: bool = False) -> str:
+    """
+    Convert Unix time to a time string "%Y-%m-%d %H:%M:%S".
+    If utc=True, interpret the string as UTC else local time;
+    """
+    if utc:
+        dt = datetime.fromtimestamp(unixtime, tz=timezone.utc)
+    else:
+        dt = datetime.fromtimestamp(unixtime)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+def write_json(data, filename):
+    with open(filename, "w") as fid:
+        json.dump(data, fid, indent=4)
+
+def write_yaml(data, filename):
+    with open(filename, "w") as fid:
+        yaml.dump(data, fid)
+
+def xmltodict(filename):
+    root = ET.parse(filename).getroot()
+    return etree_to_dict(root)
