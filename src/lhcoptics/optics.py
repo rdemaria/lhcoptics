@@ -37,7 +37,6 @@ from .utils import (
     deliver_list_str,
     print_diff_dict_float,
     print_diff_dict_objs,
-    read_knob_structure,
     find_comparable_values,
     round_to_close_rational,
 )
@@ -465,8 +464,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
             The name of the optics object.
         circuits : LHCCircuits or str or Path
             The circuits object or the path to the json file.
-        knob_structure : dict or str or Path
-            The knob structure or the path to the yaml file.
         variant : str
             The optics variant such as '2025' or 'hl'.
         params_mode : str
@@ -502,61 +499,6 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
         return self
 
     @classmethod
-    def from_madxfile(
-        cls,
-        filename,
-        name=None,
-        sliced=False,
-        make_model=None,
-        xsuite_model=None,
-        stdout=False,
-        verbose=False,
-        knob_structure=None,
-        variant="2025",
-    ):
-        """
-        Create an LHCOptics object from a MADX file.
-
-        Parameters
-        ----------
-        filename : str
-            The name of the MADX file.
-        name : str
-            The name of the optics object.
-        sliced : bool
-            If True, the optics will be sliced.
-        make_model : bool
-            If True, a MADX model will be created.
-        xsuite_model : bool
-            If True, an Xsuite model will be created.
-        stdout : bool
-            If True, the MADX output will be printed to stdout.
-        verbose : bool
-            If True, the MADX output will be printed to stdout.
-        knob_names : list
-            A list of knob names to be used.
-
-        Returns
-        -------
-        LHCOptics
-            The LHCOptics object.
-        """
-        madx = Madx(stdout=stdout)
-        madx.call(filename)
-        if name is None:
-            name = str(filename)
-        return cls.from_cpymad(
-            madx,
-            name=name,
-            knob_structure=knob_structure,
-            sliced=sliced,
-            make_model=make_model,
-            xsuite_model=xsuite_model,
-            verbose=verbose,
-            variant=variant,
-        )
-
-    @classmethod
     def regenerate(
         cls,
         madxfile,
@@ -585,10 +527,7 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
 
         opt = LHCOptics.from_xsuite(
             lhc,
-            knob_structure="acc-models-lhc/xsuite/knobs.yaml",
-            variant="hl",
             circuits="lhccircuits.json",
-            params_mode="from_variables",
         )
         opt.check()
         opt.check_phase_params(correct=True)

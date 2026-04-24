@@ -39,7 +39,6 @@ from .utils import (
     git_commit,
     git_push,
     unixtime_to_string,
-    read_knob_structure,
 )
 
 P_MASS = 0.938272046e9  # proton mass in eV/c2
@@ -1120,15 +1119,14 @@ call, file="acc-models-lhc/{settings_path}";
         if xsuite_model is None:
             xsuite_model = self.parent.parent.get_xsuite_model()
 
-        knob_structure = self.parent.parent.get_knob_structure()
 
         name = f"{self.parent.name}_{self.name}_{ts}"
         opt = LHCOptics.from_cpymad(
             madx=madx,
             name=name,
-            xsuite_model=xsuite_model,
-            knob_structure=knob_structure,
+            attach_model=False
         )
+        opt.set_xsuite_model(xsuite_model)
         print(f"Generating {eos_lhcoptics_path}")
         opt.to_json(eos_lhcoptics_path)
         print(f"Generating {eos_madx_optics_path}")
@@ -1212,9 +1210,10 @@ call, file="acc-models-lhc/{settings_path}";
         opt = LHCOptics.from_cpymad(
             madx=madx,
             name=name,
-            xsuite_model=xsuite_model,
-            knob_structure=self.parent.parent.get_knob_structure(),
+            attach_model=False,
         )
+        if xsuite is True:
+            opt.set_xsuite_model(xsuite_model)
         if set_params:
             opt.set_knobs_off()
             opt.set_params()
@@ -1639,11 +1638,6 @@ class LHCRepo:
 
     def get_eos_path(self):
         return Path("/eos/project-a/acc-models/public/lhc/") / self.name
-
-    def get_knob_structure(self):
-        knob_path = self.basedir / "xsuite" / "knobs.yaml"
-        if knob_path.exists():
-            return read_knob_structure(knob_path)
 
     def get_lsa_knobs(self):
         fn = self.basedir / "operation" / "knobs.txt"
