@@ -866,6 +866,15 @@ class LHCXsuiteModel:
                 print(f" - {dependency}")
             raise ValueError(f"Knob {knobname} still has dependencies after deletion")
 
+    def delete_expressions_from_knobs(self, knobs,verbose=False):
+        for knob in knobs:
+            if verbose:
+                print(f"Deleting expressions from targets of knob {knob.name}")
+            for wtarget in knob.weights.keys():
+                if verbose:
+                    print(f" Deleting expression in {wtarget}")
+                self.ref[wtarget]=self[wtarget]
+
     def diff(self, other):
         all_keys = set(self._var_values.keys()) | set(other._var_values.keys())
         for key in all_keys:

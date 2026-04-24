@@ -432,6 +432,8 @@ kb.a81             := ab.a81/l.mb*(1+e_kb);
                     if verbose:
                         print(f"Converting MADX model to Xsuite model")
                     model = LHCXsuiteModel.from_cpymad(model.madx)
+                    # this model may have knobs that cannot be deleted cleanly. It needs to be sanitized before being attached to the optics, otherwise it may cause issues when trying to delete the knobs later on.
+                    model.delete_expression_from_knob(knobs.values(), verbose=verbose)
                 if verbose:
                     print(f"Attaching Xsuite model")
                 opt.set_xsuite_model(model, verbose=verbose)
